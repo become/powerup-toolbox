@@ -91,8 +91,8 @@ hdiutil create \
 rm -rf "$BUILD_TMP"
 
 echo "📡 [6/6] 更新 GitHub 部署版本清單 (dist/version.json & latest 軟連結)..."
-ln -sf "MacToolbox-${VERSION}.dmg" "$DIST_DIR/MacToolbox-latest.dmg"
-ln -sf "MacToolbox-${VERSION}-Installer.pkg" "$DIST_DIR/MacToolbox-latest.pkg"
+cp -f "MacToolbox-${VERSION}.dmg" "$DIST_DIR/MacToolbox-latest.dmg"
+cp -f "MacToolbox-${VERSION}-Installer.pkg" "$DIST_DIR/MacToolbox-latest.pkg"
 
 cat << EOF > "$DIST_DIR/version.json"
 {
