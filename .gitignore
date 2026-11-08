@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# OS & Temp
+.DS_Store
+.cache/
+captures/
+*.tmp
+*.bak*
+
+# Ignore temporary local builds if needed
+.build/
+EOF

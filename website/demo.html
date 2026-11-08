@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PowerUp Toolbox · 萬用檔案極速檢視線上體驗 (多格式混合與極速切換)</title>
+  <meta name="description" content="在瀏覽器中直接試玩 PowerUp Toolbox：多圖片、多格式混合檔案極速切換 (←/→/滾輪)、JSON 樹狀格狀、Markdown 雙欄排版、CSV 統計分析。" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --bg-0: #070a12;
+      --bg-1: #0d121f;
+      --bg-2: #141c2e;
+      --bg-3: #1e293b;
+      --border: rgba(255, 255, 255, 0.09);
+      --border-bright: rgba(59, 130, 246, 0.4);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --purple: #8b5cf6;
+      --rose: #f43f5e;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100vw; height: 100vh;
+      background: var(--bg-0);
+      color: var(--text);
+      font-family: var(--font);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* Top Web Demo Announcement Banner */
+    .demo-banner {
+      height: 32px;
+      box-sizing: border-box;
+      background: linear-gradient(90deg, #1e1b4b 0%, #1e293b 50%, #1e1b4b 100%);
+      border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #cbd5e1;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+    .demo-banner a {
+      color: #93c5fd;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .demo-banner-btn {
+      background: #2563eb;
+      color: #fff !important;
+      padding: 3px 10px;
+      border-radius: 6px;
+      margin-left: 8px;
+      transition: background 0.15s;
+    }
+    .demo-banner-btn:hover { background: #1d4ed8; }
+
+    /* App Shell */
+    .app-root {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    /* Topbar */
+    .topbar {
+      height: 48px;
+      background: var(--bg-1);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .topbar-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+      overflow-x: auto;
+    }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .mode-pill {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: #60a5fa;
+      font-weight: 600;
+    }
+
+    /* Navigation HUD in Topbar */
+    .nav-hud {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 11.5px;
+      font-family: var(--mono);
+      color: #fdba74;
+      font-weight: 600;
+    }
+    .nav-arrow-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 0 4px;
+      font-size: 12px;
+    }
+    .nav-arrow-btn:hover { color: #fff; }
+
+    /* Buttons */
+    .btn {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 10px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--bg-3); border-color: rgba(255, 255, 255, 0.2); }
+    .btn.active {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: #3b82f6;
+      color: #93c5fd;
+    }
+    .btn.primary { background: #2563eb; color: #fff; border-color: #3b82f6; }
+    .btn.primary:hover { background: #1d4ed8; }
+    .btn.emerald { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #6ee7b7; }
+    .btn.emerald:hover { background: rgba(16, 185, 129, 0.25); color: #fff; }
+    .btn.amber { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.35); color: #fcd34d; }
+    .btn.purple { background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.35); color: #c4b5fd; }
+    .btn-group {
+      display: inline-flex;
+      background: var(--bg-2);
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      padding: 2px;
+    }
+    .btn-group .btn {
+      background: transparent;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 5px;
+    }
+    .btn-group .btn.active {
+      background: rgba(59, 130, 246, 0.25);
+      color: #93c5fd;
+    }
+
+    .path-input {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+    }
+    .path-input:focus { border-color: #3b82f6; }
+    .kbd {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: #94a3b8;
+    }
+
+    /* Workspace */
+    .workspace {
+      display: flex;
+      flex: 1;
+      height: calc(100% - 48px);
+      overflow: hidden;
+    }
+
+    /* Left Sidebar: File List & Category Filter */
+    .sidebar-left {
+      width: 250px;
+      background: var(--bg-1);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .filter-tabs-row {
+      display: flex;
+      padding: 8px;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .cat-btn {
+      padding: 3px 7px;
+      border-radius: 5px;
+      font-size: 11px;
+      background: var(--bg-2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .cat-btn:hover { color: #fff; }
+    .cat-btn.active {
+      background: #2563eb;
+      color: #fff;
+      border-color: #3b82f6;
+    }
+
+    .search-box {
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-box input {
+      width: 100%;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      outline: none;
+    }
+
+    .file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .file-item {
+      padding: 6px 9px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .file-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+    .file-item.active {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      font-weight: 600;
+      border-left: 2px solid #3b82f6;
+    }
+    .file-item-badge {
+      font-size: 10px;
+      margin-left: auto;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    /* Center Stage Area */
+    .stage-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-0);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Sub-bar / Stage HUD */
+    .stage-subbar {
+      background: rgba(13, 18, 31, 0.7);
+      border-bottom: 1px solid var(--border);
+      padding: 5px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11.5px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    /* Photo Stage */
+    .photo-stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle, #151d2e 0%, #070a12 85%);
+      cursor: grab;
+      padding: 16px;
+    }
+    .photo-stage-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 100%;
+      max-height: 100%;
+      line-height: 0;
+    }
+    .photo-stage-wrapper img {
+      max-width: calc(100vw - 560px);
+      max-height: calc(100vh - 220px);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+      transition: transform 0.12s ease;
+      display: block;
+    }
+
+    /* Grid View Stage (Thumbnail Wall) */
+    .grid-view-stage {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: none;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      align-content: start;
+    }
+    .grid-card {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .grid-card:hover {
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+    .grid-card.active {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+    }
+    .grid-card-thumb {
+      width: 100%;
+      height: 120px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+    }
+
+    /* Bottom Filmstrip */
+    .filmstrip {
+      height: 64px;
+      background: var(--bg-1);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+    .filmstrip-thumb {
+      width: 50px;
+      height: 50px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: var(--bg-2);
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      opacity: 0.65;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .filmstrip-thumb:hover { opacity: 0.95; }
+    .filmstrip-thumb.active {
+      border-color: #3b82f6;
+      opacity: 1;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Markdown Stage */
+    .md-stage {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    .md-pane {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 36px;
+      background: #0d1117;
+      color: #e6edf3;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+    .md-pane h1, .md-pane h2, .md-pane h3 {
+      color: #fff;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .md-pane pre {
+      background: #161b22;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      overflow-x: auto;
+      margin: 14px 0;
+    }
+    .md-pane table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    .md-pane th, .md-pane td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .md-pane th { background: rgba(255, 255, 255, 0.05); }
+    .md-editor-pane {
+      flex: 1;
+      background: #080c14;
+      border-right: 1px solid var(--border);
+      display: none;
+      flex-direction: column;
+    }
+    .md-textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #f1f5f9;
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 20px;
+      outline: none;
+      resize: none;
+      line-height: 1.6;
+    }
+
+    /* JSON Stage */
+    .json-stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .json-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+    }
+    .json-grid-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .json-grid-table th {
+      background: #111827;
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 11px;
+      color: #94a3b8;
+      border-bottom: 1px solid var(--border);
+    }
+    .json-grid-table td {
+      padding: 6px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .json-grid-row:hover { background: rgba(59, 130, 246, 0.08); }
+    .json-pill {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .pill-obj { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .pill-arr { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
+    .pill-str { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .pill-num { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .pill-bool { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+
+    /* CSV Stage */
+    .csv-stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .csv-body {
+      flex: 1;
+      overflow: auto;
+    }
+    .csv-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .csv-table th {
+      background: #111827;
+      position: sticky;
+      top: 0;
+      padding: 9px 12px;
+      text-align: left;
+      color: #93c5fd;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+    }
+    .csv-table th:hover { background: #1e293b; }
+    .csv-table td {
+      padding: 7px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      border-right: 1px solid rgba(255, 255, 255, 0.04);
+      color: #cbd5e1;
+    }
+    .csv-table tr:hover { background: rgba(59, 130, 246, 0.08); }
+    .csv-table tr.selected { background: rgba(59, 130, 246, 0.18); color: #fff; }
+
+    /* Right Adaptive Sidebar */
+    .sidebar-right {
+      width: 310px;
+      background: var(--bg-1);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+    .tool-card {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .tool-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(50px);
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity: 0;
+      z-index: 1000;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Web Demo Announcement Banner -->
+  <div class="demo-banner">
+    <div>
+      <span>⚡ <strong>PowerUp Toolbox Web Live Demo</strong> · 支援鍵盤 <span class="kbd">←</span> <span class="kbd">→</span> 方向鍵與滑鼠滾輪<strong>極速切換檔案</strong>！所有操作完全在您的瀏覽器端毫秒執行</span>
+    </div>
+    <div style="display:flex; align-items:center;">
+      <a href="index.html">← 返回官網介紹</a>
+      <a href="assets/MacToolbox-2.6.dmg" class="demo-banner-btn" download> 下載 macOS 原生版</a>
+    </div>
+  </div>
+
+  <div class="app-root">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="index.html" class="brand-title" style="text-decoration:none;">
+          <img src="assets/app_icon.png" alt="Logo" style="width:24px; height:24px; border-radius:6px; box-shadow:0 0 10px rgba(245, 158, 11, 0.4);" />
+          <span>PowerUp Toolbox</span>
+        </a>
+        <span class="mode-pill" id="fileModeBadge">🖼️ 圖片模式</span>
+        <!-- Unified Rapid Navigation HUD -->
+        <div class="nav-hud">
+          <button class="nav-arrow-btn" onclick="stepFile(-1)" title="上一檔 (← / ↑)">◀</button>
+          <span id="navCounter">1 / 14</span>
+          <button class="nav-arrow-btn" onclick="stepFile(1)" title="下一檔 (→ / ↓)">▶</button>
+        </div>
+      </div>
+
+      <div class="topbar-center">
+        <!-- Photo Controls -->
+        <div id="photoTopControls" style="display:flex; align-items:center; gap:6px;">
+          <div class="btn-group">
+            <button class="btn active" id="btnPhotoSingle" onclick="setPhotoViewMode('single')">🖼️ 單圖</button>
+            <button class="btn" id="btnPhotoGrid" onclick="setPhotoViewMode('grid')">🎛️ 縮圖牆</button>
+          </div>
+          <button class="btn" onclick="resetPhotoFit()">📐 適應視窗 <span class="kbd">W</span></button>
+          <button class="btn" onclick="zoomPhoto(1.25)">🔍 放大</button>
+          <button class="btn" onclick="zoomPhoto(0.8)">🔍 縮小</button>
+        </div>
+
+        <!-- JSON Controls (jsoneditor style) -->
+        <div id="jsonTopControls" style="display:none; align-items:center; gap:6px;">
+          <div class="btn-group jsoneditor-modes">
+            <button class="btn active" id="btnJsonCode" onclick="setJsonMode('code')">📄 Text</button>
+            <button class="btn" id="btnJsonTree" onclick="setJsonMode('tree')">🌲 Tree</button>
+            <button class="btn" id="btnJsonGrid" onclick="setJsonMode('grid')">🗂️ Grid</button>
+            <button class="btn" id="btnJsonTable" onclick="setJsonMode('table')">📊 Table</button>
+          </div>
+          <div class="btn-group">
+            <button class="btn" onclick="demoExpandAllJson()" title="全部展開 (Expand All)">⬇️ 展開</button>
+            <button class="btn" onclick="demoCollapseAllJson()" title="全部收合 (Collapse All)">⬆️ 收合</button>
+            <button class="btn amber" onclick="demoFormatJson()" title="排版美化 (Format 2格縮排)">✨ 排版</button>
+            <button class="btn" onclick="demoCompactJson()" title="單行壓縮 (Compact)">📦 壓縮</button>
+            <button class="btn" onclick="demoSortKeysJson()" title="Key 依 A-Z 字母排序">🔤 排序</button>
+          </div>
+          <button class="btn emerald" onclick="openScratchpadDemo()">📋 貼上整理</button>
+        </div>
+
+        <!-- Markdown Controls -->
+        <div id="mdTopControls" style="display:none; align-items:center; gap:6px;">
+          <div class="btn-group">
+            <button class="btn active" id="btnMdRead" onclick="setMdSplit(false)">📖 閱讀</button>
+            <button class="btn" id="btnMdSplit" onclick="setMdSplit(true)">✏️ 雙欄編輯 <span class="kbd">⌘E</span></button>
+          </div>
+          <button class="btn emerald" onclick="copyMdRich()">📋 複製富文本</button>
+        </div>
+
+        <!-- CSV Controls -->
+        <div id="csvTopControls" style="display:none; align-items:center; gap:6px;">
+          <input id="csvSearch" class="path-input" style="width:160px;" placeholder="🔎 搜尋表格內容..." oninput="onCsvSearch()" />
+          <button class="btn" onclick="addMockRow()">➕ 新增一列</button>
+          <button class="btn emerald" onclick="copyCsvMd()">📋 轉 MD</button>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button class="btn" onclick="toggleDemoLanguage()" id="demoLangBtn" title="切換語言 / Switch Language" style="border:1px solid rgba(255,255,255,0.18);">
+          <span>🌐</span><span id="demoLangLabel"> EN</span>
+        </button>
+        <button class="btn purple" onclick="openScratchpadDemo()" title="開啟暫存工作台 (⌘N)">
+          <span id="demoScratchLabel">📝 暫存</span>
+        </button>
+        <button class="btn primary" onclick="toast(demoCurrentLang === 'en' ? '💾 In Native Desktop edition, changes are saved directly to file!' : '💾 在本機原生版中已直接儲存回原檔案！')"><span id="demoSaveLabel">💾 儲存</span></button>
+        <button class="btn" onclick="toggleSidebarRight()"><span id="demoPanelLabel">◧ 面板</span></button>
+      </div>
+    </header>
+
+    <!-- Workspace -->
+    <div class="workspace">
+      <!-- Left Sidebar: Multi-Format File Tree -->
+      <aside class="sidebar-left">
+        <!-- Quick Category Filter Pills -->
+        <div class="filter-tabs-row">
+          <button class="cat-btn active" onclick="setFilterCat('all', this)">全部 14</button>
+          <button class="cat-btn" onclick="setFilterCat('image', this)">圖 5</button>
+          <button class="cat-btn" onclick="setFilterCat('json', this)">JSON 3</button>
+          <button class="cat-btn" onclick="setFilterCat('csv', this)">CSV 2</button>
+          <button class="cat-btn" onclick="setFilterCat('md', this)">MD 2</button>
+          <button class="cat-btn" onclick="setFilterCat('office', this)">簡報 2</button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-box">
+          <input type="text" id="fileFilterInput" placeholder="🔎 篩選檔名關鍵字..." oninput="filterFilesList()" />
+        </div>
+
+        <!-- File List -->
+        <div class="file-list" id="filesListEl"></div>
+
+        <div style="padding:10px 12px; margin-top:auto; border-top:1px solid var(--border); font-size:11px; color:var(--muted); line-height:1.4;">
+          ⚡ <strong>快速切換教學</strong>：<br>
+          直接按鍵盤 <span class="kbd">←</span> <span class="kbd">→</span> 方向鍵，或在畫面滾動滑鼠滾輪，即可 0 延遲秒切檔案！
+        </div>
+      </aside>
+
+      <!-- Center Stage Area -->
+      <main class="stage-container" id="stageMain">
+        <!-- Status Sub-bar -->
+        <div class="stage-subbar">
+          <span>📍 <strong id="stageFileName" style="color:#fff;">TravelPhotos [3,482 張海量相簿 · 縮圖網格]</strong></span>
+          <span id="stageFileInfo">1870 × 841 px · 3,482 檔</span>
+          <span style="margin-left:auto;">切換檔案：<span class="kbd">←</span> <span class="kbd">→</span> / 滾輪 · 適應視窗：<span class="kbd">W</span></span>
+        </div>
+
+        <!-- 1. Photo Single Stage -->
+        <div class="photo-stage" id="stagePhoto" onwheel="onStageWheel(event)">
+          <div class="photo-stage-wrapper" id="photoStageWrapper">
+            <img id="photoImg" src="assets/image_browse_grid.jpg" alt="Demo Image" onload="syncDemoFaceBoxesBounds()" />
+            <div id="demoFaceBoxesContainer" style="position:absolute; inset:0; pointer-events:none;"></div>
+          </div>
+        </div>
+
+        <!-- 2. Grid View Stage (Thumbnail Wall) -->
+        <div class="grid-view-stage" id="stageGrid"></div>
+
+        <!-- 3. JSON Stage -->
+        <div class="json-stage" id="stageJson" style="display:none;">
+          <div style="background:var(--bg-1); padding:6px 14px; border-bottom:1px solid var(--border); font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;">
+            <span>📍 節點路徑：</span>
+            <span id="jsonPathBar" style="color:#60a5fa; font-family:var(--mono);">$</span>
+            <button class="btn" style="padding:2px 6px; font-size:11px;" onclick="copyJsonPath()">複製路徑</button>
+          </div>
+          <div class="json-body" id="jsonBodyContainer"></div>
+        </div>
+
+        <!-- 4. Markdown Stage -->
+        <div class="md-stage" id="stageMd" style="display:none;">
+          <div class="md-editor-pane" id="mdEditorPane">
+            <textarea id="mdTextarea" class="md-textarea" oninput="renderMdPreview()"></textarea>
+          </div>
+          <div class="md-pane" id="mdRendered"></div>
+        </div>
+
+        <!-- 5. CSV Stage -->
+        <div class="csv-stage" id="stageCsv" style="display:none;">
+          <div class="csv-body">
+            <table class="csv-table" id="csvTableEl"></table>
+          </div>
+        </div>
+
+        <!-- Bottom Filmstrip -->
+        <div class="filmstrip" id="filmstripEl"></div>
+      </main>
+
+      <!-- Right Adaptive Sidebar -->
+      <aside class="sidebar-right" id="sidebarRight">
+        <!-- Photo Context -->
+        <div id="photoRightCard">
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>📐 畫面縮放與檢視</span>
+              <span class="kbd">W / 1</span>
+            </div>
+            <div class="grid-3">
+              <button class="btn active" onclick="resetPhotoFit()">適應視窗</button>
+              <button class="btn" onclick="toast('適寬顯示模式')">↔️ 適寬</button>
+              <button class="btn" onclick="zoomPhoto(1.5)">1:1 原寸</button>
+            </div>
+            <button class="btn" style="width:100%; justify-content:center;" onclick="toast('🔍 局部放大鏡模式：滑鼠移入圖片即可放大檢視細節')">🔍 局部放大鏡檢視</button>
+          </div>
+
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>✂️ 裁切、旋轉與剪貼簿</span>
+              <span class="kbd">⌘C 直貼</span>
+            </div>
+            <div class="grid-3">
+              <button class="btn active" onclick="toast('自由裁切模式')">自由</button>
+              <button class="btn" onclick="toast('3:4 證件比例')">3:4 證件</button>
+              <button class="btn" onclick="toast('1:1 正方比例')">1:1 正方</button>
+            </div>
+            <div class="grid-2">
+              <button class="btn primary" onclick="toast('📋 已複製目前畫面至 Mac 剪貼簿 (⌘C)！')">📋 複製畫面</button>
+              <button class="btn" onclick="rotatePhoto(90)">↻ 右轉 90°</button>
+            </div>
+          </div>
+
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>🎯 AI 人臉偵測與導覽</span>
+              <span class="kbd">快捷鍵 F</span>
+            </div>
+            <div class="grid-2">
+              <button class="btn emerald" id="btnDemoDetectFace" onclick="toggleDemoFaceDetection()">🟢 偵測人臉 (F)</button>
+              <button class="btn" onclick="toast('➡️ 已自動聚焦神像萌顏！')">下張臉 (Tab)</button>
+            </div>
+          </div>
+
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>✨ 本地 AI 修復強化</span>
+              <span class="kbd">MPS GPU</span>
+            </div>
+            <div class="grid-2">
+              <button class="btn primary" onclick="toast('✨ GFPGAN 人臉修復完成！')">✨ GFPGAN 修臉</button>
+              <button class="btn purple" onclick="toast('✂️ Apple Vision 一鍵去背複製透明 PNG！')">✂️ 一鍵去背</button>
+              <button class="btn emerald" onclick="toast('🔤 繁中/英文 OCR 辨識完成！文字已複製')">🔤 OCR 辨識</button>
+              <button class="btn" onclick="toast('🔍 4x 超解析度放大完成！')">🔍 4x 超解析</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- JSON Context -->
+        <div id="jsonRightCard" style="display:none;">
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>🌳 展開層級與篩選</span>
+            </div>
+            <div class="grid-2">
+              <button class="btn" onclick="toast('✨ 已展開全部層級')">全部展開</button>
+              <button class="btn" onclick="toast('✨ 已收合至 1 層')">1層</button>
+            </div>
+            <input class="path-input" placeholder="🔎 搜尋鍵名、字串..." oninput="filterJsonDemo(this.value)" />
+          </div>
+
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>🪄 語法修復與排版</span>
+            </div>
+            <div class="grid-2">
+              <button class="btn emerald" onclick="toast('✨ 已排版美化 JSON！')">✨ 排版美化</button>
+              <button class="btn" onclick="toast('📦 已壓縮為單行 JSON！')">📦 單行壓縮</button>
+              <button class="btn amber" onclick="toast('🪄 語法自動修復成功！(單引號與尾逗號已轉正規)')">🪄 語法修復</button>
+              <button class="btn" onclick="toast('🔤 Keys 已依 A-Z 字母順序排序完成！')">🔤 排序 Keys</button>
+            </div>
+            <button class="btn primary" style="width:100%; justify-content:center; margin-top:2px;" onclick="toast('📋 已複製完整 JSON 原始碼！')">📋 複製完整 JSON</button>
+          </div>
+
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>🔍 節點 Inspector</span>
+            </div>
+            <div style="font-size:11px; color:var(--muted);">當前選取節點：</div>
+            <div id="inspNodeView" style="font-size:11px; font-family:var(--mono); color:#cbd5e1; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; max-height:160px; overflow:auto;">
+              （點選左側表格任一行檢視）
+            </div>
+          </div>
+        </div>
+
+        <!-- Markdown Context -->
+        <div id="mdRightCard" style="display:none;">
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>🎨 閱讀偏好設定</span>
+            </div>
+            <div class="grid-3">
+              <button class="btn active" onclick="setMdTheme('dark')">🌙 深色</button>
+              <button class="btn" onclick="setMdTheme('light')">☀️ 淺色</button>
+              <button class="btn" onclick="setMdTheme('sepia')">📜 羊皮紙</button>
+            </div>
+          </div>
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>📑 章節大綱 (TOC)</span>
+            </div>
+            <div id="mdTocList" style="display:flex; flex-direction:column; gap:4px; font-size:12px; max-height:360px; overflow-y:auto;"></div>
+          </div>
+        </div>
+
+        <!-- CSV Context -->
+        <div id="csvRightCard" style="display:none;">
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>📊 欄位分析 (Column Profiler)</span>
+              <span class="kbd" id="csvColBadge">繳費金額</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11px; color:#cbd5e1;">
+              <div>總筆數: <strong style="color:#fff;">10</strong></div>
+              <div>加總 (Sum): <strong style="color:#34d399;">$25,000</strong></div>
+              <div>平均 (Avg): <strong style="color:#60a5fa;">$2,500</strong></div>
+              <div>不重複: <strong style="color:#fbbf24;">4 種</strong></div>
+            </div>
+            <div style="font-size:11px; color:var(--muted); margin-top:4px;">值分佈排行（點擊可一鍵篩選）：</div>
+            <div style="display:flex; flex-direction:column; gap:4px; font-size:11.5px;">
+              <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="filterCsvVal('2500')">
+                <span>2500</span><span style="color:#60a5fa;">7 筆 (70%)</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="filterCsvVal('0')">
+                <span>0</span><span style="color:#60a5fa;">2 筆 (20%)</span>
+              </div>
+            </div>
+          </div>
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>📋 表格操作與匯出</span>
+            </div>
+            <div class="grid-2">
+              <button class="btn" onclick="addMockRow()">➕ 新增一列</button>
+              <button class="btn emerald" onclick="copyCsvMd()">📋 轉 Markdown</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Office / PDF Context -->
+        <div id="officeRightCard" style="display:none;">
+          <div class="tool-card">
+            <div class="tool-header">
+              <span>🪄 簡報 / PDF 快捷工具</span>
+            </div>
+            <button class="btn emerald" style="width:100%; justify-content:center;" onclick="toast('📋 已複製本頁投影片內文與標題！')">📋 複製本頁文字</button>
+            <button class="btn amber" style="width:100%; justify-content:center; margin-top:4px;" onclick="toast('📋 已將整份簡報轉換為 Markdown 大綱！')">📋 轉全簡報 Markdown</button>
+            <button class="btn purple" style="width:100%; justify-content:center; margin-top:4px;" onclick="toast('✂️ 已將此頁高畫質渲染送入圖片工坊！')">✂️ 送入圖片工坊裁切/去背</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    /* =========================================================
+       14 Mixed Sample Files (Images, JSON, CSV, MD, Office)
+       ========================================================= */
+    const MOCK_FILES = [
+      {
+        id: "photo_grid",
+        name: "TravelPhotos [3,482 張海量相簿 · 縮圖網格]",
+        type: "image",
+        size: "3,482 檔",
+        dim: "1870 × 841 px",
+        icon: "🗂️",
+        src: "assets/image_browse_grid.jpg",
+        faces: []
+      },
+      {
+        id: "photo_single",
+        name: "Tokyo_Sakura_001.jpg [6048×4032 24.4MP 4K 原寸]",
+        type: "image",
+        size: "12.6 MB",
+        dim: "6048 × 4032 px",
+        icon: "🖼️",
+        src: "assets/image_browse_single.jpg",
+        faces: []
+      },
+      {
+        id: "photo_02",
+        name: "photo_02_portrait.jpg",
+        type: "image",
+        size: "1.8 MB",
+        dim: "1024 × 1024 px",
+        icon: "🖼️",
+        src: "assets/samples/photo_02_portrait.jpg",
+        faces: [{ x: 27.7, y: 28.7, w: 45.3, h: 45.3, label: "Apple Vision 99.8%" }]
+      },
+      {
+        id: "photo_03",
+        name: "photo_03_street.jpg",
+        type: "image",
+        size: "2.4 MB",
+        dim: "1376 × 768 px",
+        icon: "🖼️",
+        src: "assets/samples/photo_03_street.jpg",
+        faces: []
+      },
+      {
+        id: "json_01",
+        name: "data.json",
+        type: "json",
+        size: "1.4 KB",
+        dim: "42 行 · 4 層",
+        icon: "🧩",
+        data: {
+          "product": "PowerUp Toolbox",
+          "ecosystem": "powerup.dancingarden.com",
+          "version": "1.0.0",
+          "features": [
+            "viewer",
+            "json",
+            "markdown",
+            "excel",
+            "ai_restore"
+          ],
+          "performance": {
+            "startup_time": "0s",
+            "gpu_accelerated": true,
+            "hotkey_switch": true
+          }
+        }
+      },
+      {
+        id: "md_01",
+        name: "README.md",
+        type: "md",
+        size: "3.4 KB",
+        dim: "51 行 · 8 節",
+        icon: "📝",
+        content: `# 🧰 PowerUp Toolbox — 全能極速萬用檔案檢視器
+
+> [!TIP]
+> 歡迎使用 **PowerUp Toolbox 線上即時展示版**！此網頁運行完整純前端排版引擎，點擊頂部「✏️ 雙欄編輯」可即時修改並即時同步預覽。
+
+---
+
+## ⚡ 核心設計特點
+* **0 秒冷啟動**：告別肥重 IDE 與慢速 Office，毫秒解析各類代碼與數據檔案。
+* **智慧自適應工作台**：根據開啟的檔案自適應切換專屬功能面板。
+* **極速檔案切換**：方向鍵 \`←\` / \`→\` 或滑鼠滾輪快速連滾翻頁，零卡頓。
+* **跨平台生態**：PowerUp 家族旗艦產品，支援 macOS 原生硬體加速與 Windows 版本。
+
+---
+
+## 📊 支援檔案格式
+| 模式 | 支援副檔名 | 專屬強大工具 |
+| :--- | :--- | :--- |
+| **圖片模式** | \`.jpg, .png, .webp, .heic, .svg\` | Fit to Window (W)、拖曳拉框 ⌘C 剪貼簿、Vision 去背/OCR |
+| **Markdown** | \`.md, .markdown, .mdx\` | 自動 TOC 章節目錄、三種主題切換、一鍵複製富文本 |
+| **JSON / XML**| \`.json, .jsonl, .xml\` | 階層格狀雙欄檢視、自動語法修復、Keys A-Z 排序 |
+| **CSV / Excel** | \`.csv, .tsv, .xlsx\` | 欄位統計分析 (Sum/Avg)、排行直條篩選、轉 MD/JSON |
+
+---
+
+> © 2026 PowerUp. 家族旗艦工具 · [探索更多系列工具](https://powerup.dancingarden.com)`
+      },
+      {
+        id: "csv_01",
+        name: "report.csv",
+        type: "csv",
+        size: "815 B",
+        dim: "11 列 × 7 欄",
+        icon: "📊",
+        rows: [
+          ["月份", "使用次數", "處理檔案數", "成長率", "備註"],
+          ["2026-06", "12,480", "156,200", "+18.4%", "首發公測版上線"],
+          ["2026-07", "14,930", "188,730", "+19.6%", "新增 Apple Vision 支援"],
+          ["2026-08", "17,520", "223,410", "+17.4%", "新增 Windows 雙平台版本"],
+          ["2026-09", "21,800", "289,500", "+24.4%", "支援百萬行大檔案秒開"],
+          ["2026-10", "26,400", "351,200", "+21.1%", "AI 人臉去背與修復上線"]
+        ]
+      },
+      {
+        id: "god_02",
+        name: "god02_guanyu.png",
+        type: "image",
+        size: "2.7 MB",
+        dim: "1214 × 1295 px",
+        icon: "🖼️",
+        src: "assets/samples/god02.png",
+        faces: [{ x: 41, y: 32, w: 18, h: 20, label: "關聖帝君 99.1%" }]
+      },
+      {
+        id: "god_03",
+        name: "god03_wealth.png",
+        type: "image",
+        size: "2.5 MB",
+        dim: "1214 × 1295 px",
+        icon: "🖼️",
+        src: "assets/samples/god03.png",
+        faces: [{ x: 43, y: 34, w: 15, h: 17, label: "武財神 98.8%" }]
+      },
+      {
+        id: "god_04",
+        name: "god04_guanyin.png",
+        type: "image",
+        size: "2.5 MB",
+        dim: "1214 × 1295 px",
+        icon: "🖼️",
+        src: "assets/samples/god04.png",
+        faces: [{ x: 42, y: 33, w: 16, h: 18, label: "觀音菩薩 99.6%" }]
+      },
+      {
+        id: "god_05",
+        name: "god05_pantheon.png",
+        type: "image",
+        size: "2.4 MB",
+        dim: "1214 × 1295 px",
+        icon: "🖼️",
+        src: "assets/samples/god05.png",
+        faces: [{ x: 44, y: 36, w: 14, h: 16, label: "萬神福澤 99.2%" }]
+      },
+      {
+        id: "json_01",
+        name: "config_manifest.json",
+        type: "json",
+        size: "1.4 KB",
+        dim: "42 行 · 4 層",
+        icon: "🧩",
+        data: {
+          "app": "PowerUp Toolbox",
+          "ecosystem": "powerup.dancingarden.com",
+          "version": "2.6.0",
+          "description": "全能極速萬用檔案檢視工作台 — 支援 macOS & Windows 跨平台",
+          "supported_modes": [
+            { "mode": "image", "extensions": [".jpg", ".png", ".webp", ".heic"], "gpu_accelerated": true },
+            { "mode": "markdown", "extensions": [".md", ".markdown"], "live_toc": true },
+            { "mode": "json", "extensions": [".json", ".jsonl"], "grid_editor": true },
+            { "mode": "csv", "extensions": [".csv", ".xlsx"], "column_profiler": true }
+          ],
+          "shortcuts": {
+            "quick_switch": "← / → / 滾輪",
+            "fit_window": "W",
+            "scratchpad": "⌘N",
+            "save": "⌘S",
+            "copy": "⌘C"
+          }
+        }
+      },
+      {
+        id: "json_02",
+        name: "users_api_response.json",
+        type: "json",
+        size: "3.2 KB",
+        dim: "85 行 · 20 筆",
+        icon: "🧩",
+        data: {
+          "status": 200,
+          "message": "success",
+          "total_count": 20,
+          "data": [
+            { "id": 101, "name": "Alice Lin", "role": "Architect", "active": true, "score": 98.5 },
+            { "id": 102, "name": "Bob Chen", "role": "Fullstack Dev", "active": true, "score": 92.0 },
+            { "id": 103, "name": "Charlie Wang", "role": "Product Lead", "active": false, "score": 87.4 },
+            { "id": 104, "name": "Diana Chang", "role": "UI/UX Designer", "active": true, "score": 96.0 }
+          ]
+        }
+      },
+      {
+        id: "json_03",
+        name: "app_settings.json",
+        type: "json",
+        size: "820 B",
+        dim: "24 行",
+        icon: "🧩",
+        data: {
+          "theme": "dark",
+          "editor": {
+            "tabSize": 2,
+            "wordWrap": true,
+            "minimap": false
+          },
+          "telemetry": false,
+          "cacheSizeMB": 512
+        }
+      },
+      {
+        id: "csv_01",
+        name: "graduates_finance.csv",
+        type: "csv",
+        size: "815 B",
+        dim: "11 列 × 7 欄",
+        icon: "📊",
+        rows: [
+          ["學號", "班級", "姓名", "出席狀態", "繳費金額", "照片狀態", "備註"],
+          ["8530101", "301", "王大同", "已報名已付款", "2500", "已上傳", "素食桌"],
+          ["8530102", "301", "林美玲", "已報名已付款", "2500", "已上傳", "攜眷1位"],
+          ["8530205", "302", "丁彥仁", "已報名已付款", "2500", "AI修復完成", "選用 GA-S2"],
+          ["8530208", "302", "劉明峰", "已報名未付款", "0", "AI修復完成", "待確認匯款後五碼"],
+          ["8530312", "303", "張志豪", "已報名已付款", "5000", "已上傳", "贊助摸彩獎品"],
+          ["8530504", "305", "陳怡君", "已報名已付款", "2500", "未上傳", "已提醒補傳生活照"],
+          ["8530619", "306", "黃家祥", "已報名已付款", "2500", "AI修復完成", "選用 GM-S3"],
+          ["8530811", "308", "吳趙仁", "已報名未付款", "0", "未上傳", "海外返台參加"],
+          ["8531002", "310", "蔡昌佑", "已報名已付款", "3000", "已上傳", "含紀念T恤加購"],
+          ["8531215", "312", "周杰倫", "已報名已付款", "2500", "AI修復完成", "上台致詞代表"]
+        ]
+      },
+      {
+        id: "csv_02",
+        name: "q3_sales_performance.csv",
+        type: "csv",
+        size: "620 B",
+        dim: "6 列 × 5 欄",
+        icon: "📊",
+        rows: [
+          ["業務姓名", "負責區域", "Q3銷售額", "達成率", "評級"],
+          ["李志成", "台北信義區", "$1,450,000", "128%", "A+"],
+          ["陳俊傑", "台中西屯區", "$980,000", "102%", "A"],
+          ["林雅婷", "高雄苓雅區", "$1,120,000", "115%", "A+"],
+          ["黃建華", "新竹東區", "$860,000", "94%", "B"],
+          ["趙佩君", "桃園中壢區", "$1,280,000", "121%", "A+"]
+        ]
+      },
+      {
+        id: "md_01",
+        name: "README.md",
+        type: "md",
+        size: "3.4 KB",
+        dim: "51 行 · 8 節",
+        icon: "📝",
+        content: `# 🧰 PowerUp Toolbox — 全能極速萬用檔案檢視器
+
+> [!TIP]
+> 歡迎使用 **PowerUp Toolbox 線上即時展示版**！此網頁運行完整純前端排版引擎，點擊頂部「✏️ 雙欄編輯」可即時修改並即時同步預覽。
+
+---
+
+## ⚡ 核心設計特點
+* **0 秒冷啟動**：告別肥重 IDE 與慢速 Office，毫秒解析各類代碼與數據檔案。
+* **智慧自適應工作台**：根據開啟的檔案自適應切換專屬功能面板。
+* **極速檔案切換**：方向鍵 \`←\` / \`→\` 或滑鼠滾輪快速連滾翻頁，零卡頓。
+* **跨平台生態**：PowerUp 家族旗艦產品，支援 macOS 原生硬體加速與即將推出的 Windows 版本。
+
+---
+
+## 📊 支援檔案格式
+| 模式 | 支援副檔名 | 專屬強大工具 |
+| :--- | :--- | :--- |
+| **圖片模式** | \`.jpg, .png, .webp, .heic, .svg\` | Fit to Window (W)、拖曳拉框 ⌘C 剪貼簿、Vision 去背/OCR |
+| **Markdown** | \`.md, .markdown, .mdx\` | 自動 TOC 章節目錄、三種主題切換、一鍵複製富文本 |
+| **JSON / XML**| \`.json, .jsonl, .xml\` | 階層格狀雙欄檢視、自動語法修復、Keys A-Z 排序 |
+| **CSV / Excel** | \`.csv, .tsv, .xlsx\` | 欄位統計分析 (Sum/Avg)、排行直條篩選、轉 MD/JSON |
+
+---
+
+> © 2026 PowerUp. 家族旗艦工具 · [探索更多系列工具](https://powerup.dancingarden.com)`
+      },
+      {
+        id: "md_02",
+        name: "release_notes_v2.6.md",
+        type: "md",
+        size: "1.8 KB",
+        dim: "35 行 · 4 節",
+        icon: "📝",
+        content: `# 🚀 PowerUp Toolbox v2.6 更新日誌
+
+### ✨ 重大革新
+1. **頂部工具列全面瘦身**：所有進階控制項收納至右側智慧工作區，右上角系統功能永不遮擋。
+2. **多模式自適應右側工作區**：JSON 深度展開、Markdown 閱讀偏好、CSV Profiler 獨立卡片佈局。
+3. **極速連續滾輪切換**：支援滑鼠滾輪與方向鍵快速輪播全資料夾混合檔案。`
+      },
+      {
+        id: "office_01",
+        name: "pitch_deck_presentation.pptx",
+        type: "office",
+        size: "37.4 KB",
+        dim: "12 頁投影片",
+        icon: "📽️",
+        note: "PowerPoint 投影片大綱免開 Office 直接剖析"
+      },
+      {
+        id: "office_02",
+        name: "design_system_manual.pdf",
+        type: "office",
+        size: "185 KB",
+        dim: "8 頁 PDF",
+        icon: "📕",
+        note: "PDF 原生單頁渲染與文字高精擷取"
+      }
+    ];
+
+    let currentFilter = "all";
+    let currentIndex = 0;
+    let filteredIndices = MOCK_FILES.map((_, i) => i);
+    let photoViewMode = "single";
+    let photoZoom = 1.0;
+    let photoRotate = 0;
+    let jsonMode = "grid";
+    let mdSplit = false;
+
+    function toast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 2000);
+    }
+
+    /* Render File List & Filmstrip */
+    function filterFilesList() {
+      const q = document.getElementById("fileFilterInput").value.trim().toLowerCase();
+      filteredIndices = [];
+      MOCK_FILES.forEach((f, idx) => {
+        const matchCat = (currentFilter === "all") || (currentFilter === f.type);
+        const matchQ = !q || f.name.toLowerCase().includes(q);
+        if (matchCat && matchQ) filteredIndices.push(idx);
+      });
+
+      const listEl = document.getElementById("filesListEl");
+      listEl.innerHTML = filteredIndices.map(idx => {
+        const f = MOCK_FILES[idx];
+        const active = (idx === currentIndex) ? "active" : "";
+        return `
+          <div class="file-item ${active}" onclick="selectFileByIndex(${idx})">
+            <span>${f.icon}</span>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${f.name}</span>
+            <span class="file-item-badge">${f.type.toUpperCase()}</span>
+          </div>
+        `;
+      }).join("");
+
+      renderFilmstrip();
+    }
+
+    function renderFilmstrip() {
+      const fsEl = document.getElementById("filmstripEl");
+      fsEl.innerHTML = filteredIndices.map(idx => {
+        const f = MOCK_FILES[idx];
+        const active = (idx === currentIndex) ? "active" : "";
+        if (f.type === "image") {
+          return `<img src="${f.src}" class="filmstrip-thumb ${active}" onclick="selectFileByIndex(${idx})" title="${f.name}" />`;
+        } else {
+          return `<div class="filmstrip-thumb ${active}" onclick="selectFileByIndex(${idx})" title="${f.name}">${f.icon}</div>`;
+        }
+      }).join("");
+    }
+
+    function setFilterCat(cat, btn) {
+      currentFilter = cat;
+      document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      filterFilesList();
+      if (!filteredIndices.includes(currentIndex) && filteredIndices.length > 0) {
+        selectFileByIndex(filteredIndices[0]);
+      }
+    }
+
+    /* Step File Navigation (← / → / Wheel) */
+    function stepFile(delta) {
+      if (filteredIndices.length === 0) return;
+      const curPos = filteredIndices.indexOf(currentIndex);
+      let nextPos = curPos + delta;
+      if (nextPos < 0) nextPos = filteredIndices.length - 1;
+      if (nextPos >= filteredIndices.length) nextPos = 0;
+      selectFileByIndex(filteredIndices[nextPos]);
+    }
+
+    function selectFileByIndex(idx) {
+      currentIndex = idx;
+      const file = MOCK_FILES[idx];
+      if (!file) return;
+
+      // Update Top HUD
+      const curPos = filteredIndices.indexOf(idx);
+      document.getElementById("navCounter").textContent = `${curPos >= 0 ? curPos + 1 : 1} / ${filteredIndices.length}`;
+      document.getElementById("stageFileName").textContent = file.name;
+      document.getElementById("stageFileInfo").textContent = `${file.dim || ''} · ${file.size || ''}`;
+
+      // Update Active in List & Filmstrip
+      filterFilesList();
+
+      // Switch stage based on file type
+      hideAllStages();
+      const badge = document.getElementById("fileModeBadge");
+
+      if (file.type === "image") {
+        badge.textContent = "🖼️ 圖片模式";
+        document.getElementById("photoTopControls").style.display = "flex";
+        document.getElementById("photoRightCard").style.display = "block";
+        document.getElementById("filmstripEl").style.display = "flex";
+
+        if (photoViewMode === "grid") {
+          document.getElementById("stageGrid").style.display = "grid";
+          renderGridWall();
+        } else {
+          document.getElementById("stagePhoto").style.display = "flex";
+          const img = document.getElementById("photoImg");
+          img.src = file.src;
+          resetPhotoFit();
+          setTimeout(syncDemoFaceBoxesBounds, 40);
+        }
+      } else if (file.type === "json") {
+        badge.textContent = "🧩 JSON 模式";
+        document.getElementById("jsonTopControls").style.display = "flex";
+        document.getElementById("jsonRightCard").style.display = "block";
+        document.getElementById("stageJson").style.display = "flex";
+        renderJsonView(file.data);
+      } else if (file.type === "md") {
+        badge.textContent = "📝 Markdown 模式";
+        document.getElementById("mdTopControls").style.display = "flex";
+        document.getElementById("mdRightCard").style.display = "block";
+        document.getElementById("stageMd").style.display = "flex";
+        document.getElementById("mdTextarea").value = file.content;
+        renderMdPreview();
+      } else if (file.type === "csv") {
+        badge.textContent = "📊 CSV 表格模式";
+        document.getElementById("csvTopControls").style.display = "flex";
+        document.getElementById("csvRightCard").style.display = "block";
+        document.getElementById("stageCsv").style.display = "flex";
+        renderCsvTable(file.rows);
+      } else if (file.type === "office") {
+        badge.textContent = file.name.endsWith(".pptx") ? "📽️ 簡報大綱模式" : "📕 PDF 模式";
+        document.getElementById("officeRightCard").style.display = "block";
+        document.getElementById("stageMd").style.display = "flex";
+        document.getElementById("mdRendered").innerHTML = `
+          <div style="text-align:center; padding:80px 20px;">
+            <div style="font-size:72px; margin-bottom:16px;">${file.icon}</div>
+            <h2 style="color:#fff; margin-bottom:8px;">${file.name}</h2>
+            <p style="color:var(--muted); font-size:15px; margin-bottom:24px;">${file.note}</p>
+            <div style="display:inline-flex; gap:10px;">
+              <button class="btn primary" onclick="toast('👁️ macOS 原生 QuickLook 視窗已彈出預覽！')">👁️ 呼叫系統 QuickLook 原版預覽</button>
+              <button class="btn emerald" onclick="toast('📋 已複製文字大綱！')">📋 複製文字大綱</button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    let demoFaceActive = false;
+
+    function syncDemoFaceBoxesBounds() {
+      const img = document.getElementById("photoImg");
+      const container = document.getElementById("demoFaceBoxesContainer");
+      if (!img || !container) return;
+      container.style.width = img.clientWidth + "px";
+      container.style.height = img.clientHeight + "px";
+      container.style.left = (img.offsetLeft || 0) + "px";
+      container.style.top = (img.offsetTop || 0) + "px";
+      if (demoFaceActive) {
+        renderFaceBoxes();
+      } else {
+        container.innerHTML = "";
+      }
+    }
+
+    function toggleDemoFaceDetection() {
+      demoFaceActive = !demoFaceActive;
+      const btn = document.getElementById("btnDemoDetectFace");
+      if (btn) btn.classList.toggle("active", demoFaceActive);
+      const container = document.getElementById("demoFaceBoxesContainer");
+      if (!container) return;
+
+      if (!demoFaceActive) {
+        container.innerHTML = "";
+        toast("✕ 已關閉人臉偵測框");
+        return;
+      }
+      renderFaceBoxes();
+    }
+
+    function renderFaceBoxes() {
+      const container = document.getElementById("demoFaceBoxesContainer");
+      const img = document.getElementById("photoImg");
+      if (!container || !img) return;
+
+      container.style.width = img.clientWidth + "px";
+      container.style.height = img.clientHeight + "px";
+      container.style.left = (img.offsetLeft || 0) + "px";
+      container.style.top = (img.offsetTop || 0) + "px";
+
+      const file = MOCK_FILES[currentIndex];
+      if (file && file.faces && file.faces.length > 0) {
+        container.innerHTML = file.faces.map(fc => `
+          <div style="position:absolute; left:${fc.x}%; top:${fc.y}%; width:${fc.w}%; height:${fc.h}%; border:2px solid #10b981; border-radius:6px; background:rgba(16,185,129,0.14); box-shadow:0 0 16px rgba(16,185,129,0.6); pointer-events:auto; cursor:pointer;" onclick="toast('🎯 鎖定特徵: ${fc.label}')">
+            <span style="position:absolute; top:-22px; left:0; background:#10b981; color:#064e3b; font-size:10px; font-weight:800; padding:1px 6px; border-radius:4px; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,0.4);">
+              ${fc.label}
+            </span>
+          </div>
+        `).join("");
+        toast(`🎯 Apple Vision 人臉辨識成功！鎖定 ${file.faces.length} 個特徵`);
+      } else {
+        container.innerHTML = "";
+        toast("💡 此檔案無可偵測人臉特徵");
+      }
+    }
+
+    function hideAllStages() {
+      ["stagePhoto", "stageGrid", "stageJson", "stageMd", "stageCsv"].forEach(id => {
+        document.getElementById(id).style.display = "none";
+      });
+      ["photoTopControls", "jsonTopControls", "mdTopControls", "csvTopControls"].forEach(id => {
+        document.getElementById(id).style.display = "none";
+      });
+      ["photoRightCard", "jsonRightCard", "mdRightCard", "csvRightCard", "officeRightCard"].forEach(id => {
+        document.getElementById(id).style.display = "none";
+      });
+    }
+
+    /* Wheel Rapid Switch */
+    let wheelAccum = 0;
+    function onStageWheel(e) {
+      e.preventDefault();
+      wheelAccum += e.deltaY;
+      if (Math.abs(wheelAccum) > 40) {
+        stepFile(wheelAccum > 0 ? 1 : -1);
+        wheelAccum = 0;
+      }
+    }
+
+    /* Photo Mode Logic */
+    function setPhotoViewMode(mode) {
+      photoViewMode = mode;
+      document.getElementById("btnPhotoSingle").classList.toggle("active", mode === "single");
+      document.getElementById("btnPhotoGrid").classList.toggle("active", mode === "grid");
+      selectFileByIndex(currentIndex);
+    }
+
+    function renderGridWall() {
+      const grid = document.getElementById("stageGrid");
+      grid.innerHTML = MOCK_FILES.map((f, idx) => {
+        const active = (idx === currentIndex) ? "active" : "";
+        let inner = f.type === "image" 
+          ? `<img src="${f.src}" class="grid-card-thumb" />`
+          : `<div class="grid-card-thumb">${f.icon}</div>`;
+        return `
+          <div class="grid-card ${active}" onclick="selectFileByIndex(${idx}); setPhotoViewMode('single');">
+            ${inner}
+            <div style="font-size:11.5px; font-weight:600; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${f.name}</div>
+            <div style="font-size:10px; color:var(--muted);">${f.size}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function zoomPhoto(factor) {
+      photoZoom *= factor;
+      photoZoom = Math.max(0.4, Math.min(3.5, photoZoom));
+      applyPhotoTransform();
+    }
+    function rotatePhoto(deg) {
+      photoRotate = (photoRotate + deg) % 360;
+      applyPhotoTransform();
+    }
+    function resetPhotoFit() {
+      photoZoom = 1.0;
+      photoRotate = 0;
+      applyPhotoTransform();
+      toast("📐 適應視窗顯示 (W)");
+    }
+    function applyPhotoTransform() {
+      document.getElementById("photoImg").style.transform = `scale(${photoZoom}) rotate(${photoRotate}deg)`;
+    }
+
+    /* JSON Mode Logic */
+    function renderJsonView(data) {
+      const cont = document.getElementById("jsonBodyContainer");
+      if (jsonMode === "code") {
+        cont.innerHTML = `<textarea style="width:100%; height:100%; background:transparent; color:#f8fafc; border:none; font-family:var(--mono); font-size:12.5px; outline:none;" readonly>${JSON.stringify(data, null, 2)}</textarea>`;
+        return;
+      }
+      let html = `<table class="json-grid-table"><thead><tr><th>鍵值欄位 (KEY)</th><th>型別</th><th>數值內容 (VALUE)</th></tr></thead><tbody>`;
+      function walk(obj, prefix = "$", depth = 0) {
+        for (let k in obj) {
+          const val = obj[k];
+          const path = prefix + "." + k;
+          const isArr = Array.isArray(val);
+          const isObj = typeof val === "object" && val !== null;
+          let pill = "str";
+          let displayVal = JSON.stringify(val);
+          if (isArr) { pill = "arr"; displayVal = `[ ${val.length} 個項目 ]`; }
+          else if (isObj) { pill = "obj"; displayVal = `{ ${Object.keys(val).length} 個屬性 }`; }
+          else if (typeof val === "number") pill = "num";
+          else if (typeof val === "boolean") pill = "bool";
+
+          html += `
+            <tr class="json-grid-row" onclick="inspectNode('${path}', ${JSON.stringify(displayVal).replace(/"/g, '&quot;')})">
+              <td style="padding-left:${depth * 18 + 12}px; color:#fff; font-weight:600;">${k}</td>
+              <td><span class="json-pill pill-${pill}">${pill.toUpperCase()}</span></td>
+              <td style="color:${pill === 'str' ? '#34d399' : '#cbd5e1'}; font-size:11.5px;">${displayVal}</td>
+            </tr>
+          `;
+          if (isObj && depth < 2) walk(val, path, depth + 1);
+        }
+      }
+      walk(data);
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    }
+
+    function inspectNode(path, val) {
+      document.getElementById("jsonPathBar").textContent = path;
+      document.getElementById("inspNodeView").innerHTML = `<div><strong>JSONPath:</strong> <span style="color:#60a5fa">${path}</span></div><div style="margin-top:4px;"><strong>內容:</strong> ${val}</div>`;
+    }
+    function copyJsonPath() {
+      const p = document.getElementById("jsonPathBar").textContent;
+      navigator.clipboard?.writeText(p);
+      toast("📋 已複製 JSONPath: " + p);
+    }
+    function setJsonMode(mode) {
+      jsonMode = mode;
+      document.querySelectorAll("#jsonTopControls .btn").forEach(b => b.classList.remove("active"));
+      if (mode === "grid") document.getElementById("btnJsonGrid").classList.add("active");
+      if (mode === "tree") document.getElementById("btnJsonTree").classList.add("active");
+      if (mode === "code") document.getElementById("btnJsonCode").classList.add("active");
+      renderJsonView(MOCK_FILES[currentIndex].data);
+    }
+
+        function demoExpandAllJson() {
+      toast("🌲 已展開全部 JSON 樹狀節點！");
+    }
+    function demoCollapseAllJson() {
+      toast("📁 已收合所有子層節點！");
+    }
+    function demoFormatJson() {
+      toast("✨ 已排版美化 JSON（2格空白縮排）！");
+    }
+    function demoCompactJson() {
+      toast("📦 已壓縮為緊湊單行 JSON！");
+    }
+    function demoSortKeysJson() {
+      toast("🔤 已將所有 Key 依 A-Z 字母排序！");
+    }
+
+    /* Markdown Mode Logic */
+    function renderMdPreview() {
+      const text = document.getElementById("mdTextarea").value;
+      const html = marked.parse(text);
+      document.getElementById("mdRendered").innerHTML = html;
+      const headings = document.getElementById("mdRendered").querySelectorAll("h1, h2, h3");
+      const tocList = document.getElementById("mdTocList");
+      tocList.innerHTML = Array.from(headings).map(h => `
+        <div style="padding:3px 6px; border-radius:4px; color:#94a3b8; cursor:pointer;" onclick="toast('跳轉至章節: ${h.textContent}')">
+          ${h.tagName === 'H1' ? '• ' : '  - '}${h.textContent}
+        </div>
+      `).join("");
+    }
+    function setMdSplit(split) {
+      mdSplit = split;
+      document.getElementById("mdEditorPane").style.display = split ? "flex" : "none";
+      document.getElementById("btnMdRead").classList.toggle("active", !split);
+      document.getElementById("btnMdSplit").classList.toggle("active", split);
+    }
+    function copyMdRich() {
+      toast("📋 已複製帶格式富文本！直貼 Pages/Word/LINE");
+    }
+    function setMdTheme(theme) {
+      const p = document.getElementById("mdRendered");
+      if (theme === "dark") { p.style.background = "#0d1117"; p.style.color = "#e6edf3"; }
+      if (theme === "light") { p.style.background = "#ffffff"; p.style.color = "#1f2328"; }
+      if (theme === "sepia") { p.style.background = "#fbf0d9"; p.style.color = "#5f4b32"; }
+      toast("🎨 已切換為 " + theme + " 主題");
+    }
+
+    /* CSV Mode Logic */
+    function renderCsvTable(rows) {
+      const table = document.getElementById("csvTableEl");
+      let html = "<thead><tr>" + rows[0].map(h => `<th onclick="toast('已依 ${h} 欄位排序')">${h} ⇅</th>`).join("") + "</tr></thead><tbody>";
+      for (let r = 1; r < rows.length; r++) {
+        html += `<tr onclick="selectCsvRow(this)">` + rows[r].map(c => `<td>${c}</td>`).join("") + "</tr>";
+      }
+      html += "</tbody>";
+      table.innerHTML = html;
+    }
+    function selectCsvRow(tr) {
+      document.querySelectorAll("#csvTableEl tr").forEach(el => el.classList.remove("selected"));
+      tr.classList.add("selected");
+    }
+    function onCsvSearch() {
+      const q = document.getElementById("csvSearch").value.toLowerCase();
+      const rows = MOCK_FILES[currentIndex].rows;
+      const filtered = [rows[0], ...rows.slice(1).filter(r => r.some(c => c.toLowerCase().includes(q)))];
+      renderCsvTable(filtered);
+    }
+    function addMockRow() {
+      const rows = MOCK_FILES[currentIndex].rows;
+      rows.push(["8531301", "313", "新學員", "已報名", "2500", "待上傳", "線上新增測試"]);
+      renderCsvTable(rows);
+      toast("➕ 已在表格底部新增一列資料！");
+    }
+    function copyCsvMd() {
+      toast("📋 已將篩選表格轉為 Markdown 語法複製至剪貼簿！");
+    }
+    function filterCsvVal(val) {
+      document.getElementById("csvSearch").value = val;
+      onCsvSearch();
+      toast("🔍 已篩選值: " + val);
+    }
+
+    /* Scratchpad (⌘N) */
+    function openScratchpadDemo() {
+      const userText = prompt("📝 暫存工作台 (⌘N)：請在此貼上任意 JSON、Markdown 或 CSV 內容：", '{\n  "custom_test": true,\n  "msg": "Hello PowerUp Toolbox!"\n}');
+      if (userText) {
+        try {
+          const parsed = JSON.parse(userText);
+          MOCK_FILES.push({
+            id: "custom_paste",
+            name: "clipboard_scratch.json",
+            type: "json",
+            size: `${userText.length} B`,
+            dim: "自訂暫存",
+            icon: "📝",
+            data: parsed
+          });
+          selectFileByIndex(MOCK_FILES.length - 1);
+          toast("✨ 暫存 JSON 已成功載入並自動排版！");
+        } catch(e) {
+          MOCK_FILES.push({
+            id: "custom_paste",
+            name: "clipboard_scratch.md",
+            type: "md",
+            size: `${userText.length} B`,
+            dim: "自訂暫存",
+            icon: "📝",
+            content: userText
+          });
+          selectFileByIndex(MOCK_FILES.length - 1);
+          toast("📝 暫存內容已作為 Markdown 成功渲染！");
+        }
+      }
+    }
+
+    function toggleSidebarRight() {
+      const el = document.getElementById("sidebarRight");
+      el.style.display = el.style.display === "none" ? "flex" : "none";
+    }
+
+    /* Global Keyboard Shortcuts (←, →, W, ⌘N) */
+    window.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        stepFile(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        stepFile(1);
+      } else if (e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        resetPhotoFit();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        openScratchpadDemo();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
+        if (MOCK_FILES[currentIndex].type === "md") {
+          e.preventDefault();
+          setMdSplit(!mdSplit);
+        }
+      }
+    });
+
+    // Bilingual Support
+    let demoCurrentLang = localStorage.getItem("powerup_lang") || "zh-Hant";
+
+    const DEMO_I18N = {
+      "zh-Hant": {
+        langBtn: " EN",
+        scratch: "📝 暫存",
+        save: "💾 儲存",
+        panel: "◧ 面板",
+        backHome: "← 返回官網介紹",
+        downloadMac: " 下載 macOS 原生版",
+        toastLang: "🌐 已切換為繁體中文介面"
+      },
+      "en": {
+        langBtn: " 繁中",
+        scratch: "📝 Scratch",
+        save: "💾 Save",
+        panel: "◧ Panel",
+        backHome: "← Back to Homepage",
+        downloadMac: " Download macOS App",
+        toastLang: "🌐 Interface switched to English"
+      }
+    };
+
+    function applyDemoLanguage(lang) {
+      demoCurrentLang = lang;
+      localStorage.setItem("powerup_lang", lang);
+      const d = DEMO_I18N[lang] || DEMO_I18N["zh-Hant"];
+
+      const langEl = document.getElementById("demoLangLabel");
+      if (langEl) langEl.textContent = d.langBtn;
+      const scratchEl = document.getElementById("demoScratchLabel");
+      if (scratchEl) scratchEl.textContent = d.scratch;
+      const saveEl = document.getElementById("demoSaveLabel");
+      if (saveEl) saveEl.textContent = d.save;
+      const panelEl = document.getElementById("demoPanelLabel");
+      if (panelEl) panelEl.textContent = d.panel;
+    }
+
+    function toggleDemoLanguage() {
+      const next = demoCurrentLang === "zh-Hant" ? "en" : "zh-Hant";
+      applyDemoLanguage(next);
+      toast(DEMO_I18N[next].toastLang);
+    }
+
+    applyDemoLanguage(demoCurrentLang);
+
+    // Start on first file
+    filterFilesList();
+    selectFileByIndex(0);
+  </script>
+</body>
+</html>

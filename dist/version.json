@@ -1,0 +1,16 @@
+{
+  "version": "2.6.0",
+  "name": "PowerUp Toolbox",
+  "release_date": "2026-11-09",
+  "min_macos": "12.0",
+  "latest_dmg": "MacToolbox-latest.dmg",
+  "latest_pkg": "MacToolbox-latest.pkg",
+  "dmg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.dmg",
+  "pkg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.pkg",
+  "changelog": [
+    "🚀 全新 3D 科技工具箱高質感立體品牌圖示與 macOS AppIcon",
+    "🖼️ 海量照片極速網格瀏覽模式 (3,000+ 張照片 0 秒瞬顯)",
+    "🔍 6048×4032 24.4MP 4K 原寸自適應檢視與 AI 影像增強側欄",
+    "⚡ 內建 GitHub main 分支 dist 自動更新偵測與一鍵升級引擎"
+  ]
+}

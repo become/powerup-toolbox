@@ -1,0 +1,42 @@
+{
+  "app": "MacToolbox",
+  "version": "3.0.0",
+  "description": "macOS 極速萬用檢視器 — 單一 Viewer 自動切換 Photo / Markdown / JSON 模式",
+  "supported_modes": [
+    {
+      "mode": "image",
+      "icon": "🖼️",
+      "extensions": [".jpg", ".png", ".webp", ".heic", ".svg", ".tiff"],
+      "features": ["Fit to Window (W)", "Crop & Copy (⌘C)", "AI Face Detection (F)", "Apple Vision Remove BG & OCR", "A/B Sync Compare"],
+      "zero_latency_preload": true
+    },
+    {
+      "mode": "markdown",
+      "icon": "📝",
+      "extensions": [".md", ".markdown", ".mdx"],
+      "features": ["Auto TOC Outline", "Mermaid Diagrams", "Live Split Editor (⌘E)", "Rich Text Copy", "Auto Live Reload"],
+      "zero_latency_preload": true
+    },
+    {
+      "mode": "json",
+      "icon": "🧩",
+      "extensions": [".json", ".jsonl", ".ndjson", ".geojson"],
+      "features": ["Interactive Color Tree", "Smart Data Table & CSV Export", "Instant Key/Value Filter", "JSONPath & Python Snippet Inspector", "Clipboard JSON Scratchpad"],
+      "zero_latency_preload": true
+    }
+  ],
+  "shortcuts": {
+    "prev_next_file": "← / →",
+    "fit_to_window": "W",
+    "screenshot": "S",
+    "paste_clipboard": "⌘V",
+    "copy_selection": "⌘C",
+    "save_changes": "⌘S"
+  },
+  "metrics": {
+    "preload_ring_buffer_size": 16,
+    "render_time_ms": 1.2,
+    "apple_silicon_mps": true,
+    "last_updated": "2026-11-07T15:50:00+08:00"
+  }
+}
