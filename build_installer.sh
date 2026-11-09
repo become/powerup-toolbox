@@ -19,13 +19,15 @@ swiftc -O "$ROOT_DIR/set_default_handlers.swift" -o "$ROOT_DIR/$APP_NAME/Content
 echo "🎨 [2/5] 設定高解析度 macOS 3D 科技工具箱圖示 (AppIcon.icns)..."
 rm -rf "$BUILD_TMP"
 mkdir -p "$BUILD_TMP" "$DIST_DIR"
-if [ -f "$ROOT_DIR/website/assets/AppIcon.icns" ]; then
-    cp -f "$ROOT_DIR/website/assets/AppIcon.icns" "$ROOT_DIR/$APP_NAME/Contents/Resources/AppIcon.icns"
+if [ -f "$ROOT_DIR/assets/AppIcon.icns" ]; then
+    cp -f "$ROOT_DIR/assets/AppIcon.icns" "$ROOT_DIR/$APP_NAME/Contents/Resources/AppIcon.icns"
 fi
 
 echo "📦 [3/5] 封裝應用程式資源至 $APP_NAME/Contents/Resources..."
 cp -f "$ROOT_DIR/server.py" "$ROOT_DIR/$APP_NAME/Contents/Resources/server.py"
 cp -f "$ROOT_DIR/index.html" "$ROOT_DIR/$APP_NAME/Contents/Resources/index.html"
+rm -rf "$ROOT_DIR/$APP_NAME/Contents/Resources/assets"
+cp -R "$ROOT_DIR/assets" "$ROOT_DIR/$APP_NAME/Contents/Resources/assets"
 cp -f "$ROOT_DIR/mac_vision_helper" "$ROOT_DIR/$APP_NAME/Contents/Resources/mac_vision_helper"
 cp -f "$ROOT_DIR/README.md" "$ROOT_DIR/$APP_NAME/Contents/Resources/README.md"
 cp -f "$ROOT_DIR/sample_demo.json" "$ROOT_DIR/$APP_NAME/Contents/Resources/sample_demo.json"
@@ -91,8 +93,8 @@ hdiutil create \
 rm -rf "$BUILD_TMP"
 
 echo "📡 [6/6] 更新 GitHub 部署版本清單 (dist/version.json & latest 軟連結)..."
-cp -f "MacToolbox-${VERSION}.dmg" "$DIST_DIR/MacToolbox-latest.dmg"
-cp -f "MacToolbox-${VERSION}-Installer.pkg" "$DIST_DIR/MacToolbox-latest.pkg"
+cp -f "$DIST_DIR/MacToolbox-${VERSION}.dmg" "$DIST_DIR/MacToolbox-latest.dmg"
+cp -f "$DIST_DIR/MacToolbox-${VERSION}-Installer.pkg" "$DIST_DIR/MacToolbox-latest.pkg"
 
 cat << EOF > "$DIST_DIR/version.json"
 {

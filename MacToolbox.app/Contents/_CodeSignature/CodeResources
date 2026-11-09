@@ -12,9 +12,37 @@
 		<data>
 		cnYQupC8JSKyA7NhEdqFvdQiA7A=
 		</data>
+		<key>Resources/assets/AppIcon.icns</key>
+		<data>
+		IkQ0TKa/PCyw21jC6QOA9Me2HX0=
+		</data>
+		<key>Resources/assets/app.ico</key>
+		<data>
+		hqDVUND2v0N9ZzXkP4RviRNBmSI=
+		</data>
+		<key>Resources/assets/app_icon.png</key>
+		<data>
+		vZ03UVHCCjjlCkqR1rdieJXmqVk=
+		</data>
+		<key>Resources/assets/apple-touch-icon.png</key>
+		<data>
+		0HqRZsF65K0PMFylRitF5EQmg3o=
+		</data>
+		<key>Resources/assets/brand_logo_extracted.png</key>
+		<data>
+		YlccMerRkE8gqg4DjxPFoLiebn0=
+		</data>
+		<key>Resources/assets/favicon.ico</key>
+		<data>
+		/ZWl1p6sOyVjm48LYtASRjjOLns=
+		</data>
+		<key>Resources/assets/favicon.svg</key>
+		<data>
+		C/Ti2RlOBl2xuykmLrmwmz4AVPc=
+		</data>
 		<key>Resources/index.html</key>
 		<data>
-		amuTEqXILNuuJy0sXXuG6iy/+IQ=
+		zBUgDQkQv9PWDyUmzhTKLOen/W4=
 		</data>
 		<key>Resources/mac_vision_helper</key>
 		<data>
@@ -42,7 +70,7 @@
 		</data>
 		<key>Resources/server.py</key>
 		<data>
-		loiL99TMtgq2ElTl8RCx4hfLAzE=
+		5Q7i4IumsmJAxWCMhKDEy9nBmXs=
 		</data>
 		<key>Resources/set_default_handlers</key>
 		<data>
@@ -114,11 +142,60 @@
 			JimG50e2/XF3fMf9z+2JJx66+fZ2rbqBVDWtzvFxFuE=
 			</data>
 		</dict>
+		<key>Resources/assets/AppIcon.icns</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			u3u+0BBYoT2Ku929fu6HBcXvrCzt31GCbjzT4KP2Gyo=
+			</data>
+		</dict>
+		<key>Resources/assets/app.ico</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			2uMvRh9xlCLHXvjwbA+XEFvBH/0vAnjGR7myCxLeSTE=
+			</data>
+		</dict>
+		<key>Resources/assets/app_icon.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			VN/9pppEKdsq62FWfnLiNHvxWLY+sB0lEDAxRd0QqvY=
+			</data>
+		</dict>
+		<key>Resources/assets/apple-touch-icon.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jtrwN8iqFLmyJNk3vbtt+9U3o5CFesD8XSpz9kl64Pw=
+			</data>
+		</dict>
+		<key>Resources/assets/brand_logo_extracted.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			y+YHQ+NZ20Dh/13TadwPf8UtT9ILWrmQDTCfj1NljeY=
+			</data>
+		</dict>
+		<key>Resources/assets/favicon.ico</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			OnNirSAsXhoajf4A8s4h2DqatUlSLFwPJkuVJdZuAS0=
+			</data>
+		</dict>
+		<key>Resources/assets/favicon.svg</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			PZrP6vklrciMZ91SwsmaAJjGZAr3aEkKSfOMHvDlnDg=
+			</data>
+		</dict>
 		<key>Resources/index.html</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			F4lS0DfieeRCOi2zEey1c9vSohPnPS5+S61Z8XjrD8k=
+			lZ4o0eVAiK9TMcwRALyjrCe0KSB+2hA9w9+i/+r1ZCs=
 			</data>
 		</dict>
 		<key>Resources/mac_vision_helper</key>
@@ -167,7 +244,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			h7YqSoPmVabSnVJ2r+QmPOOrS9ADxOTbx6y4qNmEw+E=
+			B+TCOQwEv+ZcKtlQpXwvOc51AcClG5WWFO0UfujppW4=
 			</data>
 		</dict>
 		<key>Resources/set_default_handlers</key>

@@ -1333,13 +1333,11 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.wfile.write(content)
             return
 
-        if route.startswith("/website/"):
-            rel_sub = route[len("/website/"):].lstrip("/")
-            if not rel_sub or rel_sub.endswith("/"):
-                rel_sub += "index.html"
-            web_file = os.path.abspath(os.path.join(TOOLBOX_DIR, "website", rel_sub))
-            web_root = os.path.abspath(os.path.join(TOOLBOX_DIR, "website"))
-            if web_file.startswith(web_root) and os.path.isfile(web_file):
+        if route.startswith("/assets/"):
+            rel_sub = route[len("/assets/"):].lstrip("/")
+            asset_file = os.path.abspath(os.path.join(TOOLBOX_DIR, "assets", rel_sub))
+            asset_root = os.path.abspath(os.path.join(TOOLBOX_DIR, "assets"))
+            if asset_file.startswith(asset_root) and os.path.isfile(asset_file):
                 mime_map = {
                     ".html": "text/html; charset=utf-8",
                     ".css": "text/css; charset=utf-8",
@@ -1351,17 +1349,11 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     ".webp": "image/webp",
                     ".svg": "image/svg+xml",
                     ".ico": "image/x-icon",
-                    ".mp4": "video/mp4",
-                    ".dmg": "application/x-apple-diskimage",
-                    ".pkg": "application/octet-stream",
-                    ".wav": "audio/wav",
-                    ".csv": "text/csv; charset=utf-8",
-                    ".md": "text/markdown; charset=utf-8",
                 }
-                _, fext = os.path.splitext(web_file)
+                _, fext = os.path.splitext(asset_file)
                 ctype = mime_map.get(fext.lower(), "application/octet-stream")
                 try:
-                    with open(web_file, "rb") as f:
+                    with open(asset_file, "rb") as f:
                         data = f.read()
                     self.send_response(200)
                     self.send_header("Content-Type", ctype)
