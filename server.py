@@ -20,11 +20,94 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
 TOOLBOX_DIR = os.path.dirname(os.path.abspath(__file__))
-IS_APP_BUNDLE = ".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK)
+IS_WINDOWS = sys.platform == "win32"
+IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
 APP_VERSION = "2.6.0"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
+
+def reveal_in_file_manager(path):
+    """Cross-platform reveal in Finder or Windows Explorer."""
+    if not path or not os.path.exists(path):
+        return False
+    norm = os.path.normpath(path)
+    if IS_WINDOWS:
+        if os.path.isdir(norm):
+            subprocess.Popen(["explorer", norm])
+        else:
+            subprocess.Popen(["explorer", f"/select,{norm}"])
+    else:
+        subprocess.Popen(["/usr/bin/open", "-R", path])
+    return True
+
+def open_with_default_app(path):
+    """Cross-platform open file with default system handler."""
+    if not path or not os.path.exists(path):
+        return False
+    if IS_WINDOWS:
+        os.startfile(path)
+    else:
+        subprocess.Popen(["/usr/bin/open", path])
+    return True
+
+def pick_native_path(mode="folder", default_dir=None, default_name=None):
+    """Cross-platform native GUI file/folder picker."""
+    if IS_WINDOWS:
+        if not default_dir or not os.path.isdir(default_dir):
+            default_dir = os.path.expanduser("~/Desktop")
+        clean_dir = os.path.normpath(default_dir).replace("'", "''")
+        if mode == "file":
+            ps_cmd = f"""
+Add-Type -AssemblyName System.Windows.Forms
+$dlg = New-Object System.Windows.Forms.OpenFileDialog
+$dlg.InitialDirectory = '{clean_dir}'
+$dlg.Title = '選擇要開啟的檔案'
+if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
+    Write-Output $dlg.FileName
+}}
+"""
+        elif mode == "save":
+            clean_name = (default_name or "scratch.md").replace("'", "''")
+            ps_cmd = f"""
+Add-Type -AssemblyName System.Windows.Forms
+$dlg = New-Object System.Windows.Forms.SaveFileDialog
+$dlg.InitialDirectory = '{clean_dir}'
+$dlg.FileName = '{clean_name}'
+$dlg.Title = '另存新檔'
+if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
+    Write-Output $dlg.FileName
+}}
+"""
+        else:
+            ps_cmd = f"""
+Add-Type -AssemblyName System.Windows.Forms
+$dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+$dlg.SelectedPath = '{clean_dir}'
+$dlg.Description = '選擇要瀏覽的資料夾'
+if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
+    Write-Output $dlg.SelectedPath
+}}
+"""
+        res = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd], capture_output=True, text=True)
+        out = res.stdout.strip()
+        return out if (res.returncode == 0 and out) else None
+    else:
+        # macOS AppleScript
+        if not default_dir or not os.path.isdir(default_dir):
+            default_dir = os.path.expanduser("~/Desktop")
+        escaped_dir = default_dir.replace("\\", "\\\\").replace('"', '\\"')
+        if mode == "file":
+            script = f'POSIX path of (choose file with prompt "選擇要開啟的檔案：" default location (POSIX file "{escaped_dir}"))'
+        elif mode == "save":
+            def_name = (default_name or "scratch.md").replace("\\", "\\\\").replace('"', '\\"')
+            script = f'POSIX path of (choose file name with prompt "另存新檔為：" default location (POSIX file "{escaped_dir}") default name "{def_name}")'
+        else:
+            script = f'POSIX path of (choose folder with prompt "選擇要瀏覽的資料夾：" default location (POSIX file "{escaped_dir}"))'
+        res = subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            return os.path.abspath(res.stdout.strip())
+        return None
 
 def compare_versions(v1, v2):
     """Return 1 if v1 > v2, -1 if v1 < v2, 0 if equal."""
@@ -229,7 +312,7 @@ def get_ai_model(name):
             import spandrel_extra_arches
             from spandrel import ModelLoader
             spandrel_extra_arches.install()
-            dev = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+            dev = torch.device("mps" if (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()) else ("cuda" if torch.cuda.is_available() else "cpu"))
             m = ModelLoader(device=dev).load_from_file(os.path.join(MODELS_DIR, name))
             m.eval()
             MODEL_CACHE[name] = (m, dev)
@@ -1380,12 +1463,25 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 {"name": "📸 截圖匣", "full_name": "📸 截圖與剪貼簿匣", "path": os.path.abspath(CAPTURES_DIR), "icon": "📸"},
                 {"name": "📝 暫存匣", "full_name": "📝 暫存草稿工作匣 (Scratchpad)", "path": os.path.abspath(SCRATCH_DIR), "icon": "📝"},
                 {"name": "🧰 Toolbox", "full_name": "🧰 Toolbox 專案目錄", "path": os.path.abspath(TOOLBOX_DIR), "icon": "🧰"},
-                {"name": "🖥️ 桌面", "full_name": "🖥️ Mac 桌面 (Desktop)", "path": os.path.abspath(os.path.expanduser("~/Desktop")), "icon": "🖥️"},
+                {"name": "🖥️ 桌面", "full_name": "🖥️ 桌面 (Desktop)", "path": os.path.abspath(os.path.expanduser("~/Desktop")), "icon": "🖥️"},
                 {"name": "📂 下載", "full_name": "📂 下載項目 (Downloads)", "path": os.path.abspath(os.path.expanduser("~/Downloads")), "icon": "📂"},
                 {"name": "🖼️ 圖片", "full_name": "🖼️ 圖片 (Pictures)", "path": os.path.abspath(os.path.expanduser("~/Pictures")), "icon": "🖼️"},
                 {"name": "📄 文件", "full_name": "📄 文件 (Documents)", "path": os.path.abspath(os.path.expanduser("~/Documents")), "icon": "📄"},
-                {"name": "💻 專案區", "full_name": "💻 Claude 專案目錄", "path": os.path.abspath(os.path.expanduser("~/Claude/Projects")), "icon": "💻"},
             ]
+            if IS_WINDOWS:
+                import string
+                for drive_letter in string.ascii_uppercase:
+                    dpath = f"{drive_letter}:\\"
+                    if os.path.exists(dpath):
+                        bookmarks.append({
+                            "name": f"💾 {drive_letter}: 槽",
+                            "full_name": f"💾 本機磁碟 ({drive_letter}:)",
+                            "path": dpath,
+                            "icon": "💾"
+                        })
+            else:
+                bookmarks.append({"name": "💻 專案區", "full_name": "💻 Claude 專案目錄", "path": os.path.abspath(os.path.expanduser("~/Claude/Projects")), "icon": "💻"})
+
             valid = [b for b in bookmarks if os.path.exists(b["path"])]
             self.send_json({"ok": True, "bookmarks": valid, "home": os.path.abspath(os.path.expanduser("~"))})
             return
@@ -1832,21 +1928,37 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                         data = f.read()
                     ctype = "image/png"
                 else:
-                    # 1. Try sips first for standard image files
-                    subprocess.run(
-                        ["/usr/bin/sips", "-Z", "360", "-s", "format", "jpeg", path, "--out", thumb_file],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                    )
+                    # 1. Try PIL (Pillow) first (cross-platform, fast)
+                    pil_done = False
+                    try:
+                        from PIL import Image
+                        with Image.open(path) as im:
+                            im.thumbnail((360, 360))
+                            if im.mode in ("RGBA", "P"):
+                                im = im.convert("RGB")
+                            im.save(thumb_file, "JPEG", quality=85)
+                            pil_done = True
+                    except Exception:
+                        pil_done = False
+
+                    if not pil_done and not IS_WINDOWS:
+                        # 2. Try macOS sips for standard image files
+                        subprocess.run(
+                            ["/usr/bin/sips", "-Z", "360", "-s", "format", "jpeg", path, "--out", thumb_file],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                        )
+
                     if os.path.exists(thumb_file):
                         with open(thumb_file, "rb") as f:
                             data = f.read()
                         ctype = "image/jpeg"
                     else:
-                        # 2. Try macOS QuickLook for PPTX, PDF, Office, Keynote, etc.
-                        subprocess.run(
-                            ["/usr/bin/qlmanage", "-t", "-s", "360", "-o", CACHE_DIR, path],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
-                        )
+                        # 3. Try macOS QuickLook for PPTX, PDF, Office, Keynote, etc.
+                        if not IS_WINDOWS:
+                            subprocess.run(
+                                ["/usr/bin/qlmanage", "-t", "-s", "360", "-o", CACHE_DIR, path],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+                            )
                         ql_out = os.path.join(CACHE_DIR, os.path.basename(path) + ".png")
                         if os.path.exists(ql_out):
                             try:
@@ -2002,7 +2114,10 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/quicklook":
             path = body.get("path", "").strip()
             if path and os.path.exists(path):
-                subprocess.Popen(["/usr/bin/qlmanage", "-p", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if IS_WINDOWS:
+                    open_with_default_app(path)
+                else:
+                    subprocess.Popen(["/usr/bin/qlmanage", "-p", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 self.send_json({"ok": True})
             else:
                 self.send_json({"ok": False, "error": "找不到檔案"}, 404)
@@ -2063,7 +2178,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/reveal-finder":
             path = body.get("path", "")
             if path and os.path.exists(path):
-                subprocess.Popen(["/usr/bin/open", "-R", path])
+                reveal_in_file_manager(path)
                 self.send_json({"ok": True})
             else:
                 self.send_json({"ok": False, "error": "Path not found"}, 404)
@@ -2072,19 +2187,9 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/pick-path":
             mode = body.get("mode", "folder")
             default_dir = body.get("default_dir", "").strip()
-            if not default_dir or not os.path.isdir(default_dir):
-                default_dir = os.path.expanduser("~/Desktop")
-            escaped_dir = default_dir.replace("\\", "\\\\").replace('"', '\\"')
-            if mode == "file":
-                script = f'POSIX path of (choose file with prompt "選擇要開啟的檔案：" default location (POSIX file "{escaped_dir}"))'
-            elif mode == "save":
-                default_name = body.get("default_name", "scratch.md").replace("\\", "\\\\").replace('"', '\\"')
-                script = f'POSIX path of (choose file name with prompt "另存新檔為：" default location (POSIX file "{escaped_dir}") default name "{default_name}")'
-            else:
-                script = f'POSIX path of (choose folder with prompt "選擇要瀏覽的資料夾：" default location (POSIX file "{escaped_dir}"))'
-            res = subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, text=True)
-            if res.returncode == 0 and res.stdout.strip():
-                chosen = os.path.abspath(res.stdout.strip())
+            default_name = body.get("default_name", "").strip()
+            chosen = pick_native_path(mode=mode, default_dir=default_dir, default_name=default_name)
+            if chosen:
                 self.send_json({"ok": True, "path": chosen})
             else:
                 self.send_json({"ok": False, "cancelled": True})
@@ -2295,19 +2400,49 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             ry = str(crop.get("y", 0.0))
             rw = str(crop.get("w", 1.0))
             rh = str(crop.get("h", 1.0))
-            cmd = [HELPER_BIN, "crop-rotate", path, out_path, rx, ry, rw, rh, str(rotate)]
-            if action in ("copy", "both"):
-                cmd.append("copy")
 
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            try:
-                info = json.loads(res.stdout.strip())
-            except Exception:
-                info = {"ok": False, "error": res.stderr or "圖片裁切失敗"}
+            if os.path.exists(HELPER_BIN):
+                cmd = [HELPER_BIN, "crop-rotate", path, out_path, rx, ry, rw, rh, str(rotate)]
+                if action in ("copy", "both"):
+                    cmd.append("copy")
+
+                res = subprocess.run(cmd, capture_output=True, text=True)
+                try:
+                    info = json.loads(res.stdout.strip())
+                except Exception:
+                    info = {"ok": False, "error": res.stderr or "圖片裁切失敗"}
+            else:
+                try:
+                    from PIL import Image
+                    with Image.open(path) as im:
+                        orig_w, orig_h = im.size
+                        fx, fy, fw, fh = float(rx), float(ry), float(rw), float(rh)
+                        left = max(0, int(round(fx * orig_w)))
+                        top = max(0, int(round(fy * orig_h)))
+                        right = min(orig_w, int(round((fx + fw) * orig_w)))
+                        bottom = min(orig_h, int(round((fy + fh) * orig_h)))
+                        cropped = im.crop((left, top, right, bottom))
+                        if rotate != 0:
+                            cropped = cropped.rotate(-rotate, expand=True)
+                        cropped.save(out_path, format="PNG")
+                        cw, ch = cropped.size
+                        info = {"ok": True, "width": cw, "height": ch, "copied": False}
+                except Exception as e:
+                    info = {"ok": False, "error": f"圖片裁切失敗: {e}"}
 
             if not info.get("ok"):
                 self.send_json(info, 500)
                 return
+
+            # On Windows, copy image to clipboard via PowerShell if requested
+            if IS_WINDOWS and action in ("copy", "both") and os.path.exists(out_path):
+                try:
+                    clean_p = os.path.normpath(out_path).replace("'", "''")
+                    ps = f"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile('{clean_p}'))"
+                    subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, timeout=4)
+                    info["copied"] = True
+                except Exception:
+                    pass
 
             cw = info.get("width", 0)
             ch = info.get("height", 0)
@@ -2318,7 +2453,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 "saved_path": out_path,
                 "width": cw,
                 "height": ch,
-                "message": f"已處理 ({cw}×{ch} px)" + (" 並複製到 Mac 剪貼簿！可直接 Cmd+V 貼上" if copied else "")
+                "message": f"已處理 ({cw}×{ch} px)" + (" 並複製到剪貼簿！可直接 Ctrl+V / Cmd+V 貼上" if copied else "")
             })
             return
 
@@ -2327,21 +2462,47 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             ts = time.strftime("%Y%m%d_%H%M%S")
             out_path = os.path.join(CAPTURES_DIR, f"screenshot_{ts}.png")
 
+            if IS_WINDOWS:
+                if mode == "clipboard":
+                    ps = f"""
+Add-Type -AssemblyName System.Windows.Forms
+$img = [System.Windows.Forms.Clipboard]::GetImage()
+if ($img -ne $null) {{
+    $img.Save('{os.path.normpath(out_path).replace("'", "''")}', [System.Drawing.Imaging.ImageFormat]::Png)
+    $img.Dispose()
+    Write-Output "OK"
+}}
+"""
+                    res = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, text=True)
+                    if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                        self.send_json({"ok": True, "path": out_path, "folder": CAPTURES_DIR})
+                    else:
+                        self.send_json({"ok": False, "error": "剪貼簿中沒有圖片"})
+                    return
+                else:
+                    subprocess.Popen(["explorer", "ms-screenclip:"])
+                    self.send_json({"ok": True, "message": "已啟動 Windows 截圖工具，截圖完成後請點擊「貼上剪貼簿」載入。"})
+                    return
+
             if mode == "interactive":
                 subprocess.run(["/usr/sbin/screencapture", "-i", out_path])
                 if not os.path.exists(out_path):
                     self.send_json({"ok": False, "cancelled": True, "error": "已取消截圖"})
                     return
-                subprocess.run([HELPER_BIN, "copy-image", out_path], capture_output=True)
+                if os.path.exists(HELPER_BIN):
+                    subprocess.run([HELPER_BIN, "copy-image", out_path], capture_output=True)
                 self.send_json({"ok": True, "path": out_path, "folder": CAPTURES_DIR})
                 return
             elif mode == "clipboard":
                 out_path = os.path.join(CAPTURES_DIR, f"clipboard_{ts}.png")
-                res = subprocess.run([HELPER_BIN, "paste-image", out_path], capture_output=True, text=True)
-                try:
-                    info = json.loads(res.stdout.strip())
-                except Exception:
-                    info = {"ok": False, "error": res.stderr or "無法讀取剪貼簿"}
+                if os.path.exists(HELPER_BIN):
+                    res = subprocess.run([HELPER_BIN, "paste-image", out_path], capture_output=True, text=True)
+                    try:
+                        info = json.loads(res.stdout.strip())
+                    except Exception:
+                        info = {"ok": False, "error": res.stderr or "無法讀取剪貼簿"}
+                else:
+                    info = {"ok": False, "error": "無法讀取剪貼簿"}
                 if info.get("ok") and os.path.exists(out_path):
                     self.send_json({"ok": True, "path": out_path, "folder": CAPTURES_DIR})
                 else:
@@ -2354,19 +2515,33 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": "找不到圖片"}, 404)
                 return
 
-            res = subprocess.run([HELPER_BIN, "faces", path], capture_output=True, text=True)
-            try:
-                data = json.loads(res.stdout.strip())
-            except Exception:
-                data = {"ok": False, "error": res.stderr or "人臉偵測失敗"}
-            self.send_json(data)
-            return
+            if os.path.exists(HELPER_BIN):
+                res = subprocess.run([HELPER_BIN, "faces", path], capture_output=True, text=True)
+                try:
+                    data = json.loads(res.stdout.strip())
+                except Exception:
+                    data = {"ok": False, "error": res.stderr or "人臉偵測失敗"}
+                self.send_json(data)
+                return
+            else:
+                self.send_json({
+                    "ok": False,
+                    "error": "Windows 平台人臉偵測模組開發中（即將支援 OpenCV YuNet / Windows.Media.FaceAnalysis）"
+                })
+                return
 
         if route == "/api/ocr":
             path = body.get("path", "")
             crop = body.get("crop")
             if not path or not os.path.isfile(path):
                 self.send_json({"ok": False, "error": "找不到圖片"}, 404)
+                return
+
+            if not os.path.exists(HELPER_BIN):
+                self.send_json({
+                    "ok": False,
+                    "error": "Windows 平台 OCR 模組開發中（即將支援 Windows.Media.Ocr.OcrEngine）"
+                })
                 return
 
             target_path = path
@@ -2391,6 +2566,13 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             crop = body.get("crop")
             if not path or not os.path.isfile(path):
                 self.send_json({"ok": False, "error": "找不到圖片"}, 404)
+                return
+
+            if not os.path.exists(HELPER_BIN):
+                self.send_json({
+                    "ok": False,
+                    "error": "Windows 平台去背模組開發中（即將支援 RMBG ONNX DirectML）"
+                })
                 return
 
             stem = os.path.splitext(os.path.basename(path))[0]
