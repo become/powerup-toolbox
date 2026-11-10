@@ -1,7 +1,7 @@
 {
   "version": "2.7.0",
   "name": "PowerUp Toolbox",
-  "release_date": "2026-11-10",
+  "release_date": "2026-11-11",
   "min_macos": "12.0",
   "latest_dmg": "MacToolbox-latest.dmg",
   "latest_pkg": "MacToolbox-latest.pkg",

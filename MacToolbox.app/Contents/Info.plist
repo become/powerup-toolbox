@@ -7,9 +7,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.become.mactoolbox</string>
     <key>CFBundleName</key>
-    <string>MacToolbox</string>
+    <string>PowerUp Toolbox</string>
     <key>CFBundleDisplayName</key>
-    <string>MacToolbox (看圖 + MD + JSON/XML + CSV/Excel + PPTX/Word + PDF)</string>
+    <string>PowerUp Toolbox</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>

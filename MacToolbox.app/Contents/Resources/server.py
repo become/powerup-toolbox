@@ -2350,6 +2350,33 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                         })
             else:
                 bookmarks.append({"name": "💻 專案區", "full_name": "💻 Claude 專案目錄", "path": safe_or_none("~/Claude/Projects"), "icon": "💻"})
+                # Auto-detect macOS Cloud Storage (Google Drive, iCloud Drive, OneDrive, Dropbox)
+                icloud_dir = os.path.expanduser("~/Library/Mobile Documents/com~apple~CloudDocs")
+                if os.path.isdir(icloud_dir):
+                    bookmarks.append({"name": "☁️ iCloud 雲端", "full_name": "☁️ iCloud 雲端硬碟 (自動同步)", "path": icloud_dir, "icon": "☁️"})
+                cloud_storage = os.path.expanduser("~/Library/CloudStorage")
+                if os.path.isdir(cloud_storage):
+                    for entry in sorted(os.listdir(cloud_storage)):
+                        full_entry = os.path.join(cloud_storage, entry)
+                        if os.path.isdir(full_entry):
+                            if "GoogleDrive" in entry:
+                                if " (" in entry and os.path.isdir(os.path.join(cloud_storage, entry.split(" (")[0])):
+                                    continue
+                                gdrive_my = os.path.join(full_entry, "我的雲端硬碟")
+                                gpath = gdrive_my if os.path.isdir(gdrive_my) else full_entry
+                                bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟 (我的雲端硬碟)", "path": gpath, "icon": "☁️"})
+                            elif "OneDrive" in entry:
+                                bookmarks.append({"name": "☁️ OneDrive", "full_name": "☁️ OneDrive 雲端硬碟", "path": full_entry, "icon": "☁️"})
+                            elif "Dropbox" in entry:
+                                bookmarks.append({"name": "☁️ Dropbox", "full_name": "☁️ Dropbox 雲端硬碟", "path": full_entry, "icon": "☁️"})
+            if IS_WINDOWS:
+                user_home = os.path.expanduser("~")
+                onedrive_dir = os.environ.get("OneDrive") or os.path.join(user_home, "OneDrive")
+                if os.path.isdir(onedrive_dir):
+                    bookmarks.append({"name": "☁️ OneDrive", "full_name": "☁️ OneDrive 雲端硬碟", "path": onedrive_dir, "icon": "☁️"})
+                gdrive_win = os.path.join(user_home, "Google Drive")
+                if os.path.isdir(gdrive_win):
+                    bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟", "path": gdrive_win, "icon": "☁️"})
 
             valid = [b for b in bookmarks if b["path"] and not path_is_unsafe(b["path"])
                      and (len(b["path"]) == 3 and b["path"][1:] == ":\\" and winpath.drive_type(b["path"][0]) == 4
