@@ -12,19 +12,148 @@ import time
 import base64
 import shutil
 import hashlib
+import hmac
+import io
+import secrets
 import urllib.parse
 import subprocess
 import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+if sys.platform == "win32":
+    import winshell     # Windows shell helpers: clipboard / pickers through ctypes, never through a PowerShell script
+try:
+    import winpath      # Windows path whitelist (only used on win32; a Mac bundle without the file still works)
+except ImportError:
+    if sys.platform == "win32":
+        raise
+    winpath = None
 
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
 TOOLBOX_DIR = os.path.dirname(os.path.abspath(__file__))
-IS_APP_BUNDLE = ".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK)
+IS_WINDOWS = sys.platform == "win32"
+# Windows PyInstaller frozen build: read-only resources live in sys._MEIPASS,
+# writable data always goes to %LOCALAPPDATA%\PowerUpToolbox
+IS_WIN_FROZEN = IS_WINDOWS and bool(getattr(sys, "frozen", False))
+if IS_WIN_FROZEN:
+    TOOLBOX_DIR = getattr(sys, "_MEIPASS", TOOLBOX_DIR)
+    WIN_DATA_DIR = os.environ.get("POWERUP_DATA_DIR") or os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "PowerUpToolbox")
+    import win_support
+IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.6.0"
+APP_VERSION = "2.7.0"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
+
+def _mac_run(*a, **k):
+    """Every helper started through here is a macOS tool (osascript, sips, qlmanage, screencapture, textutil, the Swift helper,
+    open, codex ...). On any other platform nothing is started at all - a bare program name on Windows would be resolved
+    through the current directory / PATH, so 'not found' is not good enough."""
+    if sys.platform != "darwin":
+        return subprocess.CompletedProcess(a[0] if a else k.get("args"), 127, "" if k.get("text") else b"", "" if k.get("text") else b"")
+    return subprocess.run(*a, **k)
+
+
+def _mac_popen(*a, **k):
+    if sys.platform != "darwin":
+        return None
+    return subprocess.Popen(*a, **k)
+
+
+def reveal_in_file_manager(path):
+    """Cross-platform reveal in Finder or Windows Explorer."""
+    if not path or not os.path.exists(path):
+        return False
+    norm = os.path.normpath(path)
+    if IS_WINDOWS:
+        if '"' in norm or any(ord(c) < 32 for c in norm) or path_is_unsafe(norm):
+            return False                    # Windows file names cannot contain a double quote; never build a split argument
+        if os.path.isdir(norm):
+            subprocess.Popen([winpath.system_exe("explorer.exe"), norm])                  # argv list, the path is data
+        else:
+            subprocess.Popen([winpath.system_exe("explorer.exe"), "/select," + norm])     # one argv element (list2cmdline quotes it if needed)
+    else:
+        _mac_popen(["/usr/bin/open", "-R", "--", os.path.abspath(path)])
+    return True
+
+def windows_move_to_recycle_bin(path):
+    """Move a file/folder to the Windows Recycle Bin (undoable). Raises OSError on failure."""
+    import ctypes
+    from ctypes import wintypes
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [("hwnd", wintypes.HWND), ("wFunc", wintypes.UINT), ("pFrom", wintypes.LPCWSTR),
+                    ("pTo", wintypes.LPCWSTR), ("fFlags", ctypes.c_ushort),
+                    ("fAnyOperationsAborted", wintypes.BOOL), ("hNameMappings", ctypes.c_void_p),
+                    ("lpszProgressTitle", wintypes.LPCWSTR)]
+
+    op = SHFILEOPSTRUCTW()
+    op.hwnd = None
+    op.wFunc = 3  # FO_DELETE
+    op.pFrom = os.path.abspath(path) + "\0\0"
+    op.pTo = None
+    op.fFlags = 0x40 | 0x10 | 0x4 | 0x400  # ALLOWUNDO | NOCONFIRMATION | SILENT | NOERRORUI
+    rc = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op))
+    if rc != 0 or op.fAnyOperationsAborted:
+        raise OSError("無法移至資源回收筒（錯誤碼 %s）" % rc)
+
+
+# Only these types may be handed to the user's default program. Deliberately small: no XML family (Edge runs XHTML
+# script from file:), no legacy binary Office / RTF (macros, OLE), no project / script / shortcut / web / SVG types.
+QUICKLOOK_EXT = {".pdf", ".docx", ".xlsx", ".pptx", ".csv", ".txt", ".md", ".json",
+                 ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif", ".tiff", ".heic"}
+QUICKLOOK_REFUSED = "為安全起見，此類型不支援以預設程式開啟"
+
+
+def open_with_default_app(path):
+    """Cross-platform open file with default system handler."""
+    if not path or not os.path.exists(path):
+        return False
+    if IS_WINDOWS:
+        # os.startfile() runs the default handler: for programs / scripts / shortcuts / active documents that is code
+        # execution. Only the explicit QUICKLOOK_EXT list is handed to the shell.
+        if path_is_unsafe(path) or winpath.any_reparse(path):
+            return False                       # a symlink / junction / placeholder anywhere on the path: refuse (fake.pdf -> evil.exe)
+        path = winpath.long_path(path)         # 8.3 short names are expanded BEFORE the extension is judged (EVIL~1.PDF = evil.pdfx)
+        if path_is_unsafe(path) or winpath.any_reparse(path) or not os.path.isfile(path) or os.path.splitext(path)[1].lower() not in QUICKLOOK_EXT:
+            return False
+        os.startfile(path)
+    else:
+        _mac_popen(["/usr/bin/open", "--", os.path.abspath(path)])
+    return True
+
+def pick_native_path(mode="folder", default_dir=None, default_name=None):
+    """Cross-platform native GUI file/folder picker. User-influenced values (default folder / file name) are only ever
+    passed as DATA: Win32 API arguments on Windows, osascript argv on macOS - never spliced into script source."""
+    if not default_dir or not os.path.isdir(default_dir):
+        default_dir = os.path.expanduser("~/Desktop")
+    if IS_WINDOWS:
+        clean_dir = os.path.normpath(default_dir)
+        if path_is_unsafe(clean_dir):
+            clean_dir = os.path.expanduser("~")
+        out = winshell.pick_path(mode, clean_dir, default_name)
+        return out if out else None
+    else:
+        # macOS: the script text is a FIXED string; the values arrive in argv ("on run argv")
+        if mode == "file":
+            script = ('on run argv\n'
+                      'POSIX path of (choose file with prompt "選擇要開啟的檔案：" default location (POSIX file (item 1 of argv)))\n'
+                      'end run')
+            args = [default_dir]
+        elif mode == "save":
+            script = ('on run argv\n'
+                      'POSIX path of (choose file name with prompt "另存新檔為：" default location (POSIX file (item 1 of argv)) default name (item 2 of argv))\n'
+                      'end run')
+            args = [default_dir, default_name or "scratch.md"]
+        else:
+            script = ('on run argv\n'
+                      'POSIX path of (choose folder with prompt "選擇要瀏覽的資料夾：" default location (POSIX file (item 1 of argv)))\n'
+                      'end run')
+            args = [default_dir]
+        res = _mac_run(["/usr/bin/osascript", "-e", script, "--"] + args, capture_output=True, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            return os.path.abspath(res.stdout.strip())
+        return None
 
 def compare_versions(v1, v2):
     """Return 1 if v1 > v2, -1 if v1 < v2, 0 if equal."""
@@ -117,6 +246,11 @@ if IS_APP_BUNDLE:
     MODELS_DIR = os.path.join(USER_SUPPORT_DIR, "models")
     if not os.path.isdir(MODELS_DIR) and os.path.isdir("/Users/become/Claude/Projects/toolbox/models"):
         MODELS_DIR = "/Users/become/Claude/Projects/toolbox/models"
+elif IS_WIN_FROZEN:
+    MODELS_DIR = os.path.join(WIN_DATA_DIR, "models")
+    CACHE_DIR = os.path.join(WIN_DATA_DIR, "cache", "thumbs")
+    SCRATCH_DIR = os.path.join(WIN_DATA_DIR, "cache", "scratch")
+    CAPTURES_DIR = os.path.join(WIN_DATA_DIR, "captures")
 else:
     MODELS_DIR = os.path.join(TOOLBOX_DIR, "models")
     CACHE_DIR = os.path.join(TOOLBOX_DIR, ".cache", "thumbs")
@@ -194,7 +328,7 @@ def imread_unicode(path, flags=None):
     img = cv2.imdecode(data, flags)
     if img is None and path.lower().endswith((".heic", ".tif", ".tiff")):
         tmp = os.path.join(CACHE_DIR, "heic_tmp.png")
-        subprocess.run(["/usr/bin/sips", "-s", "format", "png", path, "--out", tmp],
+        _mac_run(["/usr/bin/sips", "-s", "format", "png", path, "--out", tmp],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if os.path.exists(tmp):
             img = cv2.imdecode(np.fromfile(tmp, dtype=np.uint8), flags)
@@ -229,7 +363,7 @@ def get_ai_model(name):
             import spandrel_extra_arches
             from spandrel import ModelLoader
             spandrel_extra_arches.install()
-            dev = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+            dev = torch.device("mps" if (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()) else ("cuda" if torch.cuda.is_available() else "cpu"))
             m = ModelLoader(device=dev).load_from_file(os.path.join(MODELS_DIR, name))
             m.eval()
             MODEL_CACHE[name] = (m, dev)
@@ -245,7 +379,7 @@ def find_codex_bin():
     ]:
         if candidate and os.path.exists(candidate):
             return candidate
-    res = subprocess.run(["/bin/zsh", "-l", "-c", "which codex"], capture_output=True, text=True)
+    res = _mac_run(["/bin/zsh", "-l", "-c", "which codex"], capture_output=True, text=True)
     if res.returncode == 0 and res.stdout.strip():
         return res.stdout.strip().splitlines()[-1]
     return "codex"
@@ -296,6 +430,8 @@ def discover_variants(file_path):
 
     def add_cand(label, p):
         ap = os.path.abspath(p)
+        if entry_is_unsafe_link(ap):
+            return
         if os.path.exists(ap) and ap not in seen:
             seen.add(ap)
             candidates.append({"label": label, "path": ap, "name": os.path.basename(ap)})
@@ -335,9 +471,9 @@ def scan_recent_files():
     skip_names = {"package-lock.json", "tsconfig.tsbuildinfo"}
 
     for r in roots:
-        if not os.path.isdir(r):
+        if path_is_unsafe(r) or not os.path.isdir(r):
             continue
-        for root_dir, subdirs, files in os.walk(r):
+        for root_dir, subdirs, files in safe_walk(r):
             rel_depth = root_dir[len(r):].count(os.sep)
             if rel_depth > 3:
                 subdirs[:] = []
@@ -372,9 +508,192 @@ def scan_recent_markdowns():
     return [f for f in scan_recent_files() if f.get("type") == "markdown"][:60]
 
 
-def parse_pptx_file(target):
-    """Extract slides, 2D canvas items, text blocks, tables, speaker notes, and all embedded/SVG images from a .pptx file."""
+class EncryptedOfficeError(Exception):
+    """Password-protected Office file (cannot be previewed)."""
+
+
+# ---- In-memory unlock cache -------------------------------------------------------------------------
+# Decrypted bytes only (never the password), keyed by (path, mtime_ns, size). Lives in this process's RAM:
+# never written to disk / log / cache dir. Limits: 5 entries, 200 MB total, 10 minutes idle.
+UNLOCK_MAX_ENTRIES = 5
+UNLOCK_MAX_BYTES = 200 * 1024 * 1024
+UNLOCK_IDLE_SECONDS = 600
+_UNLOCK_CACHE = {}          # key -> {"data": bytes, "last": float}
+_UNLOCK_LOCK = threading.Lock()
+_PDFIUM_LOCK = threading.Lock()   # pdfium is not thread-safe
+
+
+def _unlock_key(path):
+    st = os.stat(path)
+    return (os.path.normcase(os.path.abspath(path)), st.st_mtime_ns, st.st_size)
+
+
+def _unlock_purge_locked(now=None):
+    now = now or time.time()
+    for k in [k for k, v in _UNLOCK_CACHE.items() if now - v["last"] > UNLOCK_IDLE_SECONDS]:
+        del _UNLOCK_CACHE[k]
+    while _UNLOCK_CACHE and (len(_UNLOCK_CACHE) > UNLOCK_MAX_ENTRIES or
+                             sum(len(v["data"]) for v in _UNLOCK_CACHE.values()) > UNLOCK_MAX_BYTES):
+        oldest = min(_UNLOCK_CACHE, key=lambda k: _UNLOCK_CACHE[k]["last"])
+        del _UNLOCK_CACHE[oldest]
+
+
+def unlock_cache_put(path, data):
+    with _UNLOCK_LOCK:
+        _UNLOCK_CACHE[_unlock_key(path)] = {"data": data, "last": time.time()}
+        _unlock_purge_locked()
+
+
+def unlock_cache_get(path):
+    try:
+        key = _unlock_key(path)
+    except OSError:
+        return None
+    with _UNLOCK_LOCK:
+        _unlock_purge_locked()
+        ent = _UNLOCK_CACHE.get(key)
+        if ent:
+            ent["last"] = time.time()
+            return ent["data"]
+    return None
+
+
+def _unlock_sweeper():
+    while True:
+        time.sleep(60)
+        with _UNLOCK_LOCK:
+            _unlock_purge_locked()
+
+
+threading.Thread(target=_unlock_sweeper, name="unlock-sweeper", daemon=True).start()
+
+
+class WrongPasswordError(Exception):
+    pass
+
+
+def can_unlock(path):
+    """Whether this server can offer a password prompt for the file."""
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        if ext == ".pdf":
+            if not IS_WINDOWS:
+                return False
+            import pypdfium2  # noqa: F401
+            return True
+        import msoffcrypto  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def decrypt_to_bytes(path, password):
+    """Decrypt a password-protected file fully in memory. Returns plain bytes; raises WrongPasswordError."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".pdf":
+        import pypdfium2 as pdfium
+        with _PDFIUM_LOCK:
+            try:
+                pdf = pdfium.PdfDocument(path, password=password)
+            except pdfium.PdfiumError as e:
+                if "password" in str(e).lower():
+                    raise WrongPasswordError()
+                raise RuntimeError("PDF 解密失敗")
+            try:
+                buf = io.BytesIO()
+                pdf.save(buf, flags=pdfium.raw.FPDF_REMOVE_SECURITY)
+                return buf.getvalue()
+            finally:
+                pdf.close()
+    import msoffcrypto
+    from msoffcrypto.exceptions import InvalidKeyError
+    with open(path, "rb") as f:
+        of = msoffcrypto.OfficeFile(f)
+        if not of.is_encrypted():
+            raise RuntimeError("此檔案沒有加密")
+        try:
+            of.load_key(password=password, verify_password=True)
+            out = io.BytesIO()
+            of.decrypt(out)
+        except InvalidKeyError:
+            raise WrongPasswordError()
+        except Exception:
+            # never include the underlying message (could echo input) in what we return
+            raise RuntimeError("解密失敗（檔案格式不支援或已損毀）")
+        return out.getvalue()
+
+
+def encrypted_response(path):
+    return {"ok": False, "error": "此檔案有密碼保護，目前無法預覽", "encrypted": True, "can_unlock": can_unlock(path)}
+
+
+ENCRYPTED_OFFICE_RESPONSE = {"ok": False, "error": "此檔案有密碼保護，目前無法預覽", "encrypted": True}  # kept for compatibility
+
+
+def _ole_stream_names(f, max_dir_sectors=4096, max_fat_sectors=4096):
+    """Read an OLE2 compound file's directory (stream/storage names only) without loading the file.
+    Reads the 512-byte header, the FAT sectors and the directory sector chain. Returns a set or None."""
+    import struct
+    f.seek(0)
+    hdr = f.read(512)
+    if len(hdr) < 512 or hdr[:8] != bytes.fromhex("d0cf11e0a1b11ae1"):
+        return None
+    ssz = 1 << struct.unpack_from("<H", hdr, 30)[0]
+    if ssz not in (512, 4096):
+        return None
+    dir_start = struct.unpack_from("<I", hdr, 48)[0]
+    difat_start, n_difat = struct.unpack_from("<II", hdr, 68)
+    fat_secs = [x for x in struct.unpack_from("<109I", hdr, 76) if x < 0xFFFFFFFA]
+    ENDMARK = 0xFFFFFFFA
+    sec, n = difat_start, 0
+    while sec < ENDMARK and n < min(n_difat, 1000):
+        f.seek((sec + 1) * ssz)
+        blk = f.read(ssz)
+        if len(blk) < ssz:
+            break
+        vals = struct.unpack("<%dI" % (ssz // 4), blk)
+        fat_secs += [x for x in vals[:-1] if x < ENDMARK]
+        sec, n = vals[-1], n + 1
+    fat = []
+    for fs in fat_secs[:max_fat_sectors]:
+        f.seek((fs + 1) * ssz)
+        blk = f.read(ssz)
+        if len(blk) < ssz:
+            break
+        fat += struct.unpack("<%dI" % (ssz // 4), blk)
+    names, sec, seen = set(), dir_start, 0
+    while sec < ENDMARK and sec < len(fat) + 1 and seen < max_dir_sectors:
+        f.seek((sec + 1) * ssz)
+        blk = f.read(ssz)
+        for off in range(0, len(blk) - 127, 128):
+            nlen = struct.unpack_from("<H", blk, off + 64)[0]
+            if 2 <= nlen <= 64:
+                names.add(blk[off:off + nlen - 2].decode("utf-16-le", "ignore"))
+        seen += 1
+        sec = fat[sec] if sec < len(fat) else ENDMARK
+    return names
+
+
+def check_office_encrypted(target):
+    """Raise EncryptedOfficeError for password-protected OOXML (OLE container holding an
+    'EncryptedPackage' stream). Only the OLE directory is read (no whole-file read).
+    Legacy encrypted .xls is detected from xlrd's own error."""
+    try:
+        with open(target, "rb") as f:
+            names = _ole_stream_names(f)
+    except Exception:
+        return
+    if names and "EncryptedPackage" in names:
+        raise EncryptedOfficeError()
+
+
+def parse_pptx_file(target, data=None):
+    """Extract slides, 2D canvas items, text blocks, tables, speaker notes, and all embedded/SVG images from a .pptx file.
+    `data` = decrypted bytes (memory-only mode: nothing derived from them is written to disk)."""
     import pptx
+    mem = data is not None
+    if not mem:
+        check_office_encrypted(target)
     st = os.stat(target)
     ext = os.path.splitext(target)[1].lower()
     if ext == ".ppt":
@@ -399,7 +718,7 @@ def parse_pptx_file(target):
             "markdown": f"# {os.path.basename(target)}\n\n（舊版 .ppt 格式，支援系統 QuickLook 預覽）"
         }
 
-    prs = pptx.Presentation(target)
+    prs = pptx.Presentation(io.BytesIO(data) if mem else target)
     sw = float(prs.slide_width or 12192000)
     sh = float(prs.slide_height or 6858000)
     aspect = round(sw / max(1.0, sh), 4)
@@ -414,6 +733,15 @@ def parse_pptx_file(target):
             img_ext = "jpg"
         if img_ext not in ("jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "tif", "tiff"):
             img_ext = "png"
+        if mem:   # decrypted content: embed as data URI, never touch the disk
+            mime = {"jpg": "image/jpeg", "svg": "image/svg+xml", "tif": "image/tiff"}.get(img_ext, "image/" + img_ext)
+            return {
+                "path": "",
+                "url": "data:%s;base64,%s" % (mime, base64.b64encode(blob).decode("ascii")),
+                "name": shape_name or f"Slide_{slide_idx}_Image.{img_ext}",
+                "slide": slide_idx,
+                "box": box,
+            }
         h_md5 = hashlib.md5(blob).hexdigest()[:16]
         img_fname = f"pptx_{h_md5}.{img_ext}"
         img_path = os.path.join(CACHE_DIR, img_fname)
@@ -423,7 +751,7 @@ def parse_pptx_file(target):
         if img_ext in ("tif", "tiff"):
             png_path = os.path.join(CACHE_DIR, f"pptx_{h_md5}.png")
             if not os.path.exists(png_path):
-                subprocess.run(["/usr/bin/sips", "-s", "format", "png", img_path, "--out", png_path],
+                _mac_run(["/usr/bin/sips", "-s", "format", "png", img_path, "--out", png_path],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if os.path.exists(png_path):
                 img_path = png_path
@@ -771,6 +1099,8 @@ def parse_pptx_file(target):
     # High-fidelity 1:1 Retina vector slide rasterization via native Keynote / PDFKit bridge
     rendered_slides_map = {}
     try:
+        if mem:
+            raise RuntimeError("memory-only mode: no on-disk slide rasterization")
         h_cache = hashlib.md5(f"{target}_{st.st_mtime}_{st.st_size}".encode("utf-8")).hexdigest()[:16]
         cache_pdf = os.path.join(CACHE_DIR, f"pptx_vec_{h_cache}.pdf")
         cache_slides_dir = os.path.join(CACHE_DIR, f"pptx_slides_{h_cache}")
@@ -779,19 +1109,19 @@ def parse_pptx_file(target):
         if not (os.path.exists(cache_slides_dir) and os.listdir(cache_slides_dir)):
             # If PDF doesn't exist, use Keynote in headless mode to export pixel-perfect PDF
             if not os.path.exists(cache_pdf):
-                osa_script = f'''
-                tell application "Keynote"
-                    set doc to open POSIX file "{target}"
-                    export doc to POSIX file "{cache_pdf}" as PDF
-                    close doc saving no
-                end tell
-                '''
-                subprocess.run(["osascript", "-e", osa_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=40)
+                osa_script = ('on run argv\n'
+                              'tell application "Keynote"\n'
+                              'set doc to open POSIX file (item 1 of argv)\n'
+                              'export doc to POSIX file (item 2 of argv) as PDF\n'
+                              'close doc saving no\n'
+                              'end tell\n'
+                              'end run')                       # fixed script text, file names travel in argv only
+                _mac_run(["osascript", "-e", osa_script, "--", target, cache_pdf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=40)
 
             # If PDF generated successfully, use mac_vision_helper to render all 1080p slides
             if os.path.exists(cache_pdf) and os.path.getsize(cache_pdf) > 1000:
                 os.makedirs(cache_slides_dir, exist_ok=True)
-                subprocess.run([HELPER_BIN, "export-pdf-slides", cache_pdf, cache_slides_dir, "1920", "1080"],
+                _mac_run([HELPER_BIN, "export-pdf-slides", cache_pdf, cache_slides_dir, "1920", "1080"],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
 
         # Map rendered slides into slides_out
@@ -850,13 +1180,17 @@ def parse_pptx_file(target):
     }
 
 
-def parse_docx_file(target):
-    """Convert .docx / .doc / .rtf into structured Markdown & HTML with embedded images and tables."""
+def parse_docx_file(target, data=None):
+    """Convert .docx / .doc / .rtf into structured Markdown & HTML with embedded images and tables.
+    `data` = decrypted bytes (memory-only mode)."""
+    mem = data is not None
+    if not mem:
+        check_office_encrypted(target)
     st = os.stat(target)
     ext = os.path.splitext(target)[1].lower()
 
     if ext in (".doc", ".rtf"):
-        res_txt = subprocess.run(["/usr/bin/textutil", "-convert", "txt", "-stdout", target], capture_output=True, text=True)
+        res_txt = _mac_run(["/usr/bin/textutil", "-convert", "txt", "-stdout", target], capture_output=True, text=True)
         txt = res_txt.stdout if res_txt.returncode == 0 else "（無法解析舊版文件內容）"
         return {
             "ok": True,
@@ -878,7 +1212,7 @@ def parse_docx_file(target):
     from docx.text.paragraph import Paragraph
     from docx.table import Table
 
-    doc = docx.Document(target)
+    doc = docx.Document(io.BytesIO(data) if mem else target)
     md_out = []
     para_count = 0
     table_count = 0
@@ -890,8 +1224,17 @@ def parse_docx_file(target):
     try:
         for r_id, rel in doc.part.rels.items():
             if "image" in rel.target_ref:
-                blob = rel.target_part.blob
+                if getattr(rel, "is_external", False):
+                    continue                      # linked (not embedded) image: skip it, keep going
+                try:
+                    blob = rel.target_part.blob
+                except Exception:
+                    continue
                 i_ext = os.path.splitext(rel.target_ref)[1].lower().lstrip(".") or "png"
+                if mem:   # decrypted content: data URI only, nothing written to disk
+                    mime = {"jpg": "image/jpeg", "svg": "image/svg+xml", "tif": "image/tiff"}.get(i_ext, "image/" + i_ext)
+                    rel_images[r_id] = "data:%s;base64,%s" % (mime, base64.b64encode(blob).decode("ascii"))
+                    continue
                 h_md5 = hashlib.md5(blob).hexdigest()[:16]
                 img_path = os.path.join(CACHE_DIR, f"docx_{h_md5}.{i_ext}")
                 if not os.path.exists(img_path):
@@ -912,7 +1255,10 @@ def parse_docx_file(target):
             for rid in embedded_rids:
                 if rid in rel_images:
                     img_count += 1
-                    md_out.append(f"\n![Embedded Image]({rel_images[rid]})\n")
+                    _img_ref = rel_images[rid]
+                    if not _img_ref.startswith("data:"):
+                        _img_ref = "/api/image?path=" + urllib.parse.quote(_img_ref, safe="")
+                    md_out.append(f"\n![Embedded Image]({_img_ref})\n")
 
             if not txt:
                 continue
@@ -1030,12 +1376,19 @@ def _build_sheet_dict(sheet_name, raw_rows):
     }
 
 
-def parse_xlsx_file(target):
-    """Parse all worksheets of an Excel (.xlsx / .xlsm / legacy BIFF8 .xls / HTML-table .xls) workbook."""
+def parse_xlsx_file(target, data=None):
+    """Parse all worksheets of an Excel (.xlsx / .xlsm / legacy BIFF8 .xls / HTML-table .xls) workbook.
+    `data` = decrypted bytes (memory-only mode)."""
+    mem = data is not None
+    if not mem:
+        check_office_encrypted(target)
     st = os.stat(target)
     ext = os.path.splitext(target)[1].lower()
-    with open(target, "rb") as bf:
-        head = bf.read(64)
+    if mem:
+        head = data[:64]
+    else:
+        with open(target, "rb") as bf:
+            head = bf.read(64)
 
     sheets_out = []
 
@@ -1043,7 +1396,7 @@ def parse_xlsx_file(target):
     if head.startswith(b"\xd0\xcf\x11\xe0") or (ext == ".xls" and not head.startswith(b"PK")):
         try:
             import xlrd
-            wb = xlrd.open_workbook(target)
+            wb = xlrd.open_workbook(file_contents=data) if mem else xlrd.open_workbook(target)
             for sheet_name in wb.sheet_names():
                 sh = wb.sheet_by_name(sheet_name)
                 raw_rows = []
@@ -1087,10 +1440,15 @@ def parse_xlsx_file(target):
                 "sheets": sheets_out,
             }
         except Exception as xls_err:
+            if "encrypt" in str(xls_err).lower():
+                raise EncryptedOfficeError()
             # Fallback if .xls is actually HTML or TSV text saved with .xls extension
             try:
-                with open(target, "rb") as f:
-                    raw_b = f.read(10 * 1024 * 1024)
+                if mem:
+                    raw_b = data[:10 * 1024 * 1024]
+                else:
+                    with open(target, "rb") as f:
+                        raw_b = f.read(10 * 1024 * 1024)
                 txt = None
                 for enc in ("utf-8-sig", "utf-8", "cp950", "big5", "utf-16", "latin1"):
                     try:
@@ -1123,7 +1481,7 @@ def parse_xlsx_file(target):
 
     # 2. Standard OOXML .xlsx / .xlsm
     import openpyxl
-    wb = openpyxl.load_workbook(target, data_only=True)
+    wb = openpyxl.load_workbook(io.BytesIO(data) if mem else target, data_only=True)
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
         raw_rows = []
@@ -1254,16 +1612,84 @@ def parse_xml_file(target):
     }
 
 
-def parse_pdf_file(target):
-    """Extract PDF metadata, page count, dimensions, and per-page text using macOS PDFKit."""
-    st = os.stat(target)
-    res = subprocess.run([HELPER_BIN, "pdf-info", target], capture_output=True, text=True)
-    info = {}
-    if res.returncode == 0 and res.stdout.strip():
+class EncryptedPdfError(Exception):
+    """Password-protected PDF (cannot be previewed)."""
+
+
+def pdfium_pdf_info(target, max_pages=1500, data=None):
+    """Windows replacement for the macOS PDFKit helper: page count, size, metadata and per-page text.
+    `data` = decrypted PDF bytes (memory-only mode)."""
+    import pypdfium2 as pdfium
+    try:
+        pdf = pdfium.PdfDocument(data if data is not None else target)
+    except pdfium.PdfiumError as e:
+        if "password" in str(e).lower():
+            raise EncryptedPdfError()
+        raise
+    try:
+        meta = {}
         try:
-            info = json.loads(res.stdout.strip().splitlines()[-1])
+            meta = pdf.get_metadata_dict() or {}
         except Exception:
-            info = {}
+            pass
+        pages = []
+        n = len(pdf)
+        for i in range(min(n, max_pages)):
+            page = pdf[i]
+            try:
+                w, h = page.get_size()
+                tp = page.get_textpage()
+                try:
+                    txt = tp.get_text_range()
+                finally:
+                    tp.close()
+            finally:
+                page.close()
+            pages.append({"index": i + 1, "text": txt.replace("\r\n", "\n"), "width": round(w), "height": round(h)})
+        return {"pages": pages, "page_count": n, "title": (meta.get("Title") or "").strip(),
+                "author": (meta.get("Author") or "").strip()}
+    finally:
+        pdf.close()
+
+
+def pdfium_render_page(target, page_num, out_png, scale=2.0, data=None):
+    """Render one page to PNG: to a file (out_png) or, when out_png is None, return the PNG bytes."""
+    import pypdfium2 as pdfium
+    with _PDFIUM_LOCK:
+        pdf = pdfium.PdfDocument(data if data is not None else target)
+        try:
+            if page_num < 1 or page_num > len(pdf):
+                return False if out_png else None
+            page = pdf[page_num - 1]
+            try:
+                img = page.render(scale=scale).to_pil().convert("RGB")
+            finally:
+                page.close()
+            if out_png:
+                img.save(out_png, "PNG")
+                return True
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            return buf.getvalue()
+        finally:
+            pdf.close()
+
+
+def parse_pdf_file(target, data=None):
+    """Extract PDF metadata, page count, dimensions, and per-page text using macOS PDFKit
+    (Windows: pypdfium2). `data` = decrypted PDF bytes (memory-only, Windows)."""
+    st = os.stat(target)
+    info = {}
+    if IS_WINDOWS:
+        with _PDFIUM_LOCK:
+            info = pdfium_pdf_info(target, data=data)
+    else:
+        res = _mac_run([HELPER_BIN, "pdf-info", target], capture_output=True, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                info = json.loads(res.stdout.strip().splitlines()[-1])
+            except Exception:
+                info = {}
 
     pages = info.get("pages") or []
     page_count = info.get("page_count") or len(pages) or 1
@@ -1298,16 +1724,495 @@ def parse_pdf_file(target):
     }
 
 
+# Per-process secret. The page receives it as an HttpOnly, SameSite=Strict cookie when "/" is served; every
+# /api/* request must present it (cookie, or X-PowerUp-Token header for the native launchers).
+SERVER_TOKEN = secrets.token_urlsafe(32)
+# Inline handlers / styles are still used by the page, so script-src keeps 'unsafe-inline'; the rest closes
+# exfiltration and injection routes (no plugins, no <base>, no foreign forms/frames, connect only to ourselves).
+PAGE_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; "
+            "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'")
+COOKIE_PREFIX = "ptk_"
+# Windows frozen build only: the token cookie is handed out solely to a "/" request carrying a one-time nonce that the
+# launcher created and passed to the WebView (e.g. "/?k=<nonce>"). A nonce works once; later page reloads rely on the
+# cookie already in the WebView. Plain-Python / macOS mode keeps the old behaviour (the Mac shell cannot be changed
+# in lock-step), and ?path= stays available there.
+INDEX_NONCES = set()
+_NONCE_LOCK = threading.Lock()
+
+
+def register_index_nonce(nonce):
+    with _NONCE_LOCK:
+        INDEX_NONCES.add(nonce)
+
+
+def _consume_index_nonce(nonce):
+    if not nonce:
+        return False
+    with _NONCE_LOCK:
+        if nonce in INDEX_NONCES:
+            INDEX_NONCES.discard(nonce)
+            return True
+    return False
+
+
+def cookie_name(port):
+    return COOKIE_PREFIX + str(port)
+# unlock brute-force limiter (thread-safe): per-file {fails, until, inflight} keyed by file identity + a global ceiling
+_UNLOCK_RL = {}
+_UNLOCK_RL_LOCK = threading.Lock()
+_UNLOCK_GLOBAL = []
+UNLOCK_MAX_FAILS = 5
+UNLOCK_COOLDOWN_SECONDS = 30
+UNLOCK_GLOBAL_PER_MINUTE = 30
+
+
+def _file_identity(path):
+    """(st_dev, st_ino) survives renames / hard links / case variants; fall back to the real path."""
+    try:
+        st = os.stat(path)
+        if st.st_ino:
+            return ("id", st.st_dev, st.st_ino)
+    except OSError:
+        pass
+    return ("path", os.path.normcase(os.path.realpath(path)))
+
+
+def unlock_reserve(path):
+    """Reserve one attempt BEFORE doing any work, so parallel requests cannot all slip past the check.
+    Returns (key, None) when allowed or (None, message) when limited."""
+    now = time.time()
+    key = _file_identity(path)
+    with _UNLOCK_RL_LOCK:
+        while _UNLOCK_GLOBAL and now - _UNLOCK_GLOBAL[0] > 60:
+            _UNLOCK_GLOBAL.pop(0)
+        if len(_UNLOCK_GLOBAL) >= UNLOCK_GLOBAL_PER_MINUTE:
+            return None, "嘗試次數過多，請稍後再試"
+        rec = _UNLOCK_RL.setdefault(key, {"fails": 0, "until": 0.0, "inflight": 0})
+        if rec["until"] > now:
+            return None, "嘗試次數過多，請 %d 秒後再試" % (int(rec["until"] - now) + 1)
+        if rec["fails"] + rec["inflight"] >= UNLOCK_MAX_FAILS:
+            return None, "嘗試次數過多，請稍後再試"
+        rec["inflight"] += 1
+        _UNLOCK_GLOBAL.append(now)
+        return key, None
+
+
+def unlock_release(key, success):
+    with _UNLOCK_RL_LOCK:
+        rec = _UNLOCK_RL.get(key)
+        if rec is None:
+            return False
+        rec["inflight"] = max(0, rec["inflight"] - 1)
+        if success:
+            _UNLOCK_RL.pop(key, None)
+            return False
+        rec["fails"] += 1
+        if rec["fails"] >= UNLOCK_MAX_FAILS:
+            rec["fails"] = 0
+            rec["until"] = time.time() + UNLOCK_COOLDOWN_SECONDS
+            return True      # cooldown just started
+        return False
+
+
+def _tokens_from_cookie(cookie_header, port):
+    """All values of our cookie. A page on another port could plant a same-named cookie with a narrower Path;
+    accepting any matching value means a planted junk cookie cannot lock the real app out."""
+    name = cookie_name(port)
+    vals = []
+    for part in (cookie_header or "").split(";"):
+        k, _, v = part.strip().partition("=")
+        if k == name:
+            vals.append(v)
+    return vals
+
+
+# ---- Path validation --------------------------------------------------------------------------------
+# On Windows any path that begins with two separators (UNC "\\\\host\\share", "//host/share", "\\\\?\\UNC\\...",
+# "\\\\.\\pipe", "/\\host", ...) or the NT namespace prefix "\\??\\" makes the OS open an SMB / WebDAV connection
+# (leaking an NTLMv2 hash) as soon as it is touched with isfile()/open()/listdir(). Every path-like request field
+# goes through path_is_unsafe() in ONE place (the request entry points below) so no route can forget it.
+PATH_PARAM_KEYS = ("path", "base_dir", "default_dir", "source_path", "target_path", "dir", "target")
+NAME_PARAM_KEYS = ("new_name", "name", "default_name")
+_WIN_RESERVED = ({"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$", "COM\u00b9", "COM\u00b2", "COM\u00b3", "LPT\u00b9", "LPT\u00b2", "LPT\u00b3"}
+                 | {"COM%d" % i for i in range(1, 10)} | {"LPT%d" % i for i in range(1, 10)})
+# bidi controls and look-alike separators / dots (visual spoofing of names)
+_BIDI_CHARS = set("\u200e\u200f\u061c\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
+_LOOKALIKE_SEPARATORS = set("\u2044\u2215\u2216\u29f5\u29f8\u29f9\uff0f\uff3c\ufe68")
+_LOOKALIKE_DOTS = set("\uff0e\u2024\u2025\u2026\u3002\ufe52")
+
+
+PDF_INTERACT = {"t": 0.0}
+
+
+class PathRejected(Exception):
+    """A request path is a network / device path, or reaches one through a symlink / junction."""
+
+
+def _legacy_path_is_unsafe(raw):
+    """True for network / device / NT-namespace paths (Windows) and NUL bytes (everywhere).
+    The value is stripped with str.strip() first (every Unicode white-space char) because the routes do the same."""
+    if not isinstance(raw, str):
+        return False
+    raw = raw.strip()
+    if "\x00" in raw:
+        return True
+    if sys.platform == "win32":
+        t = raw.replace("/", "\\")
+        if t.startswith("\\\\") or t.startswith("\\??\\"):
+            return True
+        try:
+            n = os.path.normpath(os.path.expanduser(raw)).replace("/", "\\")
+        except Exception:
+            return True
+        if n.startswith("\\\\") or os.path.splitdrive(n)[0].startswith("\\\\"):
+            return True
+    return False
+
+
+def path_is_unsafe(raw):
+    """Windows: WHITELIST (winpath.check_raw: only local / user-mapped drive-letter paths whose every component, including
+    symlink / junction targets, passes). Elsewhere: NUL bytes only. Empty / non-string values are not 'unsafe'."""
+    if sys.platform == "win32":
+        return not winpath.check_raw(raw)
+    return _legacy_path_is_unsafe(raw)
+
+
+def normalize_posix_path(raw):
+    """POSIX: a leading '//' is the same directory as '/', so normalise instead of rejecting."""
+    if sys.platform != "win32" and isinstance(raw, str) and raw.startswith("//"):
+        return "/" + raw.lstrip("/")
+    return raw
+
+
+_REPARSE_LINK_TAGS = (0xA000000C, 0xA0000003)      # IO_REPARSE_TAG_SYMLINK, IO_REPARSE_TAG_MOUNT_POINT (junction)
+
+
+def _is_link_stat(st):
+    import stat as _st
+    return _st.S_ISLNK(st.st_mode) or getattr(st, "st_reparse_tag", 0) in _REPARSE_LINK_TAGS
+
+
+def _lstat_is_link(full):
+    try:
+        return _is_link_stat(os.lstat(full))
+    except OSError:
+        return False
+
+
+def _link_target(tgt):
+    """Interpret an os.readlink() result. Returns (unsafe, usable_target). A leading extended-length prefix is
+    fine for local paths (\\\\?\\C:\\x, \\??\\C:\\x) but \\\\?\\UNC\\... / \\??\\UNC\\... / \\\\host\\s are network paths."""
+    t = tgt.replace("/", "\\")
+    up = t.upper()
+    if up.startswith("\\\\?\\UNC\\") or up.startswith("\\??\\UNC\\"):
+        return True, tgt
+    if t.startswith("\\\\?\\") or t.startswith("\\??\\"):
+        t = t[4:]
+    if path_is_unsafe(t):
+        return True, tgt
+    return False, t
+
+
+def _split_parts(rest):
+    return [x for x in re.split(r"[\\/]+", rest) if x]
+
+
+def _legacy_chain_has_unsafe_link(p, max_hops=40):
+    """Resolve symlinks / junctions component by component with lstat + readlink ONLY (never stat'ing through a link),
+    so a link that points to a UNC / device path is detected before the OS would open an SMB connection."""
+    p = os.path.abspath(p)
+    drive, rest = os.path.splitdrive(p)
+    parts = _split_parts(rest)
+    cur = drive + os.sep
+    hops = 0
+    while parts:
+        comp = parts.pop(0)
+        if comp == ".":
+            continue
+        if comp == "..":
+            cur = os.path.dirname(cur.rstrip("\\/")) or cur
+            continue
+        nxt = os.path.join(cur, comp)
+        try:
+            st = os.lstat(nxt)
+        except OSError:
+            return False                       # does not exist: nothing deeper can be touched
+        if _is_link_stat(st):
+            hops += 1
+            if hops > max_hops:
+                return True
+            try:
+                tgt = os.readlink(nxt)
+            except OSError:
+                return True                    # cannot tell where it goes: refuse
+            unsafe, tgt = _link_target(tgt)
+            if unsafe:
+                return True
+            d2, r2 = os.path.splitdrive(tgt)
+            if d2 or tgt.startswith(("\\", "/")):
+                cur = (d2 or drive) + os.sep
+                parts = _split_parts(r2) + parts
+            else:
+                parts = _split_parts(tgt) + parts   # relative to the folder holding the link
+            continue
+        cur = nxt
+    return False
+
+
+def chain_has_unsafe_link(p, max_hops=40):
+    if sys.platform == "win32":
+        n = winpath.normalize(p)
+        return n is None or not winpath.is_allowed(n)
+    return _legacy_chain_has_unsafe_link(p, max_hops)
+
+
+def entry_is_unsafe_link(full):
+    """For directory entries: the parent chain was verified already, so only the entry itself needs checking.
+    Windows: True (= skip the entry) unless winpath.entry_ok() - reparse entries are validated, never followed blindly."""
+    if sys.platform == "win32":
+        return not winpath.entry_ok(full)
+    try:
+        st = os.lstat(full)
+    except OSError:
+        return False
+    if not _is_link_stat(st):
+        return False
+    return chain_has_unsafe_link(full)
+
+
+def safe_fs_path(raw):
+    """abspath(expanduser(raw)) after validation: the single door to the file system for request-derived paths."""
+    if sys.platform == "win32":
+        n = winpath.normalize(raw)
+        if n is None or not winpath.is_allowed(n):
+            raise PathRejected(str(raw)[:40])
+        return n
+    if isinstance(raw, str):
+        raw = raw.strip()
+        if _legacy_path_is_unsafe(raw):
+            raise PathRejected(raw[:40])
+    out = os.path.abspath(os.path.expanduser(raw))
+    if _legacy_path_is_unsafe(out) or _legacy_chain_has_unsafe_link(out):
+        raise PathRejected(out[:40])
+    return out
+
+
+def safe_or_none(raw):
+    """safe_fs_path that returns None instead of raising (for optional locations such as ~/Desktop)."""
+    try:
+        return safe_fs_path(raw)
+    except (PathRejected, OSError, ValueError):
+        return None
+
+
+def safe_walk(top):
+    """os.walk replacement: skips symlinks / junctions that lead to UNC / device paths and never descends links."""
+    try:
+        entries = list(os.scandir(top))
+    except OSError:
+        return
+    dirs, files = [], []
+    for e in entries:
+        if entry_is_unsafe_link(e.path):
+            continue
+        try:
+            (dirs if e.is_dir() else files).append(e.name)
+        except OSError:
+            files.append(e.name)
+    yield top, dirs, files
+    for d in dirs:
+        full = os.path.join(top, d)
+        if _lstat_is_link(full):
+            continue
+        yield from safe_walk(full)
+
+
+def filename_is_invalid(name):
+    """Reject names that could escape the folder, are reserved / unusable on Windows, or are visual spoofs.
+    Checked on the raw value AND on the str.strip()ped value (what the routes actually use)."""
+    if not isinstance(name, str) or name == "":
+        return False                       # empty handled by each route
+    for v in (name, name.strip()):
+        if v == "":
+            return True
+        if v != v.rstrip():
+            return True                    # trailing white-space of any kind
+        if v != v.rstrip(" ."):
+            return True                    # trailing space / dot
+        if any(ord(c) < 32 for c in v) or any(c in v for c in ':/\\<>"|?*'):
+            return True
+        if v in (".", ".."):
+            return True
+        stem = v.split(".")[0].rstrip(" ").upper()
+        if stem in _WIN_RESERVED:
+            return True
+        if any(c in _BIDI_CHARS or c in _LOOKALIKE_SEPARATORS for c in v):
+            return True
+        if all(c == "." or c in _LOOKALIKE_DOTS for c in v):
+            return True
+    return False
+
+
 class ToolboxHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
+
+    def end_headers(self):
+        """Every response carries nosniff; every response that does not set its own CSP (index page, PDF frame) gets a
+        locked-down one, so even an error page or a mis-typed payload can never run script or load anything."""
+        buf = b"".join(getattr(self, "_headers_buffer", [])).lower()
+        if b"x-content-type-options" not in buf:
+            self.send_header("X-Content-Type-Options", "nosniff")
+        if b"content-security-policy" not in buf and b"content-type: application/pdf" not in buf:
+            self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox")
+        super().end_headers()
+
+    def _reject_bad_inputs(self, qs, body):
+        """Returns True (after replying 400) when any path-like / name-like field is unsafe. Values are stripped with
+        str.strip() (as every route does) BEFORE validation and the stripped value is written back, so routes only ever
+        see the value that was validated. Symlink / junction chains are checked here too."""
+        for src in (qs, body):
+            if not isinstance(src, dict):
+                continue
+            for k in PATH_PARAM_KEYS:
+                if k not in src:
+                    continue
+                v = src[k]
+                vals = v if isinstance(v, list) else [v]
+                out = []
+                for x in vals:
+                    if isinstance(x, str):
+                        x = x.strip()
+                        try:
+                            bad = path_is_unsafe(x)
+                            if not bad and x and sys.platform != "win32":
+                                bad = chain_has_unsafe_link(os.path.expanduser(x))
+                        except Exception:
+                            bad = True
+                        if bad:
+                            self.send_json({"ok": False, "error": "不允許的路徑（網路路徑或裝置路徑）"}, 400)
+                            return True
+                        if x and sys.platform == "win32":
+                            # write back exactly what was validated (abspath / expanduser / extended-prefix applied), so a
+                            # route can never use a raw string that differs from the checked one. A relative "path" that is
+                            # joined to a base_dir by the route (/api/image) is validated there after the join instead.
+                            joined = (k == "path" and not os.path.isabs(x) and bool(src.get("base_dir")))
+                            if not joined:
+                                x = winpath.normalize(x) or x
+                    out.append(x)
+                src[k] = out if isinstance(v, list) else out[0]
+            for k in NAME_PARAM_KEYS:
+                if k not in src:
+                    continue
+                v = src[k]
+                vals = v if isinstance(v, list) else [v]
+                out = []
+                for x in vals:
+                    if isinstance(x, str):
+                        if filename_is_invalid(x):
+                            self.send_json({"ok": False, "error": "檔名不合法"}, 400)
+                            return True
+                        x = x.strip()
+                    out.append(x)
+                src[k] = out if isinstance(v, list) else out[0]
+        return False
+
+    # ---------------------------------------------------------------- single security entry point
+    def _deny(self, code, msg):
+        try:   # drain (a bounded amount of) the unread request body so the client reliably receives the 4xx
+            n = int(self.headers.get("Content-Length") or 0)
+            if 0 < n <= (1 << 20):
+                self.rfile.read(n)
+        except Exception:
+            pass
+        self.close_connection = True
+        body = json.dumps({"ok": False, "error": msg}, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+        return False
+
+    def _gate(self):
+        """Applied to EVERY request (any method, any path) before routing. Returns True when allowed.
+        Layers: Host allow-list (anti DNS-rebinding) -> Origin -> Sec-Fetch-Site -> JSON content type (POST)
+        -> per-run token for /api/*."""
+        port = self.server.server_address[1]
+        hosts = {"127.0.0.1:%d" % port, "localhost:%d" % port}
+        if (self.headers.get("Host") or "").strip().lower() not in hosts:
+            return self._deny(403, "forbidden host")
+        origin = self.headers.get("Origin")
+        if origin is not None and origin.strip().lower() not in {"http://" + h for h in hosts}:
+            return self._deny(403, "forbidden origin")
+        path = urllib.parse.urlparse(self.path).path
+        sfs = self.headers.get("Sec-Fetch-Site")
+        # Pages and static files too: a cross-site / same-site (other port) top-level navigation to "/?path=..."
+        # must not receive the token cookie nor auto-open a file. Typed URLs (none), the app shell and its own
+        # sub-requests (same-origin) are unaffected.
+        if sfs is not None and sfs.strip().lower() not in ("same-origin", "none"):
+            return self._deny(403, "cross-site request blocked")
+        if not path.startswith("/api/"):
+            return True
+        if self.command == "POST":
+            ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if ctype != "application/json":
+                return self._deny(415, "application/json required")
+        candidates = _tokens_from_cookie(self.headers.get("Cookie"), port)
+        if self.headers.get("X-PowerUp-Token"):
+            candidates.append(self.headers.get("X-PowerUp-Token"))
+        for supplied in candidates:
+            if supplied and hmac.compare_digest(supplied.encode("utf-8"), SERVER_TOKEN.encode("utf-8")):
+                return True
+        # Narrow exception for the macOS app shell (Swift URLSession, cannot hold a browser cookie): a liveness
+        # probe and the "open this path" hand-off, accepted only from non-browser clients (browsers always send
+        # Origin and/or Sec-Fetch-Site on cross-site requests, and cannot send application/json without preflight).
+        if sys.platform == "darwin" and origin is None and sfs is None and (
+                (self.command == "GET" and path == "/api/pending-open") or
+                (self.command == "POST" and path == "/api/open-target")):
+            return True
+        return self._deny(403, "missing or invalid token")
+
+    def _guarded(self, fn):
+        try:
+            fn()
+        except PathRejected:
+            try:
+                self.send_json({"ok": False, "error": "不允許的路徑（網路路徑或裝置路徑）"}, 400)
+            except Exception:
+                pass
+        except (BrokenPipeError, ConnectionError):
+            pass
+        except Exception as e:      # never let a route bug kill the connection without a JSON answer
+            try:
+                self.send_json({"ok": False, "error": "伺服器錯誤：%s" % e.__class__.__name__}, 500)
+            except Exception:
+                pass
+
+    def do_GET(self):
+        if self._gate():
+            self._guarded(self._handle_get)
+
+    def do_POST(self):
+        if self._gate():
+            self._guarded(self._handle_post)
+
+    def _method_not_allowed(self):
+        if self._gate():
+            self._deny(405, "method not allowed")
+
+    do_OPTIONS = do_PUT = do_DELETE = do_PATCH = do_HEAD = _method_not_allowed
 
     def send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 
@@ -1317,18 +2222,44 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             return {}
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
-    def do_GET(self):
+    def _handle_get(self):
         parsed = urllib.parse.urlparse(self.path)
         route = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
+        if sys.platform != "win32":
+            for _k in PATH_PARAM_KEYS:
+                if _k in qs:
+                    qs[_k] = [normalize_posix_path(x) for x in qs[_k]]
+        if route.startswith("/api/") and self._reject_bad_inputs(qs, {}):
+            return
 
         if route in ("/", "/index.html"):
             index_path = os.path.join(TOOLBOX_DIR, "index.html")
             with open(index_path, "rb") as f:
                 content = f.read()
+            port_ = self.server.server_address[1]
+            issue_cookie = True
+            if IS_WIN_FROZEN:
+                have_cookie = any(hmac.compare_digest(v.encode("utf-8"), SERVER_TOKEN.encode("utf-8"))
+                                  for v in _tokens_from_cookie(self.headers.get("Cookie"), port_))
+                if _consume_index_nonce((qs.get("k") or [""])[0]):
+                    issue_cookie = True
+                elif have_cookie:
+                    issue_cookie = False        # page reload: the WebView already holds the cookie
+                else:
+                    self._deny(403, "open PowerUp Toolbox from the application")
+                    return
+                # no ?path= auto-open in the frozen build: files arrive via the launcher hand-off (/api/pending-open)
+                content = content.replace(b'name="powerup-allow-url-path" content="1"', b'name="powerup-allow-url-path" content="0"')
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(content)))
+            if issue_cookie:
+                self.send_header("Set-Cookie", "%s=%s; HttpOnly; SameSite=Strict; Path=/" % (cookie_name(port_), SERVER_TOKEN))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Frame-Options", "SAMEORIGIN")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Security-Policy", PAGE_CSP)
             self.end_headers()
             self.wfile.write(content)
             return
@@ -1337,7 +2268,11 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             rel_sub = route[len("/assets/"):].lstrip("/")
             asset_file = os.path.abspath(os.path.join(TOOLBOX_DIR, "assets", rel_sub))
             asset_root = os.path.abspath(os.path.join(TOOLBOX_DIR, "assets"))
-            if asset_file.startswith(asset_root) and os.path.isfile(asset_file):
+            try:
+                _inside = os.path.commonpath([asset_file, asset_root]) == asset_root
+            except ValueError:      # different drives
+                _inside = False
+            if _inside and os.path.isfile(asset_file):
                 mime_map = {
                     ".html": "text/html; charset=utf-8",
                     ".css": "text/css; charset=utf-8",
@@ -1358,12 +2293,28 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-Type", ctype)
                     self.send_header("Content-Length", str(len(data)))
-                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("X-Content-Type-Options", "nosniff")
                     self.end_headers()
                     self.wfile.write(data)
                     return
                 except Exception:
                     pass
+
+        if route == "/api/win-register-status" and IS_WIN_FROZEN:
+            self.send_json({"ok": True, **win_support.register_status()})
+            return
+
+        if route == "/api/update-status" and IS_WIN_FROZEN:
+            self.send_json({"ok": True, **win_support.update_status()})
+            return
+
+        if route == "/api/check-update" and IS_WIN_FROZEN:
+            self.send_json(win_support.check_update())
+            return
+
+        if route == "/api/check-update" and IS_WINDOWS:
+            self.send_json({"ok": False, "error": "Windows 非打包版不支援自動更新"})
+            return
 
         if route == "/api/check-update":
             repo_param = qs.get("repo", [None])[0]
@@ -1380,14 +2331,30 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 {"name": "📸 截圖匣", "full_name": "📸 截圖與剪貼簿匣", "path": os.path.abspath(CAPTURES_DIR), "icon": "📸"},
                 {"name": "📝 暫存匣", "full_name": "📝 暫存草稿工作匣 (Scratchpad)", "path": os.path.abspath(SCRATCH_DIR), "icon": "📝"},
                 {"name": "🧰 Toolbox", "full_name": "🧰 Toolbox 專案目錄", "path": os.path.abspath(TOOLBOX_DIR), "icon": "🧰"},
-                {"name": "🖥️ 桌面", "full_name": "🖥️ Mac 桌面 (Desktop)", "path": os.path.abspath(os.path.expanduser("~/Desktop")), "icon": "🖥️"},
-                {"name": "📂 下載", "full_name": "📂 下載項目 (Downloads)", "path": os.path.abspath(os.path.expanduser("~/Downloads")), "icon": "📂"},
-                {"name": "🖼️ 圖片", "full_name": "🖼️ 圖片 (Pictures)", "path": os.path.abspath(os.path.expanduser("~/Pictures")), "icon": "🖼️"},
-                {"name": "📄 文件", "full_name": "📄 文件 (Documents)", "path": os.path.abspath(os.path.expanduser("~/Documents")), "icon": "📄"},
-                {"name": "💻 專案區", "full_name": "💻 Claude 專案目錄", "path": os.path.abspath(os.path.expanduser("~/Claude/Projects")), "icon": "💻"},
+                {"name": "🖥️ 桌面", "full_name": "🖥️ 桌面 (Desktop)", "path": safe_or_none("~/Desktop"), "icon": "🖥️"},
+                {"name": "📂 下載", "full_name": "📂 下載項目 (Downloads)", "path": safe_or_none("~/Downloads"), "icon": "📂"},
+                {"name": "🖼️ 圖片", "full_name": "🖼️ 圖片 (Pictures)", "path": safe_or_none("~/Pictures"), "icon": "🖼️"},
+                {"name": "📄 文件", "full_name": "📄 文件 (Documents)", "path": safe_or_none("~/Documents"), "icon": "📄"},
             ]
-            valid = [b for b in bookmarks if os.path.exists(b["path"])]
-            self.send_json({"ok": True, "bookmarks": valid, "home": os.path.abspath(os.path.expanduser("~"))})
+            if IS_WINDOWS:
+                import string
+                for drive_letter in string.ascii_uppercase:
+                    dpath = f"{drive_letter}:\\"
+                    if winpath.drive_type(drive_letter) in winpath.ALLOWED_DRIVE_TYPES and (
+                            winpath.drive_type(drive_letter) == 4 or os.path.exists(dpath)):   # mapped network drives are listed, not probed
+                        bookmarks.append({
+                            "name": f"💾 {drive_letter}: 槽",
+                            "full_name": f"💾 本機磁碟 ({drive_letter}:)",
+                            "path": dpath,
+                            "icon": "💾"
+                        })
+            else:
+                bookmarks.append({"name": "💻 專案區", "full_name": "💻 Claude 專案目錄", "path": safe_or_none("~/Claude/Projects"), "icon": "💻"})
+
+            valid = [b for b in bookmarks if b["path"] and not path_is_unsafe(b["path"])
+                     and (len(b["path"]) == 3 and b["path"][1:] == ":\\" and winpath.drive_type(b["path"][0]) == 4
+                          or os.path.exists(b["path"]))]
+            self.send_json({"ok": True, "bookmarks": valid, "home": safe_or_none("~") or ""})
             return
 
         if route == "/api/recent-files":
@@ -1403,7 +2370,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "未指定檔案路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             if not os.path.isfile(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {target}"}, 404)
                 return
@@ -1432,7 +2399,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "未指定 JSON 檔案路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             if not os.path.isfile(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {target}"}, 404)
                 return
@@ -1468,12 +2435,14 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "未指定簡報路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             if not os.path.isfile(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {target}"}, 404)
                 return
             try:
-                self.send_json(parse_pptx_file(target))
+                self.send_json(parse_pptx_file(target, data=unlock_cache_get(target)))
+            except EncryptedOfficeError:
+                self.send_json(encrypted_response(target))
             except Exception as e:
                 self.send_json({"ok": False, "error": str(e)}, 500)
             return
@@ -1483,12 +2452,14 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "未指定 Word 路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             if not os.path.isfile(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {target}"}, 404)
                 return
             try:
-                self.send_json(parse_docx_file(target))
+                self.send_json(parse_docx_file(target, data=unlock_cache_get(target)))
+            except EncryptedOfficeError:
+                self.send_json(encrypted_response(target))
             except Exception as e:
                 self.send_json({"ok": False, "error": str(e)}, 500)
             return
@@ -1498,12 +2469,14 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "未指定 Excel 路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             if not os.path.isfile(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {target}"}, 404)
                 return
             try:
-                self.send_json(parse_xlsx_file(target))
+                self.send_json(parse_xlsx_file(target, data=unlock_cache_get(target)))
+            except EncryptedOfficeError:
+                self.send_json(encrypted_response(target))
             except Exception as e:
                 self.send_json({"ok": False, "error": str(e)}, 500)
             return
@@ -1513,7 +2486,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "未指定 XML 路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             if not os.path.isfile(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {target}"}, 404)
                 return
@@ -1528,30 +2501,37 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "未指定 PDF 路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             if not os.path.isfile(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {target}"}, 404)
                 return
             try:
-                self.send_json(parse_pdf_file(target))
+                self.send_json(parse_pdf_file(target, data=unlock_cache_get(target)))
+            except EncryptedPdfError:
+                self.send_json(encrypted_response(target))
             except Exception as e:
                 self.send_json({"ok": False, "error": str(e)}, 500)
             return
 
         if route == "/api/pdf-raw":
             path = qs.get("path", [""])[0].strip()
-            target = os.path.abspath(os.path.expanduser(path)) if path else ""
+            target = safe_fs_path(path) if path else ""
             if not target or not os.path.isfile(target):
                 self.send_error(404, "PDF not found")
                 return
             try:
-                with open(target, "rb") as f:
-                    data = f.read()
+                unlocked = unlock_cache_get(target)
+                if unlocked is not None:
+                    data = unlocked
+                else:
+                    with open(target, "rb") as f:
+                        data = f.read()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/pdf")
                 self.send_header("Content-Disposition", f'inline; filename="{urllib.parse.quote(os.path.basename(target))}"')
                 self.send_header("Content-Length", str(len(data)))
-                self.send_header("Cache-Control", "public, max-age=600")
+                self.send_header("Cache-Control", "no-store" if unlocked is not None else "private, no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
                 self.end_headers()
                 self.wfile.write(data)
             except Exception:
@@ -1561,22 +2541,41 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/pdf-page":
             path = qs.get("path", [""])[0].strip()
             page_num = int(qs.get("page", ["1"])[0] or "1")
-            target = os.path.abspath(os.path.expanduser(path)) if path else ""
+            target = safe_fs_path(path) if path else ""
             if not target or not os.path.isfile(target):
                 self.send_json({"ok": False, "error": "找不到 PDF 檔案"}, 404)
                 return
             try:
+                unlocked = unlock_cache_get(target) if IS_WINDOWS else None
+                if unlocked is not None:
+                    png = pdfium_render_page(target, page_num, None, 2.0, data=unlocked)
+                    if not png:
+                        self.send_json({"ok": False, "error": "無法渲染該頁 PDF"}, 500)
+                        return
+                    uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+                    self.send_json({"ok": True, "path": "", "url": uri, "image_url": uri, "image_path": "", "page": page_num,
+                                    "in_memory": True, "error": "加密文件的頁面不會寫入磁碟，無法送到圖片工坊"})
+                    return
                 st = os.stat(target)
                 h_key = hashlib.md5(f"{target}:{st.st_mtime_ns}:{page_num}".encode()).hexdigest()[:16]
                 out_png = os.path.join(CACHE_DIR, f"pdf_p{page_num}_{h_key}.png")
                 if not os.path.exists(out_png):
-                    subprocess.run([HELPER_BIN, "pdf-page", target, str(page_num), out_png, "2.0"],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if IS_WINDOWS:
+                        try:
+                            pdfium_render_page(target, page_num, out_png, 2.0)
+                        except Exception:
+                            pass
+                    else:
+                        _mac_run([HELPER_BIN, "pdf-page", target, str(page_num), out_png, "2.0"],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if os.path.exists(out_png):
                     self.send_json({
                         "ok": True,
                         "path": out_png,
                         "url": f"/api/image?path={urllib.parse.quote(out_png)}",
+                        # the front end reads image_url / image_path (was never returned -> broken page view)
+                        "image_url": f"/api/image?path={urllib.parse.quote(out_png)}",
+                        "image_path": out_png,
                         "page": page_num,
                     })
                 else:
@@ -1592,7 +2591,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "未指定 CSV 檔案路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             if not os.path.isfile(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {target}"}, 404)
                 return
@@ -1664,7 +2663,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not raw_path:
                 desktop = os.path.expanduser("~/Desktop")
                 has_desktop_supported = False
-                if os.path.isdir(desktop):
+                if not path_is_unsafe(desktop) and os.path.isdir(desktop):
                     try:
                         has_desktop_supported = any(
                             not e.startswith(".") and detect_file_type(e) is not None
@@ -1674,7 +2673,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                         pass
                 raw_path = desktop if has_desktop_supported else TOOLBOX_DIR
 
-            target = os.path.abspath(os.path.expanduser(raw_path))
+            target = safe_fs_path(raw_path)
             focus_file = None
             focus_type = None
             if os.path.isfile(target):
@@ -1700,6 +2699,8 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     if entry.startswith("."):
                         continue
                     full = os.path.join(target, entry)
+                    if entry_is_unsafe_link(full):
+                        continue                      # symlink / junction to a UNC or device path: never touch it
                     if os.path.isdir(full):
                         if entry not in skip_dirs:
                             try:
@@ -1738,7 +2739,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
 
                 # Only walk subdirectories when recursive=1 is explicitly enabled
                 if recursive:
-                    for root_dir, subdirs, files in os.walk(target):
+                    for root_dir, subdirs, files in safe_walk(target):
                         subdirs[:] = sorted([d for d in subdirs if not d.startswith(".") and d not in skip_dirs], key=natural_key)
                         for f in sorted(files, key=natural_key):
                             if f.startswith(".") or f in skip_json_names or len(items) >= 3000:
@@ -1776,7 +2777,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.send_json({
                 "ok": True,
                 "path": target,
-                "home": os.path.abspath(os.path.expanduser("~")),
+                "home": safe_or_none("~") or "",
                 "parent": os.path.dirname(target) if target != "/" else "/",
                 "recursive": recursive,
                 "focus_file": focus_file,
@@ -1801,7 +2802,13 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             is_thumb = qs.get("thumb", ["0"])[0] == "1"
 
             if path and not os.path.isabs(path) and base_dir:
-                path = os.path.abspath(os.path.join(base_dir, path))
+                path = os.path.join(base_dir, path)
+            if path:
+                try:
+                    path = safe_fs_path(path)          # the joined path is validated as a whole (whitelist on Windows)
+                except PathRejected:
+                    self.send_json({"ok": False, "error": "不允許的路徑（網路路徑或裝置路徑）"}, 400)
+                    return
 
             if not path or not os.path.isfile(path):
                 self.send_error(404, "Image not found")
@@ -1832,21 +2839,37 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                         data = f.read()
                     ctype = "image/png"
                 else:
-                    # 1. Try sips first for standard image files
-                    subprocess.run(
-                        ["/usr/bin/sips", "-Z", "360", "-s", "format", "jpeg", path, "--out", thumb_file],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                    )
+                    # 1. Try PIL (Pillow) first (cross-platform, fast)
+                    pil_done = False
+                    try:
+                        from PIL import Image
+                        with Image.open(path) as im:
+                            im.thumbnail((360, 360))
+                            if im.mode in ("RGBA", "P"):
+                                im = im.convert("RGB")
+                            im.save(thumb_file, "JPEG", quality=85)
+                            pil_done = True
+                    except Exception:
+                        pil_done = False
+
+                    if not pil_done and not IS_WINDOWS:
+                        # 2. Try macOS sips for standard image files
+                        _mac_run(
+                            ["/usr/bin/sips", "-Z", "360", "-s", "format", "jpeg", path, "--out", thumb_file],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                        )
+
                     if os.path.exists(thumb_file):
                         with open(thumb_file, "rb") as f:
                             data = f.read()
                         ctype = "image/jpeg"
                     else:
-                        # 2. Try macOS QuickLook for PPTX, PDF, Office, Keynote, etc.
-                        subprocess.run(
-                            ["/usr/bin/qlmanage", "-t", "-s", "360", "-o", CACHE_DIR, path],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
-                        )
+                        # 3. Try macOS QuickLook for PPTX, PDF, Office, Keynote, etc.
+                        if not IS_WINDOWS:
+                            _mac_run(
+                                ["/usr/bin/qlmanage", "-t", "-s", "360", "-o", CACHE_DIR, path],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+                            )
                         ql_out = os.path.join(CACHE_DIR, os.path.basename(path) + ".png")
                         if os.path.exists(ql_out):
                             try:
@@ -1867,7 +2890,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             elif ext in (".heic", ".tif", ".tiff"):
                 conv_file = os.path.join(CACHE_DIR, f"{etag}_full.jpg")
                 if not os.path.exists(conv_file):
-                    subprocess.run(["/usr/bin/sips", "-s", "format", "jpeg", path, "--out", conv_file],
+                    _mac_run(["/usr/bin/sips", "-s", "format", "jpeg", path, "--out", conv_file],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 with open(conv_file if os.path.exists(conv_file) else path, "rb") as f:
                     data = f.read()
@@ -1886,17 +2909,90 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("ETag", etag)
-            self.send_header("Cache-Control", "public, max-age=3600")
+            self.send_header("Cache-Control", "private, no-store")
+            # A user-supplied .svg opened as a top-level document must never run script in the app origin.
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'")
             self.end_headers()
             self.wfile.write(data)
             return
 
         self.send_error(404)
 
-    def do_POST(self):
+    def _handle_post(self):
         parsed = urllib.parse.urlparse(self.path)
         route = parsed.path
-        body = self.read_json()
+        try:
+            body = self.read_json()
+        except (ValueError, UnicodeDecodeError):
+            self.send_json({"ok": False, "error": "invalid JSON body"}, 400)
+            return
+        if not isinstance(body, dict):
+            self.send_json({"ok": False, "error": "JSON object expected"}, 400)
+            return
+        if sys.platform != "win32":
+            for _k in PATH_PARAM_KEYS:
+                if isinstance(body.get(_k), str):
+                    body[_k] = normalize_posix_path(body[_k])
+        if self._reject_bad_inputs({}, body):
+            return
+
+        if route == "/api/win-register" and IS_WIN_FROZEN:
+            if body.get("action") == "unregister":
+                win_support.unregister()
+            else:
+                win_support.register()
+            self.send_json({"ok": True, **win_support.register_status()})
+            return
+
+        if route == "/api/unlock":
+            # Password arrives ONLY in the POST body; it is used once and never stored, logged or echoed.
+            path = (body.get("path") or "").strip()
+            password = body.get("password")
+            target = safe_fs_path(path) if path else ""
+            if not target or not os.path.isfile(target):
+                self.send_json({"ok": False, "error": "找不到檔案"}, 404)
+                return
+            if not isinstance(password, str) or password == "":
+                self.send_json({"ok": False, "wrong_password": True, "error": "請輸入密碼"})
+                return
+            if not can_unlock(target):
+                self.send_json(encrypted_response(target))
+                return
+            rl_key, rl_msg = unlock_reserve(target)
+            if rl_key is None:
+                self.send_json({"ok": False, "rate_limited": True, "error": rl_msg})
+                return
+            ok_flag = False
+            try:
+                plain = decrypt_to_bytes(target, password)
+                unlock_cache_put(target, plain)
+                ok_flag = True
+                self.send_json({"ok": True, "unlocked": True})
+            except WrongPasswordError:
+                cooled = unlock_release(rl_key, False)
+                rl_key = None
+                if cooled:
+                    self.send_json({"ok": False, "rate_limited": True,
+                                    "error": "密碼錯誤次數過多，請 %d 秒後再試" % UNLOCK_COOLDOWN_SECONDS})
+                else:
+                    self.send_json({"ok": False, "wrong_password": True, "error": "密碼錯誤"})
+            except Exception as e:
+                self.send_json({"ok": False, "error": e.__class__.__name__ if not isinstance(e, RuntimeError) else str(e)})
+            finally:
+                if rl_key is not None:
+                    unlock_release(rl_key, ok_flag)
+                password = None
+                body.pop("password", None)
+            return
+
+        if route == "/api/perform-update" and IS_WIN_FROZEN:
+            self.send_json(win_support.perform_update())
+            return
+
+        if route == "/api/perform-update" and IS_WINDOWS:
+            self.send_json({"ok": False, "error": "Windows 非打包版不支援自動更新"}, 400)
+            return
 
         if route == "/api/perform-update":
             pkg_url = body.get("pkg_url")
@@ -1912,7 +3008,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     req = urllib.request.Request(pkg_url, headers={"User-Agent": f"MacToolbox/{APP_VERSION}"})
                     with urllib.request.urlopen(req, timeout=45.0) as resp, open(dest, "wb") as out:
                         shutil.copyfileobj(resp, out)
-                    subprocess.Popen(["/usr/bin/open", dest])
+                    _mac_popen(["/usr/bin/open", dest])
                 except Exception as err:
                     print(f"Auto-update download error: {err}")
 
@@ -1920,10 +3016,17 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.send_json({"ok": True, "message": "已開始背景下載最新安裝包，完成後將自動啟動 macOS 安裝引導。"})
             return
 
+        if route == "/api/pdf-interact":
+            # the page reports that the user clicked inside the built-in PDF viewer (window blur with the PDF frame active):
+            # the shell uses it to tell a PDF link click from a script-driven navigation (see windows/launcher.py)
+            PDF_INTERACT["t"] = time.time()
+            self.send_json({"ok": True})
+            return
+
         if route == "/api/open-target":
             target = body.get("path", "")
             if target:
-                abs_p = os.path.abspath(os.path.expanduser(target))
+                abs_p = safe_fs_path(target)
                 LAST_OPEN_REQUEST["id"] += 1
                 LAST_OPEN_REQUEST["path"] = abs_p
                 LAST_OPEN_REQUEST["type"] = detect_file_type(abs_p)
@@ -1936,11 +3039,14 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             path = body.get("path", "").strip()
             sheet_name = (body.get("sheet_name") or body.get("sheet") or "").strip()
             headers = body.get("headers") or []
-            rows = body.get("rows") or []
+            rows = body.get("rows")
             if not path:
                 self.send_json({"ok": False, "error": "缺少檔案路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            if not isinstance(rows, list) or not isinstance(headers, list):
+                self.send_json({"ok": False, "error": "缺少必要欄位 rows（資料列陣列）"}, 400)     # never clear a sheet by accident
+                return
+            target = safe_fs_path(path)
             try:
                 ext = os.path.splitext(target)[1].lower()
                 if ext == ".xls":
@@ -1984,7 +3090,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path or content is None:
                 self.send_json({"ok": False, "error": "缺少路徑或內容"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             try:
                 with open(target, "w", encoding="utf-8") as f:
                     f.write(content)
@@ -2002,7 +3108,13 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/quicklook":
             path = body.get("path", "").strip()
             if path and os.path.exists(path):
-                subprocess.Popen(["/usr/bin/qlmanage", "-p", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if IS_WINDOWS:
+                    path = safe_fs_path(path)          # the validated, normalised path - never the raw string
+                    if not open_with_default_app(path):
+                        self.send_json({"ok": False, "error": QUICKLOOK_REFUSED}, 400)
+                        return
+                else:
+                    _mac_popen(["/usr/bin/qlmanage", "-p", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 self.send_json({"ok": True})
             else:
                 self.send_json({"ok": False, "error": "找不到檔案"}, 404)
@@ -2016,7 +3128,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "缺少檔案路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             try:
                 ext = os.path.splitext(target)[1].lower()
                 delim = "\t" if ext == ".tsv" else ","
@@ -2044,7 +3156,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_json({"ok": False, "error": "缺少檔案路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(path))
+            target = safe_fs_path(path)
             try:
                 with open(target, "w", encoding="utf-8") as f:
                     f.write(content)
@@ -2063,7 +3175,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/reveal-finder":
             path = body.get("path", "")
             if path and os.path.exists(path):
-                subprocess.Popen(["/usr/bin/open", "-R", path])
+                reveal_in_file_manager(path)
                 self.send_json({"ok": True})
             else:
                 self.send_json({"ok": False, "error": "Path not found"}, 404)
@@ -2072,19 +3184,9 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/pick-path":
             mode = body.get("mode", "folder")
             default_dir = body.get("default_dir", "").strip()
-            if not default_dir or not os.path.isdir(default_dir):
-                default_dir = os.path.expanduser("~/Desktop")
-            escaped_dir = default_dir.replace("\\", "\\\\").replace('"', '\\"')
-            if mode == "file":
-                script = f'POSIX path of (choose file with prompt "選擇要開啟的檔案：" default location (POSIX file "{escaped_dir}"))'
-            elif mode == "save":
-                default_name = body.get("default_name", "scratch.md").replace("\\", "\\\\").replace('"', '\\"')
-                script = f'POSIX path of (choose file name with prompt "另存新檔為：" default location (POSIX file "{escaped_dir}") default name "{default_name}")'
-            else:
-                script = f'POSIX path of (choose folder with prompt "選擇要瀏覽的資料夾：" default location (POSIX file "{escaped_dir}"))'
-            res = subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, text=True)
-            if res.returncode == 0 and res.stdout.strip():
-                chosen = os.path.abspath(res.stdout.strip())
+            default_name = body.get("default_name", "").strip()
+            chosen = pick_native_path(mode=mode, default_dir=default_dir, default_name=default_name)
+            if chosen:
                 self.send_json({"ok": True, "path": chosen})
             else:
                 self.send_json({"ok": False, "cancelled": True})
@@ -2164,7 +3266,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": "未指定儲存目標路徑"}, 400)
                 return
 
-            target = os.path.abspath(os.path.expanduser(target_path))
+            target = safe_fs_path(target_path)
             os.makedirs(os.path.dirname(target), exist_ok=True)
 
             try:
@@ -2196,14 +3298,14 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not raw_path:
                 self.send_json({"ok": False, "error": "未指定檔案路徑"}, 400)
                 return
-            target = os.path.abspath(os.path.expanduser(raw_path))
+            target = safe_fs_path(raw_path)
             if not os.path.exists(target):
                 self.send_json({"ok": False, "error": f"找不到檔案: {os.path.basename(target)}"}, 404)
                 return
 
             if action == "rename":
                 new_name = body.get("new_name", "").strip()
-                if not new_name or "/" in new_name or "\\" in new_name:
+                if not new_name or filename_is_invalid(new_name):
                     self.send_json({"ok": False, "error": "新檔名不合法"}, 400)
                     return
                 parent_dir = os.path.dirname(target)
@@ -2229,6 +3331,26 @@ class ToolboxHandler(BaseHTTPRequestHandler):
 
             elif action == "trash":
                 try:
+                    if IS_WINDOWS and os.environ.get("POWERUP_DATA_DIR"):
+                        # test instance: never use the real Recycle Bin; use a trash folder in the test data dir
+                        tdir = os.path.join(os.environ["POWERUP_DATA_DIR"], "trash")
+                        os.makedirs(tdir, exist_ok=True)
+                        dest = os.path.join(tdir, "%d_%s" % (int(time.time() * 1000), os.path.basename(target)))
+                        if os.path.splitdrive(os.path.abspath(target))[0].upper() != os.path.splitdrive(os.path.abspath(tdir))[0].upper():
+                            self.send_json({"ok": False, "error": "測試模式的垃圾桶只支援同一磁碟機"}, 400)
+                            return
+                        os.rename(target, dest)        # same-volume rename: moves a junction / symlink itself, never copies through it
+                        self.send_json({"ok": True, "deleted_path": target, "trash_path": dest,
+                                        "message": f"已移至資源回收筒：{os.path.basename(target)}"})
+                        return
+                    if IS_WINDOWS:
+                        windows_move_to_recycle_bin(target)
+                        self.send_json({
+                            "ok": True,
+                            "deleted_path": target,
+                            "message": f"已移至資源回收筒：{os.path.basename(target)}"
+                        })
+                        return
                     trash_dir = os.path.expanduser("~/.Trash")
                     os.makedirs(trash_dir, exist_ok=True)
                     base_name = os.path.basename(target)
@@ -2291,23 +3413,55 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             else:
                 out_path = os.path.join(CAPTURES_DIR, f"{stem}_clip_{ts}.png")
 
-            rx = str(crop.get("x", 0.0))
-            ry = str(crop.get("y", 0.0))
-            rw = str(crop.get("w", 1.0))
-            rh = str(crop.get("h", 1.0))
-            cmd = [HELPER_BIN, "crop-rotate", path, out_path, rx, ry, rw, rh, str(rotate)]
-            if action in ("copy", "both"):
-                cmd.append("copy")
-
-            res = subprocess.run(cmd, capture_output=True, text=True)
             try:
-                info = json.loads(res.stdout.strip())
-            except Exception:
-                info = {"ok": False, "error": res.stderr or "圖片裁切失敗"}
+                rx = str(float(crop.get("x", 0.0)))
+                ry = str(float(crop.get("y", 0.0)))
+                rw = str(float(crop.get("w", 1.0)))
+                rh = str(float(crop.get("h", 1.0)))
+            except (TypeError, ValueError):
+                self.send_json({"ok": False, "error": "裁切參數必須是數字"}, 400)
+                return
+
+            if os.path.exists(HELPER_BIN):
+                cmd = [HELPER_BIN, "crop-rotate", path, out_path, rx, ry, rw, rh, str(rotate)]
+                if action in ("copy", "both"):
+                    cmd.append("copy")
+
+                res = _mac_run(cmd, capture_output=True, text=True)
+                try:
+                    info = json.loads(res.stdout.strip())
+                except Exception:
+                    info = {"ok": False, "error": res.stderr or "圖片裁切失敗"}
+            else:
+                try:
+                    from PIL import Image
+                    with Image.open(path) as im:
+                        orig_w, orig_h = im.size
+                        fx, fy, fw, fh = float(rx), float(ry), float(rw), float(rh)
+                        left = max(0, int(round(fx * orig_w)))
+                        top = max(0, int(round(fy * orig_h)))
+                        right = min(orig_w, int(round((fx + fw) * orig_w)))
+                        bottom = min(orig_h, int(round((fy + fh) * orig_h)))
+                        cropped = im.crop((left, top, right, bottom))
+                        if rotate != 0:
+                            cropped = cropped.rotate(-rotate, expand=True)
+                        cropped.save(out_path, format="PNG")
+                        cw, ch = cropped.size
+                        info = {"ok": True, "width": cw, "height": ch, "copied": False}
+                except Exception as e:
+                    info = {"ok": False, "error": f"圖片裁切失敗: {e}"}
 
             if not info.get("ok"):
                 self.send_json(info, 500)
                 return
+
+            # On Windows, copy image to clipboard (Win32 clipboard API through ctypes) if requested
+            if IS_WINDOWS and action in ("copy", "both") and os.path.exists(out_path):
+                try:
+                    winshell.copy_image_to_clipboard(out_path)       # ctypes clipboard API, no PowerShell, no script text
+                    info["copied"] = True
+                except Exception:
+                    pass
 
             cw = info.get("width", 0)
             ch = info.get("height", 0)
@@ -2318,7 +3472,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 "saved_path": out_path,
                 "width": cw,
                 "height": ch,
-                "message": f"已處理 ({cw}×{ch} px)" + (" 並複製到 Mac 剪貼簿！可直接 Cmd+V 貼上" if copied else "")
+                "message": f"已處理 ({cw}×{ch} px)" + ((" 並複製到剪貼簿！可直接 Ctrl+V 貼上" if IS_WINDOWS else " 並複製到剪貼簿！可直接 Ctrl+V / Cmd+V 貼上") if copied else "")
             })
             return
 
@@ -2327,21 +3481,38 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             ts = time.strftime("%Y%m%d_%H%M%S")
             out_path = os.path.join(CAPTURES_DIR, f"screenshot_{ts}.png")
 
+            if IS_WINDOWS:
+                if mode == "clipboard":
+                    winshell.clipboard_image_to_png(out_path)         # ctypes clipboard API, no PowerShell
+                    if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                        self.send_json({"ok": True, "path": out_path, "folder": CAPTURES_DIR})
+                    else:
+                        self.send_json({"ok": False, "error": "剪貼簿中沒有圖片"})
+                    return
+                else:
+                    subprocess.Popen([winpath.system_exe("explorer.exe"), "ms-screenclip:"])
+                    self.send_json({"ok": True, "message": "已啟動 Windows 截圖工具，截圖完成後請點擊「貼上剪貼簿」載入。"})
+                    return
+
             if mode == "interactive":
-                subprocess.run(["/usr/sbin/screencapture", "-i", out_path])
+                _mac_run(["/usr/sbin/screencapture", "-i", out_path])
                 if not os.path.exists(out_path):
                     self.send_json({"ok": False, "cancelled": True, "error": "已取消截圖"})
                     return
-                subprocess.run([HELPER_BIN, "copy-image", out_path], capture_output=True)
+                if os.path.exists(HELPER_BIN):
+                    _mac_run([HELPER_BIN, "copy-image", out_path], capture_output=True)
                 self.send_json({"ok": True, "path": out_path, "folder": CAPTURES_DIR})
                 return
             elif mode == "clipboard":
                 out_path = os.path.join(CAPTURES_DIR, f"clipboard_{ts}.png")
-                res = subprocess.run([HELPER_BIN, "paste-image", out_path], capture_output=True, text=True)
-                try:
-                    info = json.loads(res.stdout.strip())
-                except Exception:
-                    info = {"ok": False, "error": res.stderr or "無法讀取剪貼簿"}
+                if os.path.exists(HELPER_BIN):
+                    res = _mac_run([HELPER_BIN, "paste-image", out_path], capture_output=True, text=True)
+                    try:
+                        info = json.loads(res.stdout.strip())
+                    except Exception:
+                        info = {"ok": False, "error": res.stderr or "無法讀取剪貼簿"}
+                else:
+                    info = {"ok": False, "error": "無法讀取剪貼簿"}
                 if info.get("ok") and os.path.exists(out_path):
                     self.send_json({"ok": True, "path": out_path, "folder": CAPTURES_DIR})
                 else:
@@ -2354,13 +3525,20 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": "找不到圖片"}, 404)
                 return
 
-            res = subprocess.run([HELPER_BIN, "faces", path], capture_output=True, text=True)
-            try:
-                data = json.loads(res.stdout.strip())
-            except Exception:
-                data = {"ok": False, "error": res.stderr or "人臉偵測失敗"}
-            self.send_json(data)
-            return
+            if os.path.exists(HELPER_BIN):
+                res = _mac_run([HELPER_BIN, "faces", path], capture_output=True, text=True)
+                try:
+                    data = json.loads(res.stdout.strip())
+                except Exception:
+                    data = {"ok": False, "error": res.stderr or "人臉偵測失敗"}
+                self.send_json(data)
+                return
+            else:
+                self.send_json({
+                    "ok": False,
+                    "error": "Windows 平台人臉偵測模組開發中（即將支援 OpenCV YuNet / Windows.Media.FaceAnalysis）"
+                })
+                return
 
         if route == "/api/ocr":
             path = body.get("path", "")
@@ -2369,16 +3547,23 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": "找不到圖片"}, 404)
                 return
 
+            if not os.path.exists(HELPER_BIN):
+                self.send_json({
+                    "ok": False,
+                    "error": "Windows 平台 OCR 模組開發中（即將支援 Windows.Media.Ocr.OcrEngine）"
+                })
+                return
+
             target_path = path
             if crop:
                 target_path = os.path.join(CACHE_DIR, "ocr_crop_tmp.png")
-                subprocess.run([
+                _mac_run([
                     HELPER_BIN, "crop-rotate", path, target_path,
-                    str(crop.get("x", 0)), str(crop.get("y", 0)),
-                    str(crop.get("w", 1)), str(crop.get("h", 1)), "0"
+                    str(float(crop.get("x", 0))), str(float(crop.get("y", 0))),
+                    str(float(crop.get("w", 1))), str(float(crop.get("h", 1))), "0"
                 ], capture_output=True)
 
-            res = subprocess.run([HELPER_BIN, "ocr", target_path], capture_output=True, text=True)
+            res = _mac_run([HELPER_BIN, "ocr", target_path], capture_output=True, text=True)
             try:
                 data = json.loads(res.stdout.strip())
             except Exception:
@@ -2393,24 +3578,39 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": "找不到圖片"}, 404)
                 return
 
+            if not os.path.exists(HELPER_BIN):
+                self.send_json({
+                    "ok": False,
+                    "error": "Windows 平台去背模組開發中（即將支援 RMBG ONNX DirectML）"
+                })
+                return
+
             stem = os.path.splitext(os.path.basename(path))[0]
             ts = time.strftime("%H%M%S")
             in_path = path
             if crop:
                 in_path = os.path.join(CACHE_DIR, "nobg_in_tmp.png")
-                subprocess.run([
+                _mac_run([
                     HELPER_BIN, "crop-rotate", path, in_path,
-                    str(crop.get("x", 0)), str(crop.get("y", 0)),
-                    str(crop.get("w", 1)), str(crop.get("h", 1)), "0"
+                    str(float(crop.get("x", 0))), str(float(crop.get("y", 0))),
+                    str(float(crop.get("w", 1))), str(float(crop.get("h", 1))), "0"
                 ], capture_output=True)
 
             out_path = os.path.join(CAPTURES_DIR, f"{stem}_nobg_{ts}.png")
-            res = subprocess.run([HELPER_BIN, "remove-bg", in_path, out_path, "copy"], capture_output=True, text=True)
+            res = _mac_run([HELPER_BIN, "remove-bg", in_path, out_path, "copy"], capture_output=True, text=True)
             try:
                 data = json.loads(res.stdout.strip())
             except Exception:
                 data = {"ok": False, "error": res.stderr or "去背失敗"}
             self.send_json(data)
+            return
+
+        if route == "/api/ai-enhance" and IS_WINDOWS:
+            self.send_json({"ok": False, "error": "Windows 版尚未支援本地 AI 修復強化"})
+            return
+
+        if route == "/api/codex" and IS_WINDOWS:
+            self.send_json({"ok": False, "error": "Windows 版尚未支援 Codex CLI 整合"})
             return
 
         if route == "/api/ai-enhance":
@@ -2519,7 +3719,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 ts = time.strftime("%H%M%S")
                 out_path = os.path.join(CAPTURES_DIR, f"{stem}_ai_{mode}_{ts}.png")
                 imwrite_unicode(out_path, final_img, ".png")
-                subprocess.run([HELPER_BIN, "copy-image", out_path], capture_output=True)
+                _mac_run([HELPER_BIN, "copy-image", out_path], capture_output=True)
 
                 elapsed = round(time.time() - t0, 2)
                 self.send_json({
@@ -2547,10 +3747,10 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             in_img_path = path
             if path and os.path.isfile(path) and crop:
                 in_img_path = os.path.join(CAPTURES_DIR, f"codex_input_{ts}.png")
-                subprocess.run([
+                _mac_run([
                     HELPER_BIN, "crop-rotate", path, in_img_path,
-                    str(crop.get("x", 0)), str(crop.get("y", 0)),
-                    str(crop.get("w", 1)), str(crop.get("h", 1)), "0"
+                    str(float(crop.get("x", 0))), str(float(crop.get("y", 0))),
+                    str(float(crop.get("w", 1))), str(float(crop.get("h", 1))), "0"
                 ], capture_output=True)
 
             codex_bin = find_codex_bin()
@@ -2564,7 +3764,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             )
 
             try:
-                proc = subprocess.run(
+                proc = _mac_run(
                     [codex_bin, "exec", "--skip-git-repo-check", "--full-auto", full_prompt],
                     cwd=TOOLBOX_DIR,
                     capture_output=True,
@@ -2574,7 +3774,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 output_log = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
                 has_new_image = os.path.exists(out_img_path)
                 if has_new_image:
-                    subprocess.run([HELPER_BIN, "copy-image", out_img_path], capture_output=True)
+                    _mac_run([HELPER_BIN, "copy-image", out_img_path], capture_output=True)
                 self.send_json({
                     "ok": proc.returncode == 0 or has_new_image,
                     "has_image": has_new_image,
@@ -2589,13 +3789,13 @@ class ToolboxHandler(BaseHTTPRequestHandler):
 
 
 class ReusableThreadingHTTPServer(ThreadingHTTPServer):
-    allow_reuse_address = True
+    allow_reuse_address = sys.platform != "win32"
 
 
 def main():
     port = int(os.environ.get("MACTOOLBOX_PORT", "18765"))
-    if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
-        abs_p = os.path.abspath(os.path.expanduser(sys.argv[1]))
+    abs_p = safe_or_none(sys.argv[1]) if len(sys.argv) > 1 else None
+    if abs_p and os.path.exists(abs_p):
         LAST_OPEN_REQUEST["id"] = 1
         LAST_OPEN_REQUEST["path"] = abs_p
         LAST_OPEN_REQUEST["type"] = detect_file_type(abs_p)

@@ -10,7 +10,7 @@
 		</data>
 		<key>Resources/README.md</key>
 		<data>
-		cnYQupC8JSKyA7NhEdqFvdQiA7A=
+		+JYO6OK13pzKczafkOmzb2g9gOQ=
 		</data>
 		<key>Resources/assets/AppIcon.icns</key>
 		<data>
@@ -40,9 +40,33 @@
 		<data>
 		C/Ti2RlOBl2xuykmLrmwmz4AVPc=
 		</data>
+		<key>Resources/assets/vendor/README.md</key>
+		<data>
+		h76cOIt8cKsXMtINucsXP81zkQY=
+		</data>
+		<key>Resources/assets/vendor/github-dark.min.css</key>
+		<data>
+		oe0DT1osdtatoK9R3LMOLlr5NqA=
+		</data>
+		<key>Resources/assets/vendor/highlight.min.js</key>
+		<data>
+		Dy3HYLZwuw6PDsPQVFNoUqwYKdA=
+		</data>
+		<key>Resources/assets/vendor/marked.min.js</key>
+		<data>
+		ljJyf1heloWK0YUj/M34W7ulIXA=
+		</data>
+		<key>Resources/assets/vendor/mermaid.min.js</key>
+		<data>
+		+AZU9xYWBS9oyvdZjVIO6MvGJc8=
+		</data>
+		<key>Resources/assets/vendor/purify.min.js</key>
+		<data>
+		U5JcsEDbtCDS0du8opIrpbH1TLc=
+		</data>
 		<key>Resources/index.html</key>
 		<data>
-		zBUgDQkQv9PWDyUmzhTKLOen/W4=
+		IuThbK4oPnWpK2p/8McYOnzmiiM=
 		</data>
 		<key>Resources/mac_vision_helper</key>
 		<data>
@@ -70,11 +94,19 @@
 		</data>
 		<key>Resources/server.py</key>
 		<data>
-		5Q7i4IumsmJAxWCMhKDEy9nBmXs=
+		uLITuYVPzIScbQRxxnNFTF4zsa8=
 		</data>
 		<key>Resources/set_default_handlers</key>
 		<data>
 		TJuls8OJCwHxdGX6tF+PAIUFdn8=
+		</data>
+		<key>Resources/winpath.py</key>
+		<data>
+		Rt2ov/uzr0uiGDMEAK/ZFSSxPB0=
+		</data>
+		<key>Resources/winshell.py</key>
+		<data>
+		8bLa/DpX0dHNIrrkp3ppOY4rTw4=
 		</data>
 		<key>Resources/xlrd/__init__.py</key>
 		<data>
@@ -139,7 +171,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			JimG50e2/XF3fMf9z+2JJx66+fZ2rbqBVDWtzvFxFuE=
+			KX2alKEKYaKBcrNBlTgmFslYQNb7H++T78EMkrXPIb8=
 			</data>
 		</dict>
 		<key>Resources/assets/AppIcon.icns</key>
@@ -191,11 +223,53 @@
 			PZrP6vklrciMZ91SwsmaAJjGZAr3aEkKSfOMHvDlnDg=
 			</data>
 		</dict>
+		<key>Resources/assets/vendor/README.md</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			PnJ4DGwT3Ndyk92P3e7REu4LHDV5bMoTp5CTk4KDmPI=
+			</data>
+		</dict>
+		<key>Resources/assets/vendor/github-dark.min.css</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			nyCNAiECsdDHrr/s2OQsp5l9XeY2ZJ0rMepjCT2AkBk=
+			</data>
+		</dict>
+		<key>Resources/assets/vendor/highlight.min.js</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			g3pvpbDHNrUrveKythkPMF2j/J7UFoHbUyFQcFe1yEY=
+			</data>
+		</dict>
+		<key>Resources/assets/vendor/marked.min.js</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Pn59f+s+XVjLbIBPaKtcJMx+XrYnD9bly7kSRzkhfQw=
+			</data>
+		</dict>
+		<key>Resources/assets/vendor/mermaid.min.js</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jWB9fvHQd6iqIC4Y5iISv6mSxov+q8XPRdUaEo/mZ10=
+			</data>
+		</dict>
+		<key>Resources/assets/vendor/purify.min.js</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			zTeJj5eCrfVIIMQTGRtWkYA/DxN8eZ1u3P04UjtMLDE=
+			</data>
+		</dict>
 		<key>Resources/index.html</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			lZ4o0eVAiK9TMcwRALyjrCe0KSB+2hA9w9+i/+r1ZCs=
+			POvVrW39fcBQIuNN73PBsJTDB2Kv7Bg8IjOujqA/fjk=
 			</data>
 		</dict>
 		<key>Resources/mac_vision_helper</key>
@@ -244,7 +318,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			B+TCOQwEv+ZcKtlQpXwvOc51AcClG5WWFO0UfujppW4=
+			68QUBT2miA3i1QIea4iCmjYVSK0bhqX6m1xCNl7Bh0Q=
 			</data>
 		</dict>
 		<key>Resources/set_default_handlers</key>
@@ -252,6 +326,20 @@
 			<key>hash2</key>
 			<data>
 			6PxsejnxV6eqH0ZFjT+qBOTr6J9ATdOK9ASUgb8TZN0=
+			</data>
+		</dict>
+		<key>Resources/winpath.py</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			teIGynzBw0gmVhL8ZmJx4lHJ4peniVNAPpUqMFQcImo=
+			</data>
+		</dict>
+		<key>Resources/winshell.py</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			RcP+u3KPwCB3lUzFEY07Ir1iT67Sx++M0fgLNhAXGvU=
 			</data>
 		</dict>
 		<key>Resources/xlrd/__init__.py</key>

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="2.6"
+VERSION="2.7"
 APP_NAME="MacToolbox.app"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
@@ -35,6 +35,8 @@ cp -f "$ROOT_DIR/sample_demo.csv" "$ROOT_DIR/$APP_NAME/Contents/Resources/sample
 cp -f "$ROOT_DIR/sample_demo.pptx" "$ROOT_DIR/$APP_NAME/Contents/Resources/sample_demo.pptx"
 cp -f "$ROOT_DIR/sample_demo.docx" "$ROOT_DIR/$APP_NAME/Contents/Resources/sample_demo.docx"
 cp -f "$ROOT_DIR/sample_demo.xlsx" "$ROOT_DIR/$APP_NAME/Contents/Resources/sample_demo.xlsx"
+cp -f "$ROOT_DIR/winpath.py" "$ROOT_DIR/$APP_NAME/Contents/Resources/winpath.py" 2>/dev/null || true
+cp -f "$ROOT_DIR/winshell.py" "$ROOT_DIR/$APP_NAME/Contents/Resources/winshell.py" 2>/dev/null || true
 rm -rf "$ROOT_DIR/$APP_NAME/Contents/Resources/xlrd"
 cp -R "$ROOT_DIR/xlrd" "$ROOT_DIR/$APP_NAME/Contents/Resources/xlrd"
 chmod +x "$ROOT_DIR/$APP_NAME/Contents/MacOS/MacToolbox"
@@ -107,10 +109,11 @@ cat << EOF > "$DIST_DIR/version.json"
   "dmg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.dmg",
   "pkg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.pkg",
   "changelog": [
-    "🚀 全新 3D 科技工具箱高質感立體品牌圖示與 macOS AppIcon",
-    "🖼️ 海量照片極速網格瀏覽模式 (3,000+ 張照片 0 秒瞬顯)",
-    "🔍 6048×4032 24.4MP 4K 原寸自適應檢視與 AI 影像增強側欄",
-    "⚡ 內建 GitHub main 分支 dist 自動更新偵測與一鍵升級引擎"
+    "🚀 PowerUp Toolbox 跨平台正式版：全面支援 macOS 與 Windows 10/11",
+    "🛡️ 企業級安全強化：本機 Token 鑑權、Strict CSP、DOMPurify 與離線安全沙盒",
+    "🖼️ 海量照片極速網格瀏覽模式 (3,000+ 張照片 0 秒瞬顯) 與原寸自適應檢視",
+    "📑 Markdown / Office / PDF / JSON / CSV 全功能即時預覽與雙欄編輯",
+    "⚡ 跨平台一鍵自動更新引擎 (GitHub Release / main 分支發布)"
   ]
 }
 EOF
