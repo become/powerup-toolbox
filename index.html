@@ -3,11 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="powerup-allow-url-path" content="1" />
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
 <title>MacToolbox — 智慧萬用檢視器 (Photo · Markdown · JSON/XML · CSV/Excel · PPTX/Word · PDF)</title>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<!-- Vendored locally (see assets/vendor/README.md): works offline, no external requests -->
+<script src="/assets/vendor/marked.min.js"></script>
+<script src="/assets/vendor/purify.min.js"></script>
+<link rel="stylesheet" href="/assets/vendor/github-dark.min.css" />
+<script src="/assets/vendor/highlight.min.js"></script>
+<script src="/assets/vendor/mermaid.min.js"></script>
 <style>
   :root {
     --bg-0: #0b0d12;
@@ -545,6 +549,11 @@
     font-weight: 600;
     font-family: "SF Mono", Menlo, monospace;
   }
+  /* HUD width budget: the shortcut hints give way first, the file name keeps >= 96px (ellipsis),
+     file actions / index / meta stay complete. */
+  .hud-bar > div:first-child { flex: 1 1 auto !important; min-width: 300px !important; }
+  #hudShortcuts { flex: 0 100 auto !important; min-width: 0; overflow: hidden; white-space: nowrap; }
+  #hudFilename { flex: 0 1 auto; min-width: 96px; }
 
   /* Stage 1: Photo Canvas */
   .stage {
@@ -709,6 +718,10 @@
     padding: 1px 3px; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+
+  .grid-toolbar { display: none; align-items: center; gap: 14px; flex-shrink: 0; padding: 8px 20px; font-size: 12px; border-bottom: 1px solid var(--border); background: var(--bg-1); }
+  .center-pane:has(#gridView.visible) .grid-toolbar { display: flex; }
+  .grid-card.folder-card .img-box { display: flex; align-items: center; justify-content: center; }
 
   /* Grid View (Thumbnail Wall) */
   .grid-view {
@@ -1897,6 +1910,7 @@
         <div class="btn-group">
           <button class="btn active" id="modeSingleBtn" onclick="setViewMode('single')">🖼️ 單圖</button>
           <button class="btn" id="modeGridBtn" onclick="setViewMode('grid')">🎛️ 縮圖牆</button>
+          <button class="btn" id="thumbToggleBtn" onclick="toggleShowThumbs()" title="顯示/隱藏圖片縮圖（預設隱藏）">🖼️ 顯示縮圖</button>
           <button class="btn" id="modeCompareBtn" onclick="setViewMode('compare')">⚖️ A/B 比對</button>
         </div>
       </div>
@@ -2098,7 +2112,7 @@
       <!-- Unified Status HUD -->
       <div class="hud-bar">
         <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
-          <span class="hud-title" id="hudFilename" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">載入中...</span>
+          <span class="hud-title" id="hudFilename" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">尚未開啟檔案</span>
           <span id="hudIndex" style="flex-shrink:0;"></span>
           <span id="hudBrowseBadge" style="display:none; background:rgba(245,158,11,0.18); color:#fcd34d; border:1px solid rgba(245,158,11,0.4); padding:1px 6px; border-radius:4px; font-size:10.5px; flex-shrink:0;" title="左側正在瀏覽其他資料夾，點擊左側任一檔案即可切換檢視">👀 保持檢視中</span>
           <div id="hudFileActions" style="display:none; align-items:center; gap:3px; margin-left:4px; flex-shrink:0;">
@@ -2118,6 +2132,12 @@
       </div>
 
       <!-- 1A. Image Single Stage -->
+      <div id="openFailBox" style="display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:30px; text-align:center; color:var(--muted); font-size:14px;">
+        <div id="openFailIcon" style="font-size:44px;">⚠️</div>
+        <div id="openFailMsg" style="max-width:520px; line-height:1.6;"></div>
+        <button class="btn primary" id="openFailUnlockBtn" style="display:none;" onclick="openUnlockForActive()">🔑 輸入密碼</button>
+      </div>
+
       <div class="stage" id="singleView" onwheel="handleStageWheel(event)">
         <div class="img-wrapper" id="imgWrapper">
           <img id="mainImage" src="" alt="" onload="onMainImageLoaded()" />
@@ -2144,6 +2164,12 @@
       <div class="face-strip" id="faceStrip"></div>
 
       <!-- 1B. Thumbnail Grid View -->
+      <div class="grid-toolbar" id="gridToolbar">
+        <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" id="chkShowThumbs" onchange="setShowThumbs(this.checked)" /><span id="lblShowThumbs">顯示縮圖</span></label>
+        <span id="lblThumbHint" style="color:var(--muted);">預設隱藏，避免看到不該看的圖片</span>
+        <span style="flex:1;"></span>
+        <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" id="chkAutoGrid" onchange="setAutoGridOnEnter(this.checked)" /><span id="lblAutoGrid">進入資料夾時自動切到縮圖牆</span></label>
+      </div>
       <div class="grid-view" id="gridView"></div>
 
       <!-- 1C. Image A/B Compare Stage -->
@@ -2260,7 +2286,7 @@
         <div id="pdfPageView" style="display:none; flex:1; overflow-y:auto; padding:24px; flex-direction:column; align-items:center; gap:16px;">
           <div style="display:flex; gap:10px; align-items:center; background:var(--bg-1); padding:8px 16px; border-radius:10px; border:1px solid var(--border); flex-wrap:wrap;">
             <span id="pdfPageImgLabel" style="font-weight:700; color:#fda4af;">第 1 頁高畫質渲染圖</span>
-            <button class="btn primary" onclick="openCurrentPdfPageInPhotoViewer()">✂️ 在圖片工坊開啟此頁（框選裁切 ⌘C / 去背 / OCR）</button>
+            <button class="btn primary" data-win-text="✂️ 在圖片工坊開啟此頁（框選裁切 Ctrl+C）" onclick="openCurrentPdfPageInPhotoViewer()">✂️ 在圖片工坊開啟此頁（框選裁切 ⌘C / 去背 / OCR）</button>
             <button class="btn emerald" onclick="copyCurrentPdfPageText()">📋 複製本頁文字</button>
           </div>
           <img id="pdfPageImage" src="" style="max-width:960px; width:100%; border-radius:10px; border:1px solid var(--border); box-shadow:0 16px 48px rgba(0,0,0,0.65); background:#fff; cursor:pointer;" onclick="openCurrentPdfPageInPhotoViewer()" title="點擊進入圖片工坊裁切或 OCR" />
@@ -2314,7 +2340,7 @@
           </div>
         </div>
 
-        <div class="tool-card">
+        <div class="tool-card" data-mac-only="1">
           <div class="tool-header">
             <span>🧑‍🤝‍🧑 AI 臉部偵測與導覽</span>
             <span class="kbd">快捷鍵 F / Tab</span>
@@ -2325,7 +2351,7 @@
           </div>
         </div>
 
-        <div class="tool-card">
+        <div class="tool-card" data-mac-only="1" data-win-title="🪄 影像工具（去背／OCR）">
           <div class="tool-header">
             <span>🪄 macOS 原生 Vision 工具</span>
             <span class="kbd">Neural Engine</span>
@@ -2337,7 +2363,7 @@
           <div id="ocrResultBox" class="output-box"></div>
         </div>
 
-        <div class="tool-card">
+        <div class="tool-card" data-mac-only="1">
           <div class="tool-header">
             <span>✨ 本地 AI 修復強化</span>
             <span class="kbd">MPS GPU</span>
@@ -2354,7 +2380,7 @@
           <button class="btn purple" style="width:100%" onclick="runAiEnhance('ddcolor')">🎨 DDColor AI 自動上色</button>
         </div>
 
-        <div class="tool-card">
+        <div class="tool-card" data-mac-only="1">
           <div class="tool-header">
             <span>🤖 呼叫本地 Codex CLI</span>
             <span class="kbd">codex exec</span>
@@ -2655,7 +2681,7 @@
   </div>
 
 <script>
-  mermaid.initialize({ startOnLoad: false, theme: "dark" });
+  mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });
 
   // Unified State
   let currentFileType = "image"; // "image" | "markdown" | "json" | "csv"
@@ -2676,6 +2702,53 @@
   let recentFiles = [];
   let currentIndex = -1;
   let activeFileObj = null;      // Currently displayed file on center stage: { path, name, type, size, mtime }
+
+  // Thumbnail privacy: image previews are hidden by default and NOT remembered across launches.
+  let showThumbs = false;
+  // tell the shell when the user clicks inside the built-in PDF viewer: the viewer's link clicks are not reported as
+  // user-initiated by WebView2, the shell only hands such a link to the system browser right after this signal
+  window.addEventListener("blur", () => {
+    const a = document.activeElement;
+    if (a && a.id === "pdfNativeFrame") {
+      fetch("/api/pdf-interact", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
+    }
+  });
+  let autoOpenPending = false;   // next selectItem() comes from automatic first-file opening, not from a user pick
+  let activeOpenIsAuto = false;
+  let unlockCtx = null;
+  let lastFailure = null;   // {msg, path, encrypted, canUnlock} of the last failed open (restored when leaving the wall)
+  let openFailed = false;   // last open attempt failed (encrypted / unreadable): stage + HUD are cleared
+  // Auto-switch to the thumbnail wall when entering a folder (off by default, remembered).
+  let autoGridOnEnter = false;
+  try { autoGridOnEnter = localStorage.getItem("powerup_auto_grid") === "1"; } catch (e) {}
+  const THUMB_I18N = {
+    "zh-Hant": { btnOn: "🙈 隱藏縮圖", btnOff: "🖼️ 顯示縮圖", label: "顯示縮圖", hint: "預設隱藏，避免看到不該看的圖片", auto: "進入資料夾時自動切到縮圖牆", parent: "上一層", folder: "資料夾" },
+    "en": { btnOn: "🙈 Hide thumbnails", btnOff: "🖼️ Show thumbnails", label: "Show thumbnails", hint: "Hidden by default for privacy", auto: "Open thumbnail wall when entering a folder", parent: "Parent", folder: "Folder" }
+  };
+  function thumbText(k) { return (THUMB_I18N[appCurrentLang] || THUMB_I18N["zh-Hant"])[k]; }
+  function setShowThumbs(on) {
+    showThumbs = Boolean(on);
+    // Drop already-loaded previews (clear src so the browser cancels/forgets them), then re-render.
+    document.querySelectorAll("#gridView img, #filmstrip img").forEach(im => { im.removeAttribute("src"); });
+    renderGridView();
+    renderFilmstrip();
+    updateThumbUi();
+  }
+  function toggleShowThumbs() { setShowThumbs(!showThumbs); }
+  function setAutoGridOnEnter(on) {
+    autoGridOnEnter = Boolean(on);
+    try { localStorage.setItem("powerup_auto_grid", autoGridOnEnter ? "1" : "0"); } catch (e) {}
+    updateThumbUi();
+  }
+  function updateThumbUi() {
+    const b = document.getElementById("thumbToggleBtn");
+    if (b) { b.textContent = showThumbs ? thumbText("btnOn") : thumbText("btnOff"); b.classList.toggle("active", showThumbs); }
+    const c1 = document.getElementById("chkShowThumbs"); if (c1) c1.checked = showThumbs;
+    const c2 = document.getElementById("chkAutoGrid"); if (c2) c2.checked = autoGridOnEnter;
+    const l1 = document.getElementById("lblShowThumbs"); if (l1) l1.textContent = thumbText("label");
+    const l2 = document.getElementById("lblThumbHint"); if (l2) l2.textContent = thumbText("hint");
+    const l3 = document.getElementById("lblAutoGrid"); if (l3) l3.textContent = thumbText("auto");
+  }
 
   // Image View State
   let viewMode = "single";
@@ -2744,8 +2817,13 @@
     t._timer = setTimeout(() => t.classList.remove("show"), duration);
   }
 
+  // For values placed inside a JS string literal that sits in an HTML attribute (inline onclick="f('...')").
+  // Uses \xNN escapes so the result contains no quote / angle bracket / ampersand / newline: safe in both contexts.
   function escapeQuotes(s) {
-    return (s || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    return String(s == null ? "" : s)
+      .replace(/\\/g, "\\\\").replace(/'/g, "\\x27").replace(/"/g, "\\x22")
+      .replace(/</g, "\\x3c").replace(/>/g, "\\x3e").replace(/&/g, "\\x26")
+      .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
   }
 
   function escapeHtml(s) {
@@ -2753,7 +2831,84 @@
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // Sanitizer for every piece of HTML that comes from file content (markdown / docx / pptx / pdf text).
+  const SANITIZE_CFG = {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ["style", "form", "iframe", "frame", "frameset", "object", "embed", "meta", "base", "link", "script",
+                  "noscript", "svg", "math", "template", "audio", "video", "source", "track", "dialog", "portal"],
+    FORBID_ATTR: ["srcdoc", "formaction", "form", "action", "ping", "background", "xlink:href"],
+    ADD_ATTR: ["target"],
+    ALLOW_DATA_ATTR: false,
+    SANITIZE_NAMED_PROPS: true,   // id / name get a "user-content-" prefix: no DOM clobbering of app globals
+  };
+  if (window.DOMPurify) {
+    DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
+      if ((data.attrName === "src" || data.attrName === "href" || data.attrName === "srcset" || data.attrName === "poster") && isRemoteRef(data.attrValue)) { data.keepAttr = false; return; }
+      // local Windows drive paths ("C:\\dir\\pic.png") are legitimate in markdown; the app rewrites them to /api/image
+      if (data.attrName === "src" || data.attrName === "href") {
+        let dv = String(data.attrValue).trim();
+        try { dv = decodeURIComponent(dv); } catch (e) {}
+        if (/^[A-Za-z]:[\\/]/.test(dv)) data.forceKeepAttr = true;
+      }
+      if (data.attrName === "style" && /expression\s*\(|url\s*\(|javascript:|@import|behavior\s*:|binding/i.test(data.attrValue)) data.keepAttr = false;
+    });
+    DOMPurify.addHook("afterSanitizeAttributes", node => {
+      if (node.tagName === "A" && node.hasAttribute("href")) {
+        const h = node.getAttribute("href") || "";
+        if (/^https?:/i.test(h)) { node.setAttribute("target", "_blank"); node.setAttribute("rel", "noopener noreferrer"); }
+        else node.removeAttribute("target");
+      }
+    });
+  }
+  // true for references that would reach out over the network or to a device: //host, \\host, \\?\ , file://host ...
+  function isRemoteRef(v) {
+    let s = String(v == null ? "" : v).trim();
+    try { s = decodeURIComponent(s); } catch (e) {}      // marked percent-encodes backslashes (\\ -> %5C%5C)
+    s = s.replace(/\\/g, "/");
+    if (/^\/\//.test(s)) return true;
+    if (/^file:/i.test(s)) return !/^file:\/\/\/(?!\/)/i.test(s);
+    return false;
+  }
+  function safeHex(c) {   // pptx colours go into style attributes: accept only 6 hex digits
+    const m = /^#?([0-9A-Fa-f]{6})$/.exec(String(c == null ? "" : c).trim());
+    return m ? "#" + m[1] : "";
+  }
+  // mermaid renders AFTER DOMPurify: drop every link target it may have produced (click X "//host/..." etc.)
+  function stripMermaidLinks() {
+    document.querySelectorAll(".mermaid *").forEach(el => {
+      ["href", "xlink:href", "src"].forEach(a => {
+        const v = el.getAttribute(a);
+        if (v != null && !String(v).trim().startsWith("#") && !/^data:image\//i.test(String(v).trim())) el.removeAttribute(a);
+      });
+    });
+  }
+  // Global guard: the main window only ever shows our own origin. External http(s) links open in a new
+  // window (the shell hands those to the system browser); anything else (//host, file:, javascript:, ...) is blocked.
+  document.addEventListener("click", guardNavigation, true);
+  document.addEventListener("auxclick", guardNavigation, true);
+  function guardNavigation(ev) {
+    const el = ev.target && ev.target.closest ? ev.target.closest("a, area") : null;
+    if (!el) return;
+    const raw = el.getAttribute("href") || el.getAttribute("xlink:href") || el.getAttributeNS("http://www.w3.org/1999/xlink", "href");
+    if (!raw || String(raw).trim().startsWith("#")) return;
+    let u;
+    try { u = new URL(raw, window.location.href); } catch (e) { ev.preventDefault(); ev.stopPropagation(); return; }
+    if (u.origin === window.location.origin) return;                     // our own pages / API
+    ev.preventDefault(); ev.stopPropagation();
+    if (!isRemoteRef(raw) && (u.protocol === "https:" || u.protocol === "http:")) {
+      window.open(u.href, "_blank", "noopener,noreferrer");
+    } else if (typeof showToast === "function") {
+      showToast("已封鎖不安全的連結");
+    }
+  }
+  function safeHtml(html) {
+    // <base> / <meta> are dropped up front (they would only trigger CSP noise while DOMPurify parses the markup)
+    const pre = String(html == null ? "" : html).replace(/<\s*(?:base|meta)(?![a-z0-9])[^>]*>/gi, "");
+    return window.DOMPurify ? DOMPurify.sanitize(pre, SANITIZE_CFG) : escapeHtml(pre);
   }
 
   function formatFileSize(bytes) {
@@ -2802,8 +2957,15 @@
 
   async function initApp() {
     const urlParams = new URLSearchParams(window.location.search);
-    const initialPath = urlParams.get("path") || "";
+    const allowUrlPath = (document.querySelector('meta[name="powerup-allow-url-path"]') || {}).content !== "0";
+    const initialPath = allowUrlPath ? (urlParams.get("path") || "") : "";
+    if (urlParams.has("k")) {   // one-time launch nonce: remove it from the address bar / history
+      urlParams.delete("k");
+      const q = urlParams.toString();
+      try { history.replaceState(null, "", window.location.pathname + (q ? "?" + q : "")); } catch (e) {}
+    }
 
+    updateThumbUi();
     await loadBookmarks();
     await loadRecentFiles();
     await checkPendingOpen();
@@ -2924,6 +3086,8 @@
     }
 
     // Right sidebar functions
+    syncRightPanels();
+    syncTopBar();
     document.getElementById("photoRightFunctions").style.display = isImg ? "block" : "none";
     document.getElementById("mdRightFunctions").style.display = (isMd || isDocx) ? "block" : "none";
     document.getElementById("jsonRightFunctions").style.display = (isJson || isXml) ? "block" : "none";
@@ -3002,7 +3166,7 @@
       const isAct = sidebarTab === "folder" && currentDir === b.path;
       return `
         <div class="bm-chip ${isAct ? 'active' : ''}" onclick="onBookmarkClick('${escapeQuotes(b.path)}')" title="${escapeHtml(b.full_name || b.name)} (${escapeHtml(b.path)})">
-          <span>${b.icon}</span>
+          <span>${escapeHtml(b.icon)}</span>
           <span style="overflow:hidden; text-overflow:ellipsis;">${escapeHtml(b.name.replace(/^[^\s]+\s/, ''))}</span>
         </div>
       `;
@@ -3096,7 +3260,7 @@
   }
 
   async function pickNativePath(mode = "folder") {
-    showToast(mode === "file" ? "📂 請在 Mac 視窗選擇要開啟的檔案..." : "📂 請在 Mac 視窗選擇要瀏覽的資料夾...");
+    showToast(T(mode === "file" ? "📂 請在 Mac 視窗選擇要開啟的檔案..." : "📂 請在 Mac 視窗選擇要瀏覽的資料夾..."));
     try {
       const res = await fetch("/api/pick-path", {
         method: "POST",
@@ -3186,6 +3350,7 @@
     }
 
     if (data.home) homeDir = data.home;
+    const prevDirForGrid = currentDir;
     currentDir = data.path;
     parentDir = data.parent;
     subDirs = data.dirs || [];
@@ -3195,7 +3360,8 @@
     renderBookmarks();
     renderBreadcrumbs();
 
-    const target = focusFile || data.focus_file;
+    // A folder path passed as "focus" (e.g. launched with a folder) is not a file target.
+    const target = data.focus_file || ((focusFile && focusFile !== path) ? focusFile : null);
     const focusMatchesFilter = (typeFilter === "all") ||
       (typeFilter === "office" && isOfficeType(data.focus_type)) ||
       (typeFilter === "json" && isStructuredType(data.focus_type)) ||
@@ -3207,10 +3373,26 @@
       });
     }
 
+    // Entering a folder (no specific file requested). With the opt-in auto thumbnail wall, switch to the wall
+    // and do NOT auto-open the first file (avoids an async load racing the view switch).
+    const normDir = p => String(p || "").replace(/[\\/]+$/, "").toLowerCase();
+    const enteredFolderOnly = Boolean(path) && !data.focus_file && (!focusFile || focusFile === path) &&
+      (forceOpen || normDir(data.path) !== normDir(prevDirForGrid));
+    if (enteredFolderOnly && autoGridOnEnter) {
+      applyFilter(null, false, true);
+      if (viewMode !== "grid") setViewMode("grid");
+      return;
+    }
+
     applyFilter(target, forceOpen || Boolean(target));
   }
 
-  function applyFilter(targetFilePath = null, forceOpen = false) {
+  function applyFilter(targetFilePath = null, forceOpen = false, noAutoOpen = false) {
+    applyFilterCore(targetFilePath, forceOpen, noAutoOpen);
+    updateFolderHud();
+  }
+
+  function applyFilterCore(targetFilePath = null, forceOpen = false, noAutoOpen = false) {
     const kw = document.getElementById("searchInput").value.trim().toLowerCase();
     const clearBtn = document.getElementById("clearSearchBtn");
     if (clearBtn) clearBtn.style.display = kw ? "block" : "none";
@@ -3250,7 +3432,11 @@
     renderGridView();
 
     // Decide whether to open a file on Center Stage or keep current file undisturbed
-    const shouldAutoOpen = forceOpen || Boolean(targetFilePath) || !activeFileObj;
+    // In the thumbnail wall never auto-open content unless a specific file was requested;
+    // with thumbnails hidden, never auto-open an image the user did not pick.
+    const wallBlocks = (viewMode === "grid" && !targetFilePath);
+    const imgBlocks = (!showThumbs && !targetFilePath && filteredItems[0] && filteredItems[0].type === "image");
+    const shouldAutoOpen = !noAutoOpen && !wallBlocks && !imgBlocks && (forceOpen || Boolean(targetFilePath) || !activeFileObj);
 
     if (filteredItems.length === 0) {
       currentIndex = -1;
@@ -3272,8 +3458,12 @@
       let idx = 0;
       if (targetFilePath) {
         const found = filteredItems.findIndex(it => it.path === targetFilePath);
-        if (found >= 0) idx = found;
+        if (found >= 0) {
+          idx = found;
+          if (viewMode === "grid") setViewMode("single");  // a specific file was requested: leave the wall
+        }
       }
+      autoOpenPending = !targetFilePath;   // automatic opening must never pop a password dialog
       selectItem(idx);
     } else {
       // Keep current activeFileObj open on Center Stage; sync index if it's in the current list
@@ -3296,6 +3486,10 @@
     if (index < 0) index = 0;
     if (index >= filteredItems.length) index = filteredItems.length - 1;
     currentIndex = index;
+    activeOpenIsAuto = autoOpenPending; autoOpenPending = false;
+    openFailed = false;
+    lastFailure = null;
+    document.getElementById("openFailBox").style.display = "none";
 
     const item = filteredItems[currentIndex];
     activeFileObj = { ...item };
@@ -3413,7 +3607,7 @@
               </div>
               <div class="nav-actions">
                 <button class="icon-btn" onclick="jumpToItemFolder(event, '${escapeQuotes(it.dir || "")}', '${escapeQuotes(it.path)}')" title="在目錄瀏覽開啟所在資料夾">📂</button>
-                <button class="icon-btn" onclick="revealFileItem(event, '${escapeQuotes(it.path)}')" title="在 Finder 顯示">🧭</button>
+                <button class="icon-btn" onclick="revealFileItem(event, '${escapeQuotes(it.path)}')" title="${T('在 Finder 顯示')}">🧭</button>
                 <button class="icon-btn" onclick="renameFileItem(event, '${escapeQuotes(it.path)}', '${escapeQuotes(it.name)}')" title="重新命名">✏️</button>
               </div>
             </div>
@@ -3464,7 +3658,7 @@
             </div>
             <div class="nav-actions">
               <button class="icon-btn" onclick="renameFileItem(event, '${escapeQuotes(it.path)}', '${escapeQuotes(baseName)}')" title="重新命名">✏️</button>
-              <button class="icon-btn" onclick="revealFileItem(event, '${escapeQuotes(it.path)}')" title="在 Mac Finder 顯示">🧭</button>
+              <button class="icon-btn" onclick="revealFileItem(event, '${escapeQuotes(it.path)}')" title="${T('在 Mac Finder 顯示')}">🧭</button>
               <button class="icon-btn danger" onclick="trashFileItem(event, '${escapeQuotes(it.path)}', '${escapeQuotes(baseName)}')" title="移至垃圾桶">🗑️</button>
             </div>
           </div>
@@ -3560,7 +3754,7 @@
     if (ev) ev.stopPropagation();
     if (!path) return;
     const baseName = name || path.split("/").pop();
-    if (!skipConfirm && !confirm(`🗑️ 確定要將「${baseName}」移至 Mac 垃圾桶嗎？\n（之後仍可從系統垃圾桶還原）`)) return;
+    if (!skipConfirm && !confirm("🗑️ 確定要將「" + baseName + "」" + T("移至 Mac 垃圾桶嗎？\n（之後仍可從系統垃圾桶還原）"))) return;
 
     const wasActive = activeFileObj && activeFileObj.path === path;
     const nextCandidateIdx = currentIndex >= 0 ? Math.min(currentIndex, Math.max(0, filteredItems.length - 2)) : 0;
@@ -3576,7 +3770,7 @@
       return;
     }
 
-    showToast("🗑️ " + (skipConfirm ? `已直接移至垃圾桶：${baseName}` : data.message));
+    showToast("🗑️ " + (skipConfirm ? T("已直接移至垃圾桶：") + baseName : data.message));
     if (wasActive) {
       activeFileObj = null;
     }
@@ -3585,6 +3779,7 @@
     if (currentDir) {
       await loadDirectory(currentDir, null, false);
       if (wasActive && filteredItems.length > 0) {
+        autoOpenPending = true;     // opening the neighbour after a delete is automatic: no password dialog, no error toast
         selectItem(Math.min(nextCandidateIdx, filteredItems.length - 1));
       }
     }
@@ -3865,18 +4060,18 @@
     const strip = document.getElementById("filmstrip");
     const list = filteredItems.slice(0, 400);
     strip.innerHTML = list.map((it, idx) => {
-      if (it.type !== "image") {
+      if (it.type !== "image" || !showThumbs) {
         return `
-          <div class="thumb-item" id="thumb-${idx}" onclick="selectThumbAndSwitchToSingle(${idx})" title="${it.name}">
+          <div class="thumb-item" id="thumb-${idx}" onclick="selectThumbAndSwitchToSingle(${idx})" title="${escapeHtml(it.name)}">
             <div class="thumb-doc-icon">${fileIcon(it.type)}</div>
-            <div class="thumb-label">${it.name.split('/').pop()}</div>
+            <div class="thumb-label">${escapeHtml(it.name.split('/').pop())}</div>
           </div>
         `;
       }
       return `
-        <div class="thumb-item" id="thumb-${idx}" onclick="selectThumbAndSwitchToSingle(${idx})" title="${it.name}">
+        <div class="thumb-item" id="thumb-${idx}" onclick="selectThumbAndSwitchToSingle(${idx})" title="${escapeHtml(it.name)}">
           <img loading="lazy" src="/api/image?path=${encodeURIComponent(it.path)}&thumb=1" />
-          <div class="thumb-label">${it.name.split('/').pop()}</div>
+          <div class="thumb-label">${escapeHtml(it.name.split('/').pop())}</div>
         </div>
       `;
     }).join("");
@@ -3885,23 +4080,36 @@
   function renderGridView() {
     const grid = document.getElementById("gridView");
     const list = filteredItems.slice(0, 500);
-    grid.innerHTML = list.map((it, idx) => {
+    // Folder cards first: ".." (parent) then sub-folders; click = same as sidebar folder click.
+    const folderCard = (name, path, label) => `
+        <div class="grid-card folder-card" onclick="loadDirectory('${escapeQuotes(path)}')" title="${escapeHtml(path)}">
+          <div class="img-box"><div style="font-size:52px; user-select:none;">📁</div></div>
+          <div class="card-info">
+            <div class="card-name">${escapeHtml(name)}</div>
+            <div class="card-meta"><span>📁 ${label}</span><span></span></div>
+          </div>
+        </div>`;
+    let folderHtml = "";
+    if (parentDir && parentDir !== currentDir && sidebarTab === "folder") folderHtml += folderCard("..", parentDir, thumbText("parent"));
+    if (sidebarTab === "folder") folderHtml += subDirs.map(d => folderCard(d.name, d.path, thumbText("folder"))).join("");
+    grid.innerHTML = folderHtml + list.map((it, idx) => {
       const ext = (it.name.split('.').pop() || it.type).toUpperCase();
       const readableSize = it.readable_size || (it.size ? ((it.size / 1024).toFixed(0) + ' KB') : '');
       const thumbUrl = `/api/image?path=${encodeURIComponent(it.path)}&thumb=1`;
       const fallbackIcon = `<div style="font-size:52px; user-select:none;">${fileIcon(it.type)}</div>`;
       const activeClass = idx === currentIndex ? " active" : "";
       return `
-        <div class="grid-card${activeClass}" id="grid-${idx}" onclick="selectThumbAndSwitchToSingle(${idx})" ondblclick="setViewMode('single'); selectItem(${idx});" title="${it.name}">
+        <div class="grid-card${activeClass}" id="grid-${idx}" onclick="selectThumbAndSwitchToSingle(${idx})" ondblclick="setViewMode('single'); selectItem(${idx});" title="${escapeHtml(it.name)}">
           <div class="img-box">
-            <span class="card-badge">${ext}</span>
-            <img loading="lazy" src="${thumbUrl}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" alt="" />
-            <div style="display:none; width:100%; height:100%; align-items:center; justify-content:center;">${fallbackIcon}</div>
+            <span class="card-badge">${escapeHtml(ext)}</span>
+            ${(showThumbs && it.type === "image") ? `<img loading="lazy" src="${thumbUrl}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" alt="" />
+            <div style="display:none; width:100%; height:100%; align-items:center; justify-content:center;">${fallbackIcon}</div>`
+            : `<div style="display:flex; width:100%; height:100%; align-items:center; justify-content:center;">${fallbackIcon}</div>`}
           </div>
           <div class="card-info">
-            <div class="card-name">${it.name}</div>
+            <div class="card-name">${escapeHtml(it.name)}</div>
             <div class="card-meta">
-              <span>${fileIcon(it.type)} ${it.type.toUpperCase()}</span>
+              <span>${fileIcon(it.type)} ${escapeHtml(it.type.toUpperCase())}</span>
               <span>${readableSize}</span>
             </div>
           </div>
@@ -3927,9 +4135,32 @@
   }
 
   /* Helper: Thumbnail click always ensures Single View is active */
+  function navSelect(idx) {   // arrow keys / mouse wheel: browsing -> do not pop the password dialog
+    autoOpenPending = true;
+    return selectItem(idx);
+  }
+
   function selectThumbAndSwitchToSingle(idx) {
+    // Returning from the wall to the file that is already open (non-image): just re-show it, don't
+    // reload — keeps its in-page state such as the table search box.
+    const it = filteredItems[idx];
+    if (it && lastFailure && lastFailure.path === it.path && activeFileObj && activeFileObj.path === it.path) {
+      // back from the wall to the file whose open failed: just bring the lock / error screen back (no dialog, no reload)
+      if (viewMode !== "single" && viewMode !== "compare") setViewMode("single");
+      currentIndex = idx; highlightActiveThumb(); renderLeftNavigation();
+      return;
+    }
+    const sameLoaded = viewMode === "grid" && it && activeFileObj && activeFileObj.path === it.path && it.type !== "image" &&
+      !(lastFailure && lastFailure.path === it.path);
     if (viewMode !== "single" && viewMode !== "compare") {
       setViewMode("single");
+    }
+    if (sameLoaded) {
+      currentIndex = idx;
+      adaptUiForFileType(it.type);
+      highlightActiveThumb();
+      renderLeftNavigation();
+      return;
     }
     selectItem(idx);
   }
@@ -4076,7 +4307,8 @@
     const res = await fetch(`/api/json?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     if (!data.ok) {
-      showToast("❌ " + (data.error || "無法開啟 JSON"));
+      if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法開啟 JSON"));
+      showOpenFailure(data.error || "無法開啟 JSON", path, data.encrypted, data.can_unlock);
       return;
     }
     currentJsonPath = data.path;
@@ -4091,7 +4323,8 @@
     const res = await fetch(`/api/xml?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     if (!data.ok) {
-      showToast("❌ " + (data.error || "無法開啟 XML"));
+      if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法開啟 XML"));
+      showOpenFailure(data.error || "無法開啟 XML", path, data.encrypted, data.can_unlock);
       return;
     }
     currentJsonPath = data.path;
@@ -4695,7 +4928,7 @@
           </td>
           <td class="json-grid-td">
             <div class="json-grid-actions">
-              <button class="btn" style="padding:2px 6px; font-size:10.5px;" onclick="copyJsonGridPath(event, '${escapeHtml(r.path)}')">路徑</button>
+              <button class="btn" style="padding:2px 6px; font-size:10.5px;" onclick="copyJsonGridPath(event, '${escapeQuotes(r.path)}')">路徑</button>
               <button class="btn" style="padding:2px 6px; font-size:10.5px;" onclick="copyJsonGridVal(event, '${r.rowId}')">複製</button>
             </div>
           </td>
@@ -5027,7 +5260,7 @@
       showToast(repaired ? "🪄 已貼上並自動修復常見語法錯誤、排版完成！" : "✨ 已貼上並排版完成！");
     } catch (err) {
       setJsonViewMode("code");
-      showToast("請在編輯框按 ⌘V 直接貼上");
+      showToast(T("請在編輯框按 ⌘V 直接貼上"));
     }
   }
 
@@ -5100,7 +5333,7 @@
       showToast("✅ 已成功解析剪貼簿中的 JSON！");
     } catch (e) {
       setJsonViewMode("code");
-      showToast("請在編輯區直接按 ⌘V 貼上 JSON 字串");
+      showToast(T("請在編輯區直接按 ⌘V 貼上 JSON 字串"));
     }
   }
 
@@ -5129,7 +5362,8 @@
     const res = await fetch(`/api/csv?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     if (!data.ok) {
-      showToast("❌ " + (data.error || "無法讀取 CSV"));
+      if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法讀取 CSV"));
+      showOpenFailure(data.error || "無法讀取 CSV", path, data.encrypted, data.can_unlock);
       return;
     }
 
@@ -5448,15 +5682,39 @@
   /* =========================================================
      5. OFFICE VIEWER ENGINES (EXCEL .XLSX / WORD .DOCX / POWERPOINT .PPTX)
      ========================================================= */
+  let qlResolve = null;
+  function askQuickLookConfirm(name) {      // in-app modal (no native dialog): resolves true only on an explicit "open"
+    return new Promise((resolve) => {
+      qlResolve = resolve;
+      document.getElementById("qlName").textContent = name || "";
+      document.getElementById("qlModal").style.display = "flex";
+      setTimeout(() => document.getElementById("qlCancelBtn").focus(), 30);
+    });
+  }
+  function qlAnswer(ok) {
+    document.getElementById("qlModal").style.display = "none";
+    if (qlResolve) { const r = qlResolve; qlResolve = null; r(!!ok); }
+  }
+  function qlKeydown(e) {
+    e.stopPropagation();
+    if (e.key === "Escape") { e.preventDefault(); qlAnswer(false); }
+  }
   async function triggerQuickLook() {
     const item = getCurrentActiveItem();
     if (!item || !item.path) return;
-    showToast("👁️ 正在開啟 macOS QuickLook 原版預覽視窗...");
-    await fetch("/api/quicklook", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: item.path }),
-    });
+    if (IS_WIN && !(await askQuickLookConfirm(item.name))) return;
+    showToast(IS_WIN ? "👁️ 正在以預設程式開啟原檔..." : "👁️ 正在開啟 macOS QuickLook 原版預覽視窗...");
+    try {
+      const res = await fetch("/api/quicklook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: item.path }),
+      });
+      const data = await res.json();
+      if (!data.ok) showToast("⚠️ " + (data.error || "無法開啟"));
+    } catch (e) {
+      showToast("⚠️ 無法開啟");
+    }
   }
 
   // 5A. Excel (.xlsx / .xlsm / .xls) Multi-Sheet Viewer
@@ -5465,7 +5723,8 @@
     const res = await fetch(`/api/xlsx?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     if (!data.ok) {
-      showToast("❌ " + (data.error || "無法讀取 Excel 檔案"));
+      if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法讀取 Excel 檔案"));
+      showOpenFailure(data.error || "無法讀取 Excel 檔案", path, data.encrypted, data.can_unlock);
       return;
     }
 
@@ -5540,7 +5799,8 @@
     const res = await fetch(`/api/docx?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     if (!data.ok) {
-      showToast("❌ " + (data.error || "無法讀取 Word 文件"));
+      if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法讀取 Word 文件"));
+      showOpenFailure(data.error || "無法讀取 Word 文件", path, data.encrypted, data.can_unlock);
       return;
     }
 
@@ -5551,8 +5811,8 @@
 
     const sizeKb = (data.size / 1024).toFixed(1);
     document.getElementById("hudMeta").textContent =
-      `${data.paragraphs || 0} 段落 · ${data.tables || 0} 表格 · ${data.images || 0} 圖片 · ${sizeKb} KB`;
-    document.getElementById("hudExtraBadge").textContent = "📘 Word 免開 Pages 極速閱讀";
+      `${data.paragraphs_count ?? data.paragraphs ?? 0} 段落 · ${data.tables_count ?? data.tables ?? 0} 表格 · ${data.images_count ?? data.images ?? 0} 圖片 · ${sizeKb} KB`;
+    document.getElementById("hudExtraBadge").textContent = T("📘 Word 免開 Pages 極速閱讀");
 
     renderMarkdownContent(currentMdRaw);
   }
@@ -5563,7 +5823,8 @@
     const res = await fetch(`/api/pptx?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     if (!data.ok) {
-      showToast("❌ " + (data.error || "無法讀取 PowerPoint 簡報"));
+      if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法讀取 PowerPoint 簡報"));
+      showOpenFailure(data.error || "無法讀取 PowerPoint 簡報", path, data.encrypted, data.can_unlock);
       return;
     }
 
@@ -5578,7 +5839,7 @@
 
     document.getElementById("hudMeta").textContent =
       `共 ${currentPptxSlides.length} 張投影片 · ${totalImgs} 張內嵌圖片 · ${totalTbls} 個表格 · ${sizeKb} KB`;
-    document.getElementById("hudExtraBadge").textContent = "📽️ 免開 Keynote 極速簡報檢視";
+    document.getElementById("hudExtraBadge").textContent = T("📽️ 免開 Keynote 極速簡報檢視");
 
     renderPptxRightSidebar();
     renderPptxGrid();
@@ -5715,6 +5976,7 @@
   }
 
   function getHighlightStyle(hex) {
+    hex = safeHex(hex);
     if (!hex) return "";
     const u = hex.toUpperCase();
     if (u === "#FFFF00") {
@@ -5766,7 +6028,8 @@
           const b = ci.box || { x: 5, y: 5, w: 30, h: 20 };
           const stylePos = `left:${b.x}%; top:${b.y}%; width:${Math.max(2.5, b.w)}%; height:${Math.max(2.5, b.h)}%; z-index:${zIdx + 1};`;
           if (ci.type === "shape") {
-            const bgStyle = ci.bg_color ? `background:${ci.bg_color}33; border-color:${ci.bg_color};` : `background:rgba(30,41,59,0.35); border-color:rgba(148,163,184,0.45);`;
+            const _bgc = safeHex(ci.bg_color);
+            const bgStyle = _bgc ? `background:${_bgc}33; border-color:${_bgc};` : `background:rgba(30,41,59,0.35); border-color:rgba(148,163,184,0.45);`;
             return `<div style="position:absolute; ${stylePos} border:1.5px dashed; border-radius:6px; box-sizing:border-box; pointer-events:none; ${bgStyle}"></div>`;
           }
           if (ci.type === "image" && ci.image && ci.image.url) {
@@ -5945,7 +6208,7 @@
   function renderPptxOutline() {
     const container = document.getElementById("pptxOutlineRendered");
     marked.setOptions({ gfm: true, breaks: true });
-    container.innerHTML = marked.parse(currentPptxMarkdown || "");
+    container.innerHTML = safeHtml(marked.parse(currentPptxMarkdown || ""));
   }
 
   function renderPptxRightSidebar() {
@@ -6035,7 +6298,8 @@
     const res = await fetch(`/api/pdf?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     if (!data.ok) {
-      showToast("❌ " + (data.error || "無法讀取 PDF 文件"));
+      if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法讀取 PDF 文件"));
+      showOpenFailure(data.error || "無法讀取 PDF 文件", path, data.encrypted, data.can_unlock);
       return;
     }
 
@@ -6047,7 +6311,7 @@
     const sizeKb = (data.size / 1024).toFixed(1);
     document.getElementById("hudMeta").textContent =
       `共 ${data.page_count || currentPdfPages.length} 頁 · ${sizeKb} KB` + (data.author ? ` · 作者: ${data.author}` : "");
-    document.getElementById("hudExtraBadge").textContent = "📕 PDFKit 原生引擎 + 單頁轉圖 AI 裁切/OCR";
+    document.getElementById("hudExtraBadge").textContent = IS_WIN ? "📕 PDF 預覽 + 單頁轉圖裁切" : "📕 PDFKit 原生引擎 + 單頁轉圖 AI 裁切/OCR";
 
     // Load native PDF stream into iframe
     const nativeFrame = document.getElementById("pdfNativeFrame");
@@ -6056,7 +6320,7 @@
 
     // Render full extracted text markdown
     marked.setOptions({ gfm: true, breaks: true });
-    document.getElementById("pdfTextRendered").innerHTML = marked.parse(currentPdfMarkdown || "");
+    document.getElementById("pdfTextRendered").innerHTML = safeHtml(marked.parse(currentPdfMarkdown || ""));
 
     // Render right sidebar page list
     document.getElementById("pdfPageCountBadge").textContent = `${currentPdfPages.length} 頁`;
@@ -6138,10 +6402,10 @@
     const txtCard = document.getElementById("pdfPageTextCard");
     if (pg && pg.text && pg.text.trim()) {
       txtCard.style.display = "block";
-      txtCard.innerHTML = `<div style="font-weight:700; color:#fda4af; margin-bottom:6px;">📝 本頁內嵌文字（若為掃描檔可點上方按鈕送圖片工坊執行 Vision OCR）：</div><div style="white-space:pre-wrap;">${escapeHtml(pg.text)}</div>`;
+      txtCard.innerHTML = `<div style="font-weight:700; color:#fda4af; margin-bottom:6px;">${T("📝 本頁內嵌文字（若為掃描檔可點上方按鈕送圖片工坊執行 Vision OCR）：")}</div><div style="white-space:pre-wrap;">${escapeHtml(pg.text)}</div>`;
     } else {
       txtCard.style.display = "block";
-      txtCard.innerHTML = `<div style="color:var(--muted);">💡 此頁無內嵌文字層（可能為掃描檔或設計海報），點擊上方「✂️ 在圖片工坊開啟此頁」即可使用 macOS Vision OCR 辨識文字或框選裁切！</div>`;
+      txtCard.innerHTML = `<div style="color:var(--muted);">${T("💡 此頁無內嵌文字層（可能為掃描檔或設計海報），點擊上方「✂️ 在圖片工坊開啟此頁」即可使用 macOS Vision OCR 辨識文字或框選裁切！")}</div>`;
     }
   }
 
@@ -6155,7 +6419,7 @@
       return;
     }
     await loadDirectory(data.image_path, data.image_path, true);
-    showToast(`✅ 已在圖片工坊開啟第 ${currentPdfPageNum} 頁！可直接拖曳框選裁切 (⌘C)、OCR 或去背`);
+    showToast(T(`✅ 已在圖片工坊開啟第 ${currentPdfPageNum} 頁！可直接拖曳框選裁切 (⌘C)、OCR 或去背`));
   }
 
   function copyCurrentPdfPageText() {
@@ -6291,6 +6555,7 @@
   }
 
   function preloadNeighbors(centerIdx) {
+    if (!showThumbs) return;  // privacy: don't pre-fetch neighbouring images the user did not open
     for (let offset = -8; offset <= 8; offset++) {
       if (offset === 0) continue;
       const idx = centerIdx + offset;
@@ -6308,8 +6573,183 @@
     }
   }
 
+  const MODE_PILL_LABELS = {
+    image: "🖼️ 圖片模式", markdown: "📝 Markdown 模式", docx: "📘 Word 文件模式", json: "🧩 JSON 模式",
+    xml: "🏷️ XML 結構模式", csv: "📊 CSV 表格模式", xlsx: "📗 Excel 試算表模式", pptx: "📽️ PowerPoint 簡報模式",
+    pdf: "📕 PDF 文件模式"
+  };
+  let _hudSaved = null;
+  function folderSummaryText() {
+    const segs = String(currentDir || "").replace(/[\\/]+$/, "").split(/[\\/]/);
+    const name = segs[segs.length - 1] || currentDir || "";
+    const nDirs = (subDirs && subDirs.length) ? ` · ${subDirs.length} 個資料夾` : "";
+    return `📁 ${name} · ${filteredItems.length} 個檔案${nDirs}`;
+  }
+  function updateFolderHud() {
+    if (!currentDir) return;
+    if (viewMode === "grid" || !activeFileObj) {
+      document.getElementById("hudFilename").textContent = folderSummaryText();
+      document.getElementById("hudFilename").title = currentDir;
+      document.getElementById("hudIndex").textContent = "";
+    }
+  }
+  // Top bar / HUD: in the thumbnail wall hide the previous file's controls and labels; restore on leaving.
+  function syncTopBar() {
+    const g = viewMode === "grid", t = currentFileType, hideCtl = g || openFailed;
+    const show = (id, on, disp) => { const el = document.getElementById(id); if (el) el.style.display = on ? (disp || "flex") : "none"; };
+    show("mdTopControls", !hideCtl && (t === "markdown" || t === "docx"));
+    show("jsonTopControls", !hideCtl && (t === "json" || t === "xml"));
+    show("csvTopControls", !hideCtl && (t === "csv" || t === "xlsx"));
+    show("pptxTopControls", !hideCtl && t === "pptx");
+    show("pdfTopControls", !hideCtl && t === "pdf");
+    show("photoTopControls", t === "image" && !openFailed);
+    const pill = document.getElementById("currentModePill");
+    const hudName = document.getElementById("hudFilename"), hudIdx = document.getElementById("hudIndex");
+    const hudMeta = document.getElementById("hudMeta"), hudSc = document.getElementById("hudShortcuts");
+    const acts = document.getElementById("hudFileActions");
+    if (g) {
+      if (!_hudSaved) _hudSaved = {
+        meta: hudMeta.textContent, sc: hudSc ? hudSc.innerHTML : "",
+        extra: document.getElementById("hudExtraBadge").textContent,
+        sBadge: document.getElementById("hudScratchBadge").style.display,
+        sActs: document.getElementById("hudScratchActions").style.display
+      };
+      document.getElementById("hudExtraBadge").textContent = "";
+      document.getElementById("hudScratchBadge").style.display = "none";
+      document.getElementById("hudScratchActions").style.display = "none";
+      if (pill) pill.textContent = "🎛️ 縮圖牆";
+      hudMeta.textContent = "";
+      if (hudSc) hudSc.innerHTML = `<span>點選卡片開啟檔案</span> <span>資料夾卡片：進入該資料夾</span> <span>顯示縮圖：預設關閉</span>`;
+      if (acts) acts.style.display = "none";
+      updateFolderHud();
+    } else {
+      if (pill) pill.textContent = openFailed ? "⚠️ 無法預覽" : (MODE_PILL_LABELS[t] || MODE_PILL_LABELS.image);
+      if (_hudSaved) {
+        hudMeta.textContent = _hudSaved.meta; if (hudSc) hudSc.innerHTML = _hudSaved.sc;
+        document.getElementById("hudExtraBadge").textContent = _hudSaved.extra;
+        document.getElementById("hudScratchBadge").style.display = _hudSaved.sBadge;
+        document.getElementById("hudScratchActions").style.display = _hudSaved.sActs;
+        _hudSaved = null;
+      }
+      if (acts) acts.style.display = activeFileObj ? "inline-flex" : "none";
+      if (openFailed) {
+        // keep the failed file's name, show nothing stale
+        if (activeFileObj) { hudName.textContent = activeFileObj.name.split("/").pop(); hudName.title = activeFileObj.path; }
+      } else if (activeFileObj) {
+        hudName.textContent = activeFileObj.name.split("/").pop();
+        hudName.title = activeFileObj.path;
+        hudIdx.textContent = (currentIndex >= 0 && filteredItems.length) ? `[${currentIndex + 1} / ${filteredItems.length}]` : "";
+      } else {
+        updateFolderHud();
+      }
+    }
+  }
+
+  function openUnlockDialog(path) {
+    unlockCtx = { path, name: path.split(/[\\/]/).pop(), asked: path };
+    document.getElementById("unlockFileName").textContent = unlockCtx.name;
+    document.getElementById("unlockErr").textContent = "";
+    document.getElementById("unlockPwd").value = "";
+    document.getElementById("unlockSubmitBtn").disabled = false;
+    document.getElementById("unlockModal").style.display = "flex";
+    setTimeout(() => document.getElementById("unlockPwd").focus(), 30);
+  }
+  function openUnlockForActive() {
+    if (unlockCtx && unlockCtx.path) openUnlockDialog(unlockCtx.path);
+  }
+  function closeUnlockDialog() {
+    const pwd = document.getElementById("unlockPwd");
+    if (pwd) pwd.value = "";   // drop the password from the DOM immediately
+    document.getElementById("unlockModal").style.display = "none";
+  }
+  function unlockKeydown(e) {
+    e.stopPropagation();   // typing a password must not trigger global shortcuts
+    if (e.key === "Enter") { e.preventDefault(); submitUnlock(); }
+    else if (e.key === "Escape") { e.preventDefault(); closeUnlockDialog(); }
+  }
+  async function submitUnlock() {
+    if (!unlockCtx) return;
+    const pwdEl = document.getElementById("unlockPwd"), errEl = document.getElementById("unlockErr"), btn = document.getElementById("unlockSubmitBtn");
+    const password = pwdEl.value;
+    if (!password) { errEl.textContent = "請輸入密碼"; pwdEl.focus(); return; }
+    btn.disabled = true; errEl.textContent = "";
+    let data;
+    try {
+      const res = await fetch("/api/unlock", { method: "POST", headers: { "Content-Type": "application/json" },
+                                               body: JSON.stringify({ path: unlockCtx.path, password }) });
+      data = await res.json();
+    } catch (e) {
+      btn.disabled = false; errEl.textContent = "無法連線到本機服務"; return;
+    }
+    btn.disabled = false;
+    if (data.ok) {
+      const path = unlockCtx.path;
+      closeUnlockDialog();
+      const idx = filteredItems.findIndex(i => i.path === path);
+      if (idx >= 0) selectItem(idx);   // reload: the server now serves the decrypted preview from memory
+      return;
+    }
+    pwdEl.value = "";
+    errEl.textContent = data.wrong_password ? "密碼錯誤" : (data.error || "解鎖失敗");
+    pwdEl.focus();
+  }
+
+  function showOpenFailure(msg, path, encrypted, canUnlock, restoring) {
+    if (path && activeFileObj && activeFileObj.path !== path) return;   // a newer file was opened meanwhile
+    lastFailure = { msg, path, encrypted, canUnlock };
+    openFailed = true;
+    ["mdStage", "jsonStage", "csvStage", "pptxStage", "pdfStage"].forEach(id => document.getElementById(id).classList.remove("visible"));
+    document.getElementById("singleView").style.display = "none";
+    document.getElementById("compareView").classList.remove("visible");
+    document.getElementById("gridView").classList.remove("visible");
+    document.getElementById("faceStrip").classList.remove("visible");
+    document.getElementById("loupe").style.display = "none";
+    document.getElementById("filmstrip").style.display = "none";
+    document.getElementById("xlsxSheetTabsBar").style.display = "none";
+    document.getElementById("xlsxMetaBanner").style.display = "none";
+    // drop stale PDF state so nothing from the previous document stays around
+    const nf = document.getElementById("pdfNativeFrame"); if (nf) nf.src = "about:blank";
+    const pi = document.getElementById("pdfPageImage"); if (pi) { pi.removeAttribute("src"); delete pi.dataset.imgPath; }
+    const toc = document.getElementById("pdfTocList"); if (toc) toc.innerHTML = "";
+    const ptx = document.getElementById("pdfTextRendered"); if (ptx) ptx.innerHTML = "";
+    const pcb = document.getElementById("pdfPageCountBadge"); if (pcb) pcb.textContent = "";
+    currentPdfPages = []; currentPdfPath = "";
+    document.getElementById("hudMeta").textContent = "⚠️ 無法預覽";
+    document.getElementById("hudExtraBadge").textContent = "";
+    document.getElementById("openFailIcon").textContent = encrypted ? "🔒" : "⚠️";
+    document.getElementById("openFailMsg").textContent = msg || "無法開啟此檔案";
+    document.getElementById("openFailBox").style.display = "flex";
+    const ub = document.getElementById("openFailUnlockBtn");
+    const unlockable = Boolean(encrypted && canUnlock && path);
+    ub.style.display = unlockable ? "inline-flex" : "none";
+    if (unlockable) {
+      unlockCtx = { path, name: path.split(/[\\/]/).pop() };
+      // only ask when the user opened this file on purpose (not for automatic first-file opening)
+      if (!restoring && !activeOpenIsAuto && !(unlockCtx.asked === path)) openUnlockDialog(path);
+    }
+    syncRightPanels();
+    syncTopBar();
+  }
+
+  function syncRightPanels() {
+    const t = currentFileType, g = viewMode === "grid" || openFailed;
+    const isImg = t === "image", isMd = t === "markdown" || t === "docx", isJson = t === "json" || t === "xml";
+    const isCsv = t === "csv" || t === "xlsx", isPptx = t === "pptx", isPdf = t === "pdf";
+    const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = (on && !g) ? "block" : "none"; };
+    show("photoRightFunctions", isImg); show("mdRightFunctions", isMd); show("jsonRightFunctions", isJson);
+    show("csvRightFunctions", isCsv); show("pptxRightFunctions", isPptx); show("pdfRightFunctions", isPdf);
+  }
+
   function setViewMode(mode) {
     viewMode = mode;
+    if (mode === "grid") { openFailed = false; document.getElementById("openFailBox").style.display = "none"; }
+    else if (lastFailure && activeFileObj && activeFileObj.path === lastFailure.path) {
+      // coming back from the wall to a file that failed to open: bring the lock / error screen back
+      const f = lastFailure;
+      setTimeout(() => showOpenFailure(f.msg, f.path, f.encrypted, f.canUnlock, true), 0);
+    }
+    syncRightPanels();
+    syncTopBar();
     document.getElementById("modeSingleBtn").classList.toggle("active", mode === "single");
     document.getElementById("modeGridBtn").classList.toggle("active", mode === "grid");
     document.getElementById("modeCompareBtn").classList.toggle("active", mode === "compare");
@@ -6362,8 +6802,8 @@
       if (Math.abs(zoom - 1) < 0.04) { zoom = 1; panX = 0; panY = 0; }
       applyTransform();
     } else {
-      if (e.deltaY > 10) selectItem(currentIndex + 1);
-      else if (e.deltaY < -10) selectItem(currentIndex - 1);
+      if (e.deltaY > 10) navSelect(currentIndex + 1);
+      else if (e.deltaY < -10) navSelect(currentIndex - 1);
     }
   }
 
@@ -6513,7 +6953,7 @@
     if (mode === "interactive") {
       showToast("📸 請在螢幕上拖曳十字準星框選截圖（按 Esc 取消）...");
     } else {
-      showToast("📋 正在從 Mac 剪貼簿讀取圖片...");
+      showToast(T("📋 正在從 Mac 剪貼簿讀取圖片..."));
     }
     const res = await fetch("/api/screenshot", {
       method: "POST",
@@ -6532,6 +6972,7 @@
   }
 
   async function detectFaces() {
+    if (IS_WIN) { showToast("Windows 版尚未支援人臉偵測"); return; }
     const item = getCurrentActiveItem();
     if (!item || currentFileType !== "image") return;
     showToast("🧑‍🤝‍🧑 正在使用 RetinaFace 偵測人臉...");
@@ -6568,7 +7009,7 @@
            style="left:${f.box.x*100}%; top:${f.box.y*100}%; width:${f.box.w*100}%; height:${f.box.h*100}%;"
            onmousedown="event.stopPropagation()"
            onclick="focusOnFace(${idx})">
-        <div class="face-tag">#${f.index} ${f.label ? f.label : ('清晰度:' + f.sharpness)}</div>
+        <div class="face-tag">#${escapeHtml(f.index)} ${escapeHtml(f.label ? f.label : ('清晰度:' + f.sharpness))}</div>
       </div>
     `).join("");
 
@@ -6613,7 +7054,7 @@
     cropRect = { ...detectedFaces[idx].id_crop };
     renderCropBox();
     renderFaces();
-    showToast(`🪪 已自動框選 #${idx + 1} 號人物的 3:4 大頭照範圍！按 ⌘C 即可複製`);
+    showToast(T(`🪪 已自動框選 #${idx + 1} 號人物的 3:4 大頭照範圍！按 ⌘C 即可複製`));
   }
 
   function cycleFace(step) {
@@ -6623,6 +7064,7 @@
   }
 
   async function runOcr() {
+    if (IS_WIN) { showToast("Windows 版尚未支援 OCR 文字辨識"); return; }
     const item = getCurrentActiveItem();
     if (!item || currentFileType !== "image") return;
     showToast("🔤 正在使用 macOS Vision 辨識文字...");
@@ -6646,6 +7088,7 @@
   }
 
   async function runRemoveBg() {
+    if (IS_WIN) { showToast("Windows 版尚未支援一鍵去背"); return; }
     const item = getCurrentActiveItem();
     if (!item || currentFileType !== "image") return;
     showToast("🪄 正在使用 macOS Vision 主體去背並寫入剪貼簿...");
@@ -6655,11 +7098,12 @@
       body: JSON.stringify({ path: item.path, crop: cropRect }),
     });
     const data = await res.json();
-    if (data.ok) showToast("🎉 去背完成！透明 PNG 已複製到剪貼簿，可直接 Cmd+V 貼上");
+    if (data.ok) showToast(T("🎉 去背完成！透明 PNG 已複製到剪貼簿，可直接 Cmd+V 貼上"));
     else showToast("❌ " + (data.error || "去背失敗"));
   }
 
   async function runAiEnhance(mode) {
+    if (IS_WIN) { showToast("Windows 版尚未支援本地 AI 修復強化"); return; }
     const item = getCurrentActiveItem();
     if (!item || currentFileType !== "image") return;
     const pasteBack = document.getElementById("pasteBackCheck").checked;
@@ -6680,6 +7124,7 @@
   }
 
   async function runCodexCli() {
+    if (IS_WIN) { showToast("Windows 版尚未支援 Codex CLI 整合"); return; }
     const prompt = document.getElementById("codexPrompt").value.trim();
     if (!prompt) return showToast("⚠️ 請先輸入給 Codex CLI 的指令");
     const item = getCurrentActiveItem();
@@ -6721,7 +7166,7 @@
     }
     const selA = document.getElementById("compareSelectA");
     const selB = document.getElementById("compareSelectB");
-    const opts = variants.map(v => `<option value="${v.path}">${v.label}</option>`).join("");
+    const opts = variants.map(v => `<option value="${escapeHtml(v.path)}">${escapeHtml(v.label)}</option>`).join("");
     selA.innerHTML = opts;
     selB.innerHTML = opts;
     selA.selectedIndex = 0;
@@ -6807,7 +7252,7 @@
     if (!path) return;
     const res = await fetch(`/api/md?path=${encodeURIComponent(path)}`);
     const data = await res.json();
-    if (!data.ok) return showToast("❌ " + (data.error || "無法開啟 Markdown"));
+    if (!data.ok) { if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法開啟 Markdown")); return showOpenFailure(data.error || "無法開啟 Markdown", path, data.encrypted, data.can_unlock); }
     currentMdPath = data.path;
     currentMdRaw = data.content;
     currentMdMtimeNs = data.mtime_ns;
@@ -6849,11 +7294,19 @@
     );
 
     marked.setOptions({ gfm: true, breaks: true });
-    container.innerHTML = marked.parse(processed);
+    container.innerHTML = safeHtml(marked.parse(processed));
 
     container.querySelectorAll("img").forEach(img => {
       const rawSrc = img.getAttribute("src") || "";
+      if (isRemoteRef(rawSrc)) { img.removeAttribute("src"); img.alt = img.alt || "(已封鎖的網路路徑)"; return; }
       let resolvedPath = rawSrc.replace(/^file:\/\//, "");
+      if (rawSrc.startsWith("/api/image?")) {
+        try { resolvedPath = new URLSearchParams(rawSrc.split("?")[1]).get("path") || resolvedPath; } catch (e) {}
+      } else if (rawSrc && !rawSrc.startsWith("http") && !rawSrc.startsWith("data:")) {
+        // marked already percent-encoded the path once (e.g. "\\" -> %5C): decode so it is encoded only once below
+        try { resolvedPath = decodeURIComponent(resolvedPath); } catch (e) {}
+        if (isRemoteRef(resolvedPath)) { img.removeAttribute("src"); img.alt = img.alt || "(已封鎖的網路路徑)"; return; }
+      }
       if (rawSrc && !rawSrc.startsWith("http") && !rawSrc.startsWith("data:") && !rawSrc.startsWith("/api/")) {
         img.src = `/api/image?path=${encodeURIComponent(resolvedPath)}&base_dir=${encodeURIComponent(currentMdDir)}`;
       }
@@ -6865,10 +7318,13 @@
 
     container.querySelectorAll("a").forEach(a => {
       const href = a.getAttribute("href") || "";
+      if (isRemoteRef(href)) { a.removeAttribute("href"); return; }
       if (href.startsWith("file://") || (!href.startsWith("http") && !href.startsWith("#"))) {
         a.onclick = (ev) => {
           ev.preventDefault();
           let target = href.replace(/^file:\/\//, "").split("#")[0];
+          try { target = decodeURIComponent(target); } catch (e2) {}
+          if (isRemoteRef(target)) return;
           if (!target.startsWith("/")) target = currentMdDir + "/" + target;
           loadDirectory(target, target, true);
         };
@@ -6886,7 +7342,7 @@
       }
     });
 
-    mermaid.run({ querySelector: ".mermaid" }).catch(() => {});
+    mermaid.run({ querySelector: ".mermaid" }).then(stripMermaidLinks).catch(() => {});
     buildMarkdownToc();
   }
 
@@ -6907,8 +7363,8 @@
       h.id = id;
       const level = h.tagName.toLowerCase();
       items.push(`
-        <div class="toc-item toc-${level}" onclick="document.getElementById('${id}').scrollIntoView({behavior:'smooth'})" title="${h.textContent}">
-          ${h.textContent}
+        <div class="toc-item toc-${level}" onclick="document.getElementById('${id}').scrollIntoView({behavior:'smooth'})" title="${escapeHtml(h.textContent)}">
+          ${escapeHtml(h.textContent)}
         </div>
       `);
     });
@@ -7072,7 +7528,7 @@
     }
 
     // Cmd+Shift+Backspace: Direct delete to Mac Trash WITHOUT confirmation prompt
-    if (e.metaKey && e.shiftKey && e.key === "Backspace") {
+    if (((e.metaKey && e.key === "Backspace") || (IS_WIN && e.ctrlKey && (e.key === "Delete" || e.key === "Backspace"))) && e.shiftKey) {
       e.preventDefault();
       const item = getCurrentActiveItem();
       if (item) trashFileItem(null, item.path, item.name.split("/").pop(), true);
@@ -7080,7 +7536,7 @@
     }
 
     // Cmd+Backspace: move the active file to the Mac Trash (asks to confirm)
-    if (e.metaKey && !e.shiftKey && e.key === "Backspace") {
+    if (((e.metaKey && e.key === "Backspace") || (IS_WIN && e.ctrlKey && (e.key === "Delete" || e.key === "Backspace"))) && !e.shiftKey) {
       e.preventDefault();
       const item = getCurrentActiveItem();
       if (item) trashFileItem(null, item.path, item.name.split("/").pop(), false);
@@ -7115,18 +7571,17 @@
     if (viewMode === "grid") {
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        selectItem(currentIndex + 1);
+        navSelect(currentIndex + 1);
         return;
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        selectItem(currentIndex - 1);
+        navSelect(currentIndex - 1);
         return;
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        setViewMode("single");
-        selectItem(currentIndex);
+        selectThumbAndSwitchToSingle(currentIndex);
         return;
       }
     }
@@ -7138,8 +7593,8 @@
         copyCurrentPdfPageText();
         return;
       }
-      if (e.key === "ArrowRight") { e.preventDefault(); selectItem(currentIndex + 1); return; }
-      if (e.key === "ArrowLeft") { e.preventDefault(); selectItem(currentIndex - 1); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); navSelect(currentIndex + 1); return; }
+      if (e.key === "ArrowLeft") { e.preventDefault(); navSelect(currentIndex - 1); return; }
       if (e.key === "ArrowDown" || e.key === "PageDown") {
         e.preventDefault();
         stepPdfPage(1);
@@ -7160,8 +7615,8 @@
         copyCurrentPptxSlideText();
         return;
       }
-      if (e.key === "ArrowRight") { e.preventDefault(); selectItem(currentIndex + 1); return; }
-      if (e.key === "ArrowLeft") { e.preventDefault(); selectItem(currentIndex - 1); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); navSelect(currentIndex + 1); return; }
+      if (e.key === "ArrowLeft") { e.preventDefault(); navSelect(currentIndex - 1); return; }
       if (e.key === "ArrowDown" || e.key === "PageDown") {
         e.preventDefault();
         stepPptxSlide(1);
@@ -7192,8 +7647,8 @@
         copySelectedCsvRowJson();
         return;
       }
-      if (e.key === "ArrowRight") { e.preventDefault(); selectItem(currentIndex + 1); return; }
-      if (e.key === "ArrowLeft") { e.preventDefault(); selectItem(currentIndex - 1); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); navSelect(currentIndex + 1); return; }
+      if (e.key === "ArrowLeft") { e.preventDefault(); navSelect(currentIndex - 1); return; }
       return;
     }
 
@@ -7209,8 +7664,8 @@
         copySelectedJsonValue();
         return;
       }
-      if (e.key === "ArrowRight") { e.preventDefault(); selectItem(currentIndex + 1); return; }
-      if (e.key === "ArrowLeft") { e.preventDefault(); selectItem(currentIndex - 1); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); navSelect(currentIndex + 1); return; }
+      if (e.key === "ArrowLeft") { e.preventDefault(); navSelect(currentIndex - 1); return; }
       return;
     }
 
@@ -7226,8 +7681,8 @@
         saveMarkdownFile();
         return;
       }
-      if (e.key === "ArrowRight") { e.preventDefault(); selectItem(currentIndex + 1); return; }
-      if (e.key === "ArrowLeft") { e.preventDefault(); selectItem(currentIndex - 1); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); navSelect(currentIndex + 1); return; }
+      if (e.key === "ArrowLeft") { e.preventDefault(); navSelect(currentIndex - 1); return; }
       if (e.key === "w" || e.key === "W") {
         e.preventDefault();
         const isFull = document.getElementById("mdRendered").classList.contains("fit-window");
@@ -7258,12 +7713,12 @@
       case "ArrowRight":
       case "ArrowDown":
         e.preventDefault();
-        selectItem(currentIndex + 1);
+        navSelect(currentIndex + 1);
         break;
       case "ArrowLeft":
       case "ArrowUp":
         e.preventDefault();
-        selectItem(currentIndex - 1);
+        navSelect(currentIndex - 1);
         break;
       case "w":
       case "W":
@@ -7296,6 +7751,7 @@
       case "f":
       case "F":
         e.preventDefault();
+        if (IS_WIN) { showToast("Windows 版尚未支援人臉偵測"); break; }
         detectFaces();
         break;
       case "Tab":
@@ -7499,7 +7955,7 @@
       onScratchpadInput();
       showToast("📋 已從剪貼簿貼入內容");
     } catch (e) {
-      showToast("💡 請直接在編輯框中按下 ⌘V 貼上文字");
+      showToast(T("💡 請直接在編輯框中按下 ⌘V 貼上文字"));
       document.getElementById("scratchpadTextarea").focus();
     }
   }
@@ -7539,7 +7995,7 @@
 
     // Load scratch folder and focus on the scratch file
     await loadDirectory(data.scratch_dir, data.path, true);
-    showToast(`⚡ 已開啟暫存檢視 (${data.format.toUpperCase()}) · 隨時可點「另存為新檔」或按 ⌘S 正式存檔`);
+    showToast(T(`⚡ 已開啟暫存檢視 (${data.format.toUpperCase()}) · 隨時可點「另存為新檔」或按 ⌘S 正式存檔`));
   }
 
   async function saveScratchpadDirectToFile() {
@@ -7742,6 +8198,7 @@
     if (modeSingleEl) modeSingleEl.innerHTML = d.modeSingle;
     const modeGridEl = document.getElementById("modeGridBtn");
     if (modeGridEl) modeGridEl.innerHTML = d.modeGrid;
+    updateThumbUi();
     const modeCompareEl = document.getElementById("modeCompareBtn");
     if (modeCompareEl) modeCompareEl.innerHTML = d.modeCompare;
 
@@ -7815,7 +8272,7 @@
       `目前版本: v${latestUpdateInfo.current_version} ➔ 最新版本: v${latestUpdateInfo.latest_version}`;
     const list = document.getElementById("modalChangelogList");
     if (list) {
-      list.innerHTML = (latestUpdateInfo.changelog || []).map(item => `<li>${item}</li>`).join("");
+      list.innerHTML = (latestUpdateInfo.changelog || []).map(item => `<li>${escapeHtml(item)}</li>`).join("");
     }
     modal.style.display = "flex";
   }
@@ -7828,6 +8285,24 @@
   function openGitHubRelease() {
     if (latestUpdateInfo && latestUpdateInfo.dmg_url) {
       window.open(latestUpdateInfo.dmg_url, '_blank');
+    }
+  }
+
+  async function pollWinUpdate(statusBox, btn) {
+    const label = { downloading: "下載中", verifying: "驗證更新檔", installing: "安裝中，程式即將自動重新啟動…" };
+    for (let i = 0; i < 900; i++) {  // ~12 min cap
+      await new Promise(r => setTimeout(r, 800));
+      let s;
+      try { s = await (await fetch('/api/update-status')).json(); }
+      catch (e) { if (statusBox) statusBox.innerHTML = "🔄 程式正在重新啟動以套用更新…"; return; }  // server gone = app is restarting
+      if (s.state === "error") {
+        if (statusBox) statusBox.innerHTML = `<span style="color:#f87171;">❌ ${escapeHtml(s.message || '更新失敗')}<br>請稍後重試，或點選「前往 GitHub」手動下載。</span>`;
+        if (btn) btn.disabled = false;
+        return;
+      }
+      let txt = label[s.state] || s.message || "處理中";
+      if (s.state === "downloading" && s.total > 0) txt += ` ${Math.floor(100 * s.downloaded / s.total)}%`;
+      if (statusBox) statusBox.innerHTML = `⏳ ${txt}`;
     }
   }
 
@@ -7847,8 +8322,17 @@
         })
       });
       const data = await res.json();
+      if (data.win) {  // Windows portable build: poll real progress, never auto-close on error
+        await pollWinUpdate(statusBox, btn);
+        return;
+      }
+      if (data.ok === false) {
+        if (statusBox) statusBox.innerHTML = `<span style="color:#f87171;">❌ ${escapeHtml(data.message || '更新失敗')}</span>`;
+        if (btn) btn.disabled = false;
+        return;
+      }
       if (statusBox) {
-        statusBox.innerHTML = `✅ ${data.message || '安裝包下載完成，已啟動 macOS 安裝精靈！'}`;
+        statusBox.innerHTML = `✅ ${escapeHtml(data.message || '安裝包下載完成，已啟動 macOS 安裝精靈！')}`;
       }
       setTimeout(closeUpdateModal, 3500);
     } catch (e) {
@@ -7859,10 +8343,124 @@
     }
   }
 
+  /* =========================================================
+     Windows adaptation layer (no effect on macOS)
+     ========================================================= */
+  var IS_WIN = /Windows/i.test(navigator.userAgent);
+  function T(str) { return IS_WIN ? winText(str) : str; }   // for fixed UI wording only (never user data)
+  function winText(str) {
+    if (!str || !/Mac|macOS|Finder|⌘|⇧|⌫|Cmd|Quick ?Look|垃圾桶|Keynote|Pages|Retina|Vision|OCR 或去背/.test(str)) return str;
+    return str
+      .replace(/（若為掃描檔可點上方按鈕送圖片工坊執行 Vision OCR）/g, "")
+      .replace(/，點擊上方「✂️ 在圖片工坊開啟此頁」即可使用 macOS Vision OCR 辨識文字或框選裁切！/g, "，點擊上方「✂️ 在圖片工坊開啟此頁」即可框選裁切。")
+      .replace(/、OCR 或去背/g, "")
+      .replace(/Keynote \/ Pages \/ Numbers/g, "PowerPoint / Word / Excel")
+      .replace(/Word 免開 Pages 極速閱讀/g, "Word 文件極速閱讀")
+      .replace(/免開 Keynote 極速簡報檢視/g, "簡報極速檢視")
+      .replace(/免開 Keynote /g, "")
+      .replace(/直貼 Pages\/Word\/LINE/g, "直貼 Word/LINE")
+      .replace(/Retina PNG/g, "高解析 PNG")
+      .replace(/⌘⇧⌫/g, "Ctrl+Shift+Del").replace(/⌘⌫/g, "Ctrl+Del")
+      .replace(/⌘/g, "Ctrl+").replace(/⇧/g, "Shift+").replace(/⌫/g, "Del")
+      .replace(/Cmd\+/g, "Ctrl+").replace(/\bCmd\b/g, "Ctrl")
+      .replace(/macOS QuickLook|Quick ?Look/g, "預設程式")
+      .replace(/Mac 十字截圖/g, "Windows 截圖工具")
+      .replace(/Mac 剪貼簿/g, "剪貼簿")
+      .replace(/([\u4e00-\u9fff]) ?(?:Mac |系統)垃圾桶/g, "$1資源回收筒").replace(/(?:Mac |系統)垃圾桶/g, "資源回收筒").replace(/垃圾桶/g, "資源回收筒")
+      .replace(/([\u4e00-\u9fff]) ?(?:Mac )?Finder ?(?=[\u4e00-\u9fff])/g, "$1檔案總管").replace(/Mac Finder|Finder/g, "檔案總管")
+      .replace(/MacToolbox/g, "PowerUp Toolbox")
+      .replace(/macOS/g, "Windows")
+      .replace(/\bMac ?/g, "Windows ");
+  }
+  // Never touch user content (file names, documents, tables, previews): only app chrome is translated.
+  const WIN_SKIP = "#leftNavList,#gridView,#filmstrip,#mdStage,#jsonStage,#csvStage,#pptxStage,#pdfStage,#singleView,#compareView,#hudFilename,#hudMeta,#hudIndex,#bookmarkList,#pathInput,[data-mac-only] .tool-header,textarea,script,style,code,pre";
+  const WIN_SKIP_MIN = "textarea,script,style,code,pre";
+  function winSkipped(node, force) {
+    const el = node.nodeType === 1 ? node : node.parentElement;
+    return !el || Boolean(el.closest(force ? WIN_SKIP_MIN : WIN_SKIP));
+  }
+  function winTextNode(root, force) {
+    if (!root || winSkipped(root, force)) return;
+    if (root.nodeType === 3) {
+      const v = winText(root.nodeValue); if (v !== root.nodeValue) root.nodeValue = v; return;
+    }
+    if (root.nodeType !== 1) return;
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => winSkipped(n, force) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    });
+    let n; while ((n = tw.nextNode())) { const v = winText(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v; }
+    const fixAttrs = el => {
+      if (winSkipped(el, force)) return;
+      ["title", "placeholder"].forEach(a => { const v = el.getAttribute(a); if (v) { const w = winText(v); if (w !== v) el.setAttribute(a, w); } });
+    };
+    fixAttrs(root);
+    root.querySelectorAll("[title],[placeholder]").forEach(fixAttrs);
+  }
+  if (IS_WIN) {
+    document.documentElement.classList.add("is-win");
+    document.title = "PowerUp Toolbox — 智慧萬用檢視器";
+    // macOS-only features: show a notice instead of buttons that would only fail
+    document.querySelectorAll("[data-mac-only]").forEach(card => {
+      Array.from(card.children).forEach((c, i) => { if (i > 0) c.style.display = "none"; });
+      if (card.dataset.winTitle) { const hs = card.querySelector(".tool-header span"); if (hs) hs.textContent = card.dataset.winTitle; }
+      const note = document.createElement("div");
+      note.style.cssText = "font-size:11.5px; color:var(--muted); padding:6px 2px;";
+      note.textContent = "⚠️ Windows 版尚未支援此功能";
+      card.appendChild(note);
+    });
+    TOUR_STEPS.forEach(st => {   // tour copy is fixed text; fix Windows wording + unsupported features at the source
+      ["badge", "title", "html"].forEach(k => {
+        if (typeof st[k] !== "string") return;
+        st[k] = winText(st[k]
+          .replace(/、Vision 去背\/OCR 與人臉修圖/g, "（去背/OCR/人臉修圖：Windows 版尚未支援）")
+          .replace(/內建 <strong>macOS 原生 Vision[\s\S]*?超解析。/g, "提供縮放、裁切與旋轉、A/B 比對；<strong>去背、OCR、人臉偵測與 AI 修復目前 Windows 版尚未支援</strong>。"));
+      });
+    });
+    document.querySelectorAll("[data-win-text]").forEach(el => { el.textContent = el.dataset.winText; });
+    document.querySelectorAll("[data-mac-only] .tool-header .kbd").forEach(el => { el.style.setProperty("display", "none", "important"); });
+    winTextNode(document.body, true);  // one-time pass over static interface text (runs before any user content exists)
+    // Fixed interface fragments rendered later (tour steps, shortcut hints, language labels) are translated
+    // explicitly after they render; file names / paths / document text are never touched.
+    const wrapAfter = (fn, after) => function () { const r = fn.apply(this, arguments); after(); return r; };
+    renderTourStep = wrapAfter(renderTourStep, () => winTextNode(document.getElementById("tourOverlay")));
+    adaptUiForFileType = wrapAfter(adaptUiForFileType, () => winTextNode(document.getElementById("hudShortcuts")));
+    applyAppLanguage = wrapAfter(applyAppLanguage, () =>
+      document.querySelectorAll(".topbar-sys-btn,.topbar-center").forEach(el => winTextNode(el)));
+  }
+
   initApp();
   applyAppLanguage(appCurrentLang);
   setTimeout(() => checkAppUpdates(true), 2500);
 </script>
+
+  <!-- Password dialog for encrypted files (password is only sent in a POST body, never stored) -->
+  <div id="qlModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); backdrop-filter:blur(6px); z-index:100001; align-items:center; justify-content:center;"
+       onkeydown="qlKeydown(event)">
+    <div style="background:#0b0f19; border:1px solid rgba(245,158,11,0.5); border-radius:14px; width:440px; max-width:92vw; padding:22px; box-shadow:0 25px 60px rgba(0,0,0,0.85);">
+      <div style="font-size:15px; font-weight:700; margin-bottom:6px;">⚠️ 以系統預設程式開啟</div>
+      <div id="qlName" style="font-family:'SF Mono',Menlo,monospace; font-size:12px; color:var(--text); word-break:break-all; margin-bottom:8px;"></div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">將以系統預設程式開啟此檔案（等同在檔案總管雙擊），確定？</div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+        <button class="btn" id="qlCancelBtn" onclick="qlAnswer(false)">取消</button>
+        <button class="btn primary" id="qlOkBtn" onclick="qlAnswer(true)">開啟</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="unlockModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); backdrop-filter:blur(6px); z-index:100000; align-items:center; justify-content:center;"
+       onkeydown="unlockKeydown(event)">
+    <div style="background:#0b0f19; border:1px solid rgba(96,165,250,0.45); border-radius:14px; width:420px; max-width:92vw; padding:22px; box-shadow:0 25px 60px rgba(0,0,0,0.85);">
+      <div style="font-size:15px; font-weight:700; margin-bottom:6px;">🔒 此檔案需要密碼</div>
+      <div id="unlockFileName" style="font-family:'SF Mono',Menlo,monospace; font-size:12px; color:var(--text); word-break:break-all; margin-bottom:8px;"></div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">密碼只用於本次預覽，不會儲存。</div>
+      <input id="unlockPwd" type="password" class="path-input" style="width:100%;" autocomplete="new-password" spellcheck="false" placeholder="輸入密碼" />
+      <div id="unlockErr" style="color:#f87171; font-size:12px; min-height:18px; margin-top:6px;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+        <button class="btn" onclick="closeUnlockDialog()">取消</button>
+        <button class="btn primary" id="unlockSubmitBtn" onclick="submitUnlock()">解鎖</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Auto-Update Modal Dialog -->
   <div id="updateModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.78); backdrop-filter:blur(10px); z-index:99999; align-items:center; justify-content:center;">

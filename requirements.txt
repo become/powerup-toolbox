@@ -7,6 +7,12 @@ Pillow>=9.0.0
 openpyxl>=3.0.0
 xlrd>=2.0.1
 
+# Password-protected Office files (decrypted in memory only; optional - without it the app just says the file is protected)
+msoffcrypto-tool>=5.0.0
+
+# Windows PDF preview (pdfium; macOS uses the native PDFKit helper instead)
+pypdfium2>=4.0.0; sys_platform == "win32"
+
 # Optional: AI Image Enhancement & Super-Resolution
 # (Uncomment below if you want to use GFPGAN / CodeFormer / Real-ESRGAN locally)
 # opencv-python>=4.8.0

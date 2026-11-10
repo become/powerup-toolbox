@@ -13,3 +13,8 @@ captures/
 # Ignore temporary local builds if needed
 .build/
 EOF
+
+# Windows portable build outputs
+build_win/
+release_win/
+release_win_next/
