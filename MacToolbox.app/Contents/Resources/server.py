@@ -19,6 +19,10 @@ import urllib.parse
 import subprocess
 import threading
 try:
+    import local_albums
+except ImportError:
+    local_albums = None
+try:
     import gphotos
 except ImportError:
     gphotos = None
@@ -2420,9 +2424,19 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.send_json(gphotos.get_album_media(album_id=album_id) if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
             return
 
+        if route == "/api/local-albums/list":
+            self.send_json({"ok": True, "albums": local_albums.list_all_local_albums() if local_albums else []})
+            return
+
+        if route == "/api/local-albums/photos":
+            album_id = qs.get("album_id", [""])[0]
+            album_path = qs.get("album_path", [""])[0]
+            self.send_json(local_albums.get_album_photos(album_id, album_path) if local_albums else {"ok": False, "error": "本機相簿模組未載入"})
+            return
+
         if route == "/api/bookmarks":
             bookmarks = [
-                {"name": "📷 Google 相簿", "full_name": "📷 Google 相簿 (雲端瀏覽、上傳與相簿整理)", "path": "gphotos://", "icon": "📷", "special": "gphotos"},
+                {"name": "📷 本機相簿", "full_name": "📷 本機相簿工坊 (真實照片庫、智慧分類與雲端同步)", "path": "albums://", "icon": "📷", "special": "albums"},
                 {"name": "📸 截圖匣", "full_name": "📸 截圖與剪貼簿匣", "path": os.path.abspath(CAPTURES_DIR), "icon": "📸"},
                 {"name": "📝 暫存匣", "full_name": "📝 暫存草稿工作匣 (Scratchpad)", "path": os.path.abspath(SCRATCH_DIR), "icon": "📝"},
                 {"name": "🧰 Toolbox", "full_name": "🧰 Toolbox 專案目錄", "path": os.path.abspath(TOOLBOX_DIR), "icon": "🧰"},
@@ -2474,7 +2488,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟", "path": gdrive_win, "icon": "☁️"})
 
             valid = [b for b in bookmarks if b["path"] and (
-                b.get("special") == "gphotos"
+                b.get("special") in ("albums", "gphotos")
                 or (not path_is_unsafe(b["path"]) and (
                     (IS_WINDOWS and len(b["path"]) == 3 and b["path"][1:] == ":\\" and winpath.drive_type(b["path"][0]) == 4)
                     or os.path.exists(b["path"])
@@ -3103,6 +3117,23 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             album_id = body.get("album_id", "")
             media_item_ids = body.get("media_item_ids", [])
             self.send_json(gphotos.add_media_to_album(album_id, media_item_ids) if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
+            return
+
+        if route == "/api/local-albums/create":
+            title = body.get("title", "")
+            self.send_json(local_albums.create_album(title) if local_albums else {"ok": False, "error": "本機相簿模組未載入"})
+            return
+
+        if route == "/api/local-albums/add-photos":
+            album_path = body.get("album_path", "")
+            photo_paths = body.get("photo_paths", [])
+            mode = body.get("mode", "copy")
+            self.send_json(local_albums.add_photos_to_album(album_path, photo_paths, mode) if local_albums else {"ok": False, "error": "本機相簿模組未載入"})
+            return
+
+        if route == "/api/local-albums/reveal":
+            path = body.get("path", "")
+            self.send_json({"ok": local_albums.reveal_in_system(path) if local_albums else False})
             return
 
         if route == "/api/gphotos/load-to-local":

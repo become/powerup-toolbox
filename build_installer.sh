@@ -29,6 +29,7 @@ fi
 
 echo "📦 [3/5] 封裝應用程式資源至 $APP_NAME/Contents/Resources..."
 cp -f "$ROOT_DIR/server.py" "$ROOT_DIR/$APP_NAME/Contents/Resources/server.py"
+cp -f "$ROOT_DIR/local_albums.py" "$ROOT_DIR/$APP_NAME/Contents/Resources/local_albums.py" 2>/dev/null || true
 cp -f "$ROOT_DIR/gphotos.py" "$ROOT_DIR/$APP_NAME/Contents/Resources/gphotos.py" 2>/dev/null || true
 cp -f "$ROOT_DIR/index.html" "$ROOT_DIR/$APP_NAME/Contents/Resources/index.html"
 rm -rf "$ROOT_DIR/$APP_NAME/Contents/Resources/assets"

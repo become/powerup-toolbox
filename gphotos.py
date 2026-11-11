@@ -38,43 +38,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email"
 ]
 
-# In-memory Demo Data when demo mode is active or user hasn't configured real credentials
-DEMO_ALBUMS = [
-    {
-        "id": "demo_album_tokyo",
-        "title": "🌸 2026 日本賞櫻 · 富士山巡禮",
-        "totalMediaItems": 6,
-        "coverPhotoBaseUrl": "/assets/brand_logo_extracted.png"
-    },
-    {
-        "id": "demo_album_ai",
-        "title": "✨ AI 影像修復 & 證件照工坊",
-        "totalMediaItems": 4,
-        "coverPhotoBaseUrl": "/assets/app_icon.png"
-    },
-    {
-        "id": "demo_album_screenshots",
-        "title": "📸 工作工作台截圖與靈感收藏",
-        "totalMediaItems": 5,
-        "coverPhotoBaseUrl": "/assets/brand_logo_extracted.png"
-    }
-]
-
-DEMO_PHOTOS = {
-    "demo_album_tokyo": [
-        {"id": "demo_pic_1", "filename": "Tokyo_Sakura_001.jpg", "description": "東京櫻花盛開景緻", "creationTime": "2026-04-02T10:30:00Z", "width": "4032", "height": "3024", "baseUrl": "/assets/brand_logo_extracted.png"},
-        {"id": "demo_pic_2", "filename": "Fuji_Lake_002.jpg", "description": "河口湖逆富士日出", "creationTime": "2026-04-03T06:15:00Z", "width": "4032", "height": "3024", "baseUrl": "/assets/brand_logo_extracted.png"},
-        {"id": "demo_pic_3", "filename": "Miyajima_Torii_003.jpg", "description": "嚴島神社海上鳥居夕照", "creationTime": "2026-04-04T17:40:00Z", "width": "4032", "height": "3024", "baseUrl": "/assets/brand_logo_extracted.png"},
-    ],
-    "demo_album_ai": [
-        {"id": "demo_ai_1", "filename": "Portrait_Enhanced_01.png", "description": "GFPGAN 4K 人臉超解析度修復", "creationTime": "2026-11-05T14:20:00Z", "width": "2048", "height": "2048", "baseUrl": "/assets/app_icon.png"},
-        {"id": "demo_ai_2", "filename": "Passport_Photo_3x4.png", "description": "3:4 證件照自動定位裁切", "creationTime": "2026-11-06T09:10:00Z", "width": "1200", "height": "1600", "baseUrl": "/assets/app_icon.png"},
-    ],
-    "demo_album_screenshots": [
-        {"id": "demo_sc_1", "filename": "Toolbox_3000_Grid.png", "description": "PowerUp Toolbox 3,000+ 張照片瞬開網格", "creationTime": "2026-11-08T11:00:00Z", "width": "1920", "height": "1080", "baseUrl": "/assets/app_icon.png"},
-    ]
-}
-
 
 def load_json(filepath, default=None):
     if default is None:
@@ -141,15 +104,14 @@ def get_status():
     tokens = get_tokens()
     has_creds = bool(cfg.get("client_id") and cfg.get("client_secret"))
     has_token = bool(tokens.get("access_token") or tokens.get("refresh_token"))
-    is_demo = cfg.get("demo_mode", False) or (not has_creds and not has_token)
     
     return {
         "ok": True,
-        "connected": bool(has_token and not is_demo),
-        "demo_mode": is_demo,
+        "connected": bool(has_token),
+        "demo_mode": False,
         "has_credentials": has_creds,
         "client_id_preview": (cfg.get("client_id")[:12] + "...") if cfg.get("client_id") else "",
-        "email": tokens.get("email") or ("體驗帳號 (demo@gmail.com)" if is_demo else ""),
+        "email": tokens.get("email") or "",
         "expires_in": max(0, int(tokens.get("expires_at", 0) - time.time())) if has_token else 0
     }
 
@@ -225,10 +187,6 @@ def handle_oauth_callback(code, redirect_uri="http://127.0.0.1:18765/api/gphotos
 
 
 def get_valid_token():
-    status = get_status()
-    if status["demo_mode"]:
-        return "DEMO_TOKEN", None
-    
     tokens = get_tokens()
     access_token = tokens.get("access_token")
     refresh_token = tokens.get("refresh_token")
@@ -239,7 +197,7 @@ def get_valid_token():
         return access_token, None
     
     if not refresh_token:
-        return None, "尚未登入或授權已過期，請重新連線 Google 帳號"
+        return None, "尚未登入或授權已過期，請於設定中連線 Google 帳號"
     
     cfg = get_config()
     client_id = cfg.get("client_id")
@@ -271,12 +229,12 @@ def get_valid_token():
 
 def list_albums():
     status = get_status()
-    if status["demo_mode"]:
-        return {"ok": True, "albums": DEMO_ALBUMS, "is_demo": True}
+    if not status["connected"]:
+        return {"ok": True, "albums": [], "connected": False, "message": "尚未連結 Google 帳號"}
     
     token, err = get_valid_token()
     if err:
-        return {"ok": False, "error": err}
+        return {"ok": False, "error": err, "connected": False}
     
     url = f"{PHOTOS_API_BASE}/albums?pageSize=50"
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
@@ -292,26 +250,19 @@ def list_albums():
                     "totalMediaItems": int(a.get("mediaItemsCount", 0)),
                     "coverPhotoBaseUrl": a.get("coverPhotoBaseUrl", "")
                 })
-            return {"ok": True, "albums": out, "is_demo": False}
+            return {"ok": True, "albums": out, "connected": True}
     except Exception as e:
         return {"ok": False, "error": f"載入相簿清單失敗: {e}"}
 
 
 def get_album_media(album_id=None, page_size=60):
     status = get_status()
-    if status["demo_mode"]:
-        if album_id and album_id in DEMO_PHOTOS:
-            items = DEMO_PHOTOS[album_id]
-        else:
-            # Flatten all demo photos
-            items = []
-            for alb_items in DEMO_PHOTOS.values():
-                items.extend(alb_items)
-        return {"ok": True, "media": items, "is_demo": True}
+    if not status["connected"]:
+        return {"ok": True, "media": [], "connected": False, "message": "尚未連結 Google 帳號"}
     
     token, err = get_valid_token()
     if err:
-        return {"ok": False, "error": err}
+        return {"ok": False, "error": err, "connected": False}
     
     try:
         if album_id:
@@ -340,7 +291,7 @@ def get_album_media(album_id=None, page_size=60):
                     "height": m.get("mediaMetadata", {}).get("height", "0"),
                     "baseUrl": m.get("baseUrl", "")
                 })
-            return {"ok": True, "media": out, "is_demo": False}
+            return {"ok": True, "media": out, "connected": True}
     except Exception as e:
         return {"ok": False, "error": f"讀取相片失敗: {e}"}
 
@@ -350,22 +301,9 @@ def create_album(title):
     if not title:
         return {"ok": False, "error": "請提供相簿名稱"}
     
-    status = get_status()
-    if status["demo_mode"]:
-        new_id = f"demo_album_{int(time.time())}"
-        new_alb = {
-            "id": new_id,
-            "title": title,
-            "totalMediaItems": 0,
-            "coverPhotoBaseUrl": "/assets/brand_logo_extracted.png"
-        }
-        DEMO_ALBUMS.insert(0, new_alb)
-        DEMO_PHOTOS[new_id] = []
-        return {"ok": True, "album": new_alb, "is_demo": True}
-    
     token, err = get_valid_token()
     if err:
-        return {"ok": False, "error": err}
+        return {"ok": False, "error": err, "connected": False}
     
     url = f"{PHOTOS_API_BASE}/albums"
     payload = json.dumps({"album": {"title": title}}).encode("utf-8")
@@ -384,7 +322,7 @@ def create_album(title):
                     "totalMediaItems": 0,
                     "coverPhotoBaseUrl": ""
                 },
-                "is_demo": False
+                "connected": True
             }
     except Exception as e:
         return {"ok": False, "error": f"建立相簿失敗: {e}"}
@@ -398,31 +336,9 @@ def upload_media_file(file_path, album_id=None, description=""):
     mime_type, _ = mimetypes.guess_type(file_path)
     mime_type = mime_type or "image/jpeg"
     
-    status = get_status()
-    if status["demo_mode"]:
-        time.sleep(0.6) # simulate upload latency
-        demo_id = f"demo_up_{int(time.time())}"
-        demo_item = {
-            "id": demo_id,
-            "filename": filename,
-            "description": description or f"上傳自 PowerUp Toolbox ({time.strftime('%Y-%m-%d %H:%M')})",
-            "creationTime": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "width": "1920",
-            "height": "1080",
-            "baseUrl": "/assets/brand_logo_extracted.png"
-        }
-        target_alb = album_id or (DEMO_ALBUMS[0]["id"] if DEMO_ALBUMS else None)
-        if target_alb and target_alb in DEMO_PHOTOS:
-            DEMO_PHOTOS[target_alb].insert(0, demo_item)
-            for a in DEMO_ALBUMS:
-                if a["id"] == target_alb:
-                    a["totalMediaItems"] += 1
-                    break
-        return {"ok": True, "mediaItemId": demo_id, "albumId": target_alb, "is_demo": True, "message": f"（Demo模式）成功模擬上傳 {filename} 至相簿"}
-    
     token, err = get_valid_token()
     if err:
-        return {"ok": False, "error": err}
+        return {"ok": False, "error": f"尚未連結 Google 帳號，請先於設定中登入: {err}"}
     
     # Step 1: Upload Raw Bytes
     upload_url = f"{PHOTOS_API_BASE}/uploads"
@@ -484,10 +400,6 @@ def upload_media_file(file_path, album_id=None, description=""):
 def add_media_to_album(album_id, media_item_ids):
     if not album_id or not media_item_ids:
         return {"ok": False, "error": "缺少相簿 ID 或相片 ID"}
-    
-    status = get_status()
-    if status["demo_mode"]:
-        return {"ok": True, "is_demo": True, "message": "（Demo模式）已成功將照片整理至指定相簿"}
     
     token, err = get_valid_token()
     if err:
