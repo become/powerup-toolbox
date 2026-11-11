@@ -64,9 +64,13 @@
 		<data>
 		U5JcsEDbtCDS0du8opIrpbH1TLc=
 		</data>
+		<key>Resources/gphotos.py</key>
+		<data>
+		uAnOBd5ncb0qwO9+XdKEwI16siU=
+		</data>
 		<key>Resources/index.html</key>
 		<data>
-		IuThbK4oPnWpK2p/8McYOnzmiiM=
+		cuE7T/Of+9RS7sRrsyO2tdqIGWQ=
 		</data>
 		<key>Resources/mac_vision_helper</key>
 		<data>
@@ -94,7 +98,7 @@
 		</data>
 		<key>Resources/server.py</key>
 		<data>
-		JgmGcC7fyEjLdCmiK6ub4FoiV+g=
+		pj7iyW24+/loEsapIY/350nqRL0=
 		</data>
 		<key>Resources/set_default_handlers</key>
 		<data>
@@ -265,11 +269,18 @@
 			zTeJj5eCrfVIIMQTGRtWkYA/DxN8eZ1u3P04UjtMLDE=
 			</data>
 		</dict>
+		<key>Resources/gphotos.py</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			BZVVckF9+j3aJ8CKT5syVGfZKOeTOIRuDgzoIyeupP0=
+			</data>
+		</dict>
 		<key>Resources/index.html</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			POvVrW39fcBQIuNN73PBsJTDB2Kv7Bg8IjOujqA/fjk=
+			Frx0FLK1fJykNz74WxBfUYRVIyopQP/SQxSIHb3dl8M=
 			</data>
 		</dict>
 		<key>Resources/mac_vision_helper</key>
@@ -318,7 +329,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			bOfKzoobZ5pMIU47iWGALs/cgzwPzRZ/j8L8p/t0ioM=
+			zD3OsSt4Lnb9drIOgvwOPMXTx8FeQxh9oMfshZX3+tA=
 			</data>
 		</dict>
 		<key>Resources/set_default_handlers</key>

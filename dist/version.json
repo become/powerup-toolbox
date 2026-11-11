@@ -9,8 +9,6 @@
   "pkg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.pkg",
   "changelog": [
     "🚀 PowerUp Toolbox 跨平台正式版：全面支援 macOS 與 Windows 10/11",
-    "🪟 Windows 免安裝可攜版：解壓縮即用，WebView2 原生獨立視窗，右鍵「以 PowerUp Toolbox 開啟」",
-    "🔐 加密 Excel／Word／PowerPoint／PDF 輸入密碼即可預覽（僅在記憶體解密，不寫入硬碟）",
     "🛡️ 企業級安全強化：本機 Token 鑑權、Strict CSP、DOMPurify 與離線安全沙盒",
     "🖼️ 海量照片極速網格瀏覽模式 (3,000+ 張照片 0 秒瞬顯) 與原寸自適應檢視",
     "📑 Markdown / Office / PDF / JSON / CSV 全功能即時預覽與雙欄編輯",

@@ -18,6 +18,10 @@ import secrets
 import urllib.parse
 import subprocess
 import threading
+try:
+    import gphotos
+except ImportError:
+    gphotos = None
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 if sys.platform == "win32":
     import winshell     # Windows shell helpers: clipboard / pickers through ctypes, never through a PowerShell script
@@ -1730,7 +1734,7 @@ SERVER_TOKEN = secrets.token_urlsafe(32)
 # Inline handlers / styles are still used by the page, so script-src keeps 'unsafe-inline'; the rest closes
 # exfiltration and injection routes (no plugins, no <base>, no foreign forms/frames, connect only to ourselves).
 PAGE_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; "
+            "img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self'; frame-src 'self'; "
             "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'")
 COOKIE_PREFIX = "ptk_"
 # Windows frozen build only: the token cookie is handed out solely to a "/" request carrying a one-time nonce that the
@@ -2149,6 +2153,8 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if origin is not None and origin.strip().lower() not in {"http://" + h for h in hosts}:
             return self._deny(403, "forbidden origin")
         path = urllib.parse.urlparse(self.path).path
+        if path == "/api/gphotos/oauth-callback":
+            return True
         sfs = self.headers.get("Sec-Fetch-Site")
         # Pages and static files too: a cross-site / same-site (other port) top-level navigation to "/?path=..."
         # must not receive the token cookie nor auto-open a file. Typed URLs (none), the app shell and its own
@@ -2326,8 +2332,47 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.send_json({"ok": True, **LAST_OPEN_REQUEST})
             return
 
+        if route == "/api/gphotos/status":
+            self.send_json(gphotos.get_status() if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
+            return
+
+        if route == "/api/gphotos/auth-url":
+            if not gphotos:
+                self.send_json({"ok": False, "error": "Google Photos 模組未載入"})
+                return
+            port = self.server.server_address[1]
+            redirect_uri = f"http://127.0.0.1:{port}/api/gphotos/oauth-callback"
+            url, err = gphotos.get_auth_url(redirect_uri)
+            self.send_json({"ok": bool(url), "url": url, "error": err})
+            return
+
+        if route == "/api/gphotos/oauth-callback":
+            if not gphotos:
+                self.send_response(302)
+                self.send_header("Location", "/?gphotos_auth=0")
+                self.end_headers()
+                return
+            code = qs.get("code", [""])[0]
+            port = self.server.server_address[1]
+            redirect_uri = f"http://127.0.0.1:{port}/api/gphotos/oauth-callback"
+            ok, msg = gphotos.handle_oauth_callback(code, redirect_uri)
+            self.send_response(302)
+            self.send_header("Location", f"/?gphotos_auth={'1' if ok else '0'}")
+            self.end_headers()
+            return
+
+        if route == "/api/gphotos/albums":
+            self.send_json(gphotos.list_albums() if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
+            return
+
+        if route == "/api/gphotos/media":
+            album_id = qs.get("album_id", [None])[0]
+            self.send_json(gphotos.get_album_media(album_id=album_id) if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
+            return
+
         if route == "/api/bookmarks":
             bookmarks = [
+                {"name": "📷 Google 相簿", "full_name": "📷 Google 相簿 (雲端瀏覽、上傳與相簿整理)", "path": "gphotos://", "icon": "📷", "special": "gphotos"},
                 {"name": "📸 截圖匣", "full_name": "📸 截圖與剪貼簿匣", "path": os.path.abspath(CAPTURES_DIR), "icon": "📸"},
                 {"name": "📝 暫存匣", "full_name": "📝 暫存草稿工作匣 (Scratchpad)", "path": os.path.abspath(SCRATCH_DIR), "icon": "📝"},
                 {"name": "🧰 Toolbox", "full_name": "🧰 Toolbox 專案目錄", "path": os.path.abspath(TOOLBOX_DIR), "icon": "🧰"},
@@ -2378,9 +2423,13 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 if os.path.isdir(gdrive_win):
                     bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟", "path": gdrive_win, "icon": "☁️"})
 
-            valid = [b for b in bookmarks if b["path"] and not path_is_unsafe(b["path"])
-                     and (len(b["path"]) == 3 and b["path"][1:] == ":\\" and winpath.drive_type(b["path"][0]) == 4
-                          or os.path.exists(b["path"]))]
+            valid = [b for b in bookmarks if b["path"] and (
+                b.get("special") == "gphotos"
+                or (not path_is_unsafe(b["path"]) and (
+                    (IS_WINDOWS and len(b["path"]) == 3 and b["path"][1:] == ":\\" and winpath.drive_type(b["path"][0]) == 4)
+                    or os.path.exists(b["path"])
+                ))
+            )]
             self.send_json({"ok": True, "bookmarks": valid, "home": safe_or_none("~") or ""})
             return
 
@@ -2970,6 +3019,63 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             else:
                 win_support.register()
             self.send_json({"ok": True, **win_support.register_status()})
+            return
+
+        if route == "/api/gphotos/config":
+            if not gphotos:
+                self.send_json({"ok": False, "error": "Google Photos 模組未載入"})
+                return
+            cid = body.get("client_id", "")
+            csec = body.get("client_secret", "")
+            dmode = body.get("demo_mode", False)
+            ok = gphotos.save_config(cid, csec, dmode)
+            self.send_json({"ok": ok})
+            return
+
+        if route == "/api/gphotos/disconnect":
+            ok = gphotos.disconnect() if gphotos else False
+            self.send_json({"ok": ok})
+            return
+
+        if route == "/api/gphotos/create-album":
+            title = body.get("title", "")
+            self.send_json(gphotos.create_album(title) if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
+            return
+
+        if route == "/api/gphotos/upload":
+            path = body.get("path", "")
+            album_id = body.get("album_id")
+            desc = body.get("description", "")
+            self.send_json(gphotos.upload_media_file(path, album_id, desc) if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
+            return
+
+        if route == "/api/gphotos/organize":
+            album_id = body.get("album_id", "")
+            media_item_ids = body.get("media_item_ids", [])
+            self.send_json(gphotos.add_media_to_album(album_id, media_item_ids) if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
+            return
+
+        if route == "/api/gphotos/load-to-local":
+            media_id = body.get("id", str(int(time.time())))
+            base_url = body.get("baseUrl", "")
+            filename = body.get("filename", f"gphotos_{media_id}.jpg")
+            if not base_url:
+                self.send_json({"ok": False, "error": "缺少照片 URL"}, 400)
+                return
+            out_file = os.path.join(CAPTURES_DIR, f"gphotos_{media_id}_{filename}")
+            try:
+                if base_url.startswith("/"):
+                    src = os.path.join(TOOLBOX_DIR, base_url.lstrip("/"))
+                    if os.path.exists(src):
+                        shutil.copyfile(src, out_file)
+                else:
+                    dl_url = base_url + "=d"
+                    req = urllib.request.Request(dl_url, headers={"User-Agent": "PowerUpToolbox/2.7"})
+                    with urllib.request.urlopen(req, timeout=30) as resp, open(out_file, "wb") as out:
+                        shutil.copyfileobj(resp, out)
+                self.send_json({"ok": True, "path": out_file})
+            except Exception as e:
+                self.send_json({"ok": False, "error": str(e)}, 500)
             return
 
         if route == "/api/unlock":

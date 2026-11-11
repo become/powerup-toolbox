@@ -1337,6 +1337,101 @@
   }
   .pdf-stage.visible { display: flex; }
 
+  /* Google Photos Stage & Cards */
+  .gphotos-stage {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    background: #090c12;
+  }
+  .gphotos-stage.visible { display: flex; }
+  .gphotos-album-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: #e2e8f0;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  .gphotos-album-chip:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.45);
+    color: #fff;
+  }
+  .gphotos-album-chip.active {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.3), rgba(29, 78, 216, 0.3));
+    border-color: #3b82f6;
+    color: #93c5fd;
+    font-weight: 700;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+  }
+  .gphotos-card {
+    position: relative;
+    background: #111520;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease;
+  }
+  .gphotos-card:hover {
+    border-color: rgba(59, 130, 246, 0.55);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
+    transform: translateY(-2px);
+  }
+  .gphotos-card-thumb-wrap {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #06080d;
+    position: relative;
+    cursor: pointer;
+  }
+  .gphotos-card-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.25s ease;
+    display: block;
+  }
+  .gphotos-card:hover .gphotos-card-thumb {
+    transform: scale(1.04);
+  }
+  .gphotos-card-meta {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .gphotos-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gphotos-card-sub {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+  .gphotos-card-actions {
+    display: flex;
+    gap: 4px;
+    padding: 0 10px 10px 10px;
+  }
+
   /* 2D Visual Slide Canvas inside PPTX Stage */
   .pptx-canvas-board {
     width: 100%;
@@ -1992,6 +2087,9 @@
       <button class="btn purple topbar-sys-btn" onclick="openScratchpad()" title="開啟暫存工作台：貼上 JSON/MD/CSV 快速預覽並暫存 (快捷鍵 ⌘N)">
         <span>📝</span><span class="label-text" id="labelScratchpad"> 暫存</span>
       </button>
+      <button class="btn topbar-sys-btn" onclick="openGooglePhotosView()" id="btnTopGPhotos" title="開啟 Google 相簿瀏覽、上傳與整理" style="border: 1px solid rgba(59,130,246,0.4); background:rgba(37,99,235,0.2); color:#93c5fd;">
+        <span>📷</span><span class="label-text"> Google 相簿</span>
+      </button>
       <button class="btn topbar-sys-btn" onclick="pickNativePath('file')" title="呼叫 Mac 系統視窗選取單一檔案開啟">
         <span>📂</span><span class="label-text"> 開啟…</span>
       </button>
@@ -2299,6 +2397,53 @@
         </div>
       </div>
 
+      <!-- 7. Google Photos Stage (Gallery + Albums Organizer) -->
+      <div class="gphotos-stage" id="gphotosStage">
+        <!-- Top Google Photos Subbar -->
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 16px; background:#121620; border-bottom:1px solid rgba(255,255,255,0.08); flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">📷</span>
+            <strong style="font-size:15px; color:#fff;">Google 相簿</strong>
+            <span id="gphotosAccountPill" style="font-size:11px; padding:2px 8px; border-radius:12px; background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.4); color:#93c5fd;">
+              載入中...
+            </span>
+          </div>
+          <div style="height:18px; width:1px; background:rgba(255,255,255,0.12); margin:0 4px;"></div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:12px; color:var(--muted);">目前相簿：</span>
+            <select id="gphotosAlbumSelect" class="path-input" style="min-width:180px; max-width:280px;" onchange="onGPhotosAlbumSelectChange(this.value)">
+              <option value="">全部雲端相片</option>
+            </select>
+          </div>
+          <button class="btn" onclick="openNewAlbumModal()" style="font-size:12px; gap:4px;">
+            <span>➕ 建立相簿</span>
+          </button>
+          <button class="btn primary" onclick="openUploadToGPhotosModal()" style="font-size:12px; gap:4px; background:linear-gradient(135deg, #2563eb, #1d4ed8);">
+            <span>📤 上傳本機照片</span>
+          </button>
+          <button class="btn" onclick="refreshGooglePhotos()" style="font-size:12px; gap:4px;" title="重新整理相簿與照片">
+            <span>🔄 重新整理</span>
+          </button>
+          <span style="flex:1;"></span>
+          <button class="btn" onclick="exitGooglePhotosView()" style="font-size:12px; gap:4px;" title="返回本機檔案檢視">
+            <span>✕ 返回本機檢視</span>
+          </button>
+          <button class="btn" onclick="openGPhotosSettingsModal()" style="font-size:12px; gap:4px;">
+            <span>⚙️ 連線設定</span>
+          </button>
+        </div>
+
+        <!-- Google Photos Album Chips Bar -->
+        <div id="gphotosAlbumCardsBar" style="display:flex; gap:10px; padding:10px 16px; overflow-x:auto; background:#0e1118; border-bottom:1px solid rgba(255,255,255,0.06); min-height:48px; align-items:center;">
+          <!-- Dynamically populated: Album chips -->
+        </div>
+
+        <!-- Google Photos Media Grid -->
+        <div id="gphotosGrid" style="flex:1; overflow-y:auto; padding:16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:14px; align-content:start;">
+          <!-- Dynamically populated: Photo cards -->
+        </div>
+      </div>
+
       <!-- Unified Bottom Filmstrip -->
       <div class="filmstrip" id="filmstrip"></div>
     </div>
@@ -2388,6 +2533,22 @@
           <textarea id="codexPrompt" class="prompt-box" placeholder="輸入自然語言指令讓 Codex CLI 處理或生成圖片..."></textarea>
           <button class="btn primary" id="codexRunBtn" onclick="runCodexCli()">🚀 交給 Codex CLI 執行</button>
           <div id="codexOutputBox" class="output-box"></div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <span>☁️ Google 相簿雲端同步</span>
+            <span class="kbd">Photos</span>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">一鍵將目前圖片上傳備份至 Google 相簿，或瀏覽雲端圖庫：</div>
+          <div class="grid-2">
+            <button class="btn primary" onclick="openUploadToGPhotosModal()" style="font-size:12px; justify-content:center; background:linear-gradient(135deg, #2563eb, #1d4ed8);">
+              📤 上傳此照片
+            </button>
+            <button class="btn" onclick="openGooglePhotosView()" style="font-size:12px; justify-content:center;">
+              📷 瀏覽雲端相簿
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2965,6 +3126,25 @@
       try { history.replaceState(null, "", window.location.pathname + (q ? "?" + q : "")); } catch (e) {}
     }
 
+    if (urlParams.has("gphotos_auth")) {
+      const gAuth = urlParams.get("gphotos_auth");
+      const errMsg = urlParams.get("msg") || "";
+      urlParams.delete("gphotos_auth");
+      if (urlParams.has("msg")) urlParams.delete("msg");
+      const q = urlParams.toString();
+      try { history.replaceState(null, "", window.location.pathname + (q ? "?" + q : "")); } catch (e) {}
+      if (gAuth === "1") {
+        setTimeout(() => {
+          showToast("✅ Google 相簿授權成功！");
+          openGooglePhotosView();
+        }, 500);
+      } else {
+        setTimeout(() => {
+          alert("Google 相簿授權連線失敗: " + (errMsg || "未知錯誤"));
+        }, 500);
+      }
+    }
+
     updateThumbUi();
     await loadBookmarks();
     await loadRecentFiles();
@@ -3163,7 +3343,7 @@
     if (caret) caret.textContent = bookmarksCollapsed ? "▶" : "▼";
 
     el.innerHTML = bookmarksData.map(b => {
-      const isAct = sidebarTab === "folder" && currentDir === b.path;
+      const isAct = isGPhotosActive ? (b.special === "gphotos" || b.path === "gphotos://") : (sidebarTab === "folder" && currentDir === b.path);
       return `
         <div class="bm-chip ${isAct ? 'active' : ''}" onclick="onBookmarkClick('${escapeQuotes(b.path)}')" title="${escapeHtml(b.full_name || b.name)} (${escapeHtml(b.path)})">
           <span>${escapeHtml(b.icon)}</span>
@@ -3179,6 +3359,13 @@
   }
 
   function onBookmarkClick(path) {
+    if (path === "gphotos://" || path === "gphotos") {
+      openGooglePhotosView();
+      return;
+    }
+    if (isGPhotosActive) {
+      exitGooglePhotosView();
+    }
     if (sidebarTab !== "folder") setSidebarTab("folder");
     loadDirectory(path);
   }
@@ -3341,6 +3528,17 @@
   }
 
   async function loadDirectory(path = "", focusFile = null, forceOpen = false) {
+    if (path === "gphotos://" || path === "gphotos") {
+      openGooglePhotosView();
+      return;
+    }
+    if (isGPhotosActive) {
+      isGPhotosActive = false;
+      const gp = document.getElementById("gphotosStage");
+      if (gp) gp.classList.remove("visible");
+      const topBtn = document.getElementById("btnTopGPhotos");
+      if (topBtn) topBtn.classList.remove("active");
+    }
     const q = new URLSearchParams({ path, recursive: isRecursive ? "1" : "0" });
     const res = await fetch(`/api/list?${q.toString()}`);
     const data = await res.json();
@@ -6698,7 +6896,10 @@
     if (path && activeFileObj && activeFileObj.path !== path) return;   // a newer file was opened meanwhile
     lastFailure = { msg, path, encrypted, canUnlock };
     openFailed = true;
-    ["mdStage", "jsonStage", "csvStage", "pptxStage", "pdfStage"].forEach(id => document.getElementById(id).classList.remove("visible"));
+    ["mdStage", "jsonStage", "csvStage", "pptxStage", "pdfStage", "gphotosStage"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove("visible");
+    });
     document.getElementById("singleView").style.display = "none";
     document.getElementById("compareView").classList.remove("visible");
     document.getElementById("gridView").classList.remove("visible");
@@ -6741,6 +6942,13 @@
   }
 
   function setViewMode(mode) {
+    if (isGPhotosActive) {
+      isGPhotosActive = false;
+      const gp = document.getElementById("gphotosStage");
+      if (gp) gp.classList.remove("visible");
+      const topBtn = document.getElementById("btnTopGPhotos");
+      if (topBtn) topBtn.classList.remove("active");
+    }
     viewMode = mode;
     if (mode === "grid") { openFailed = false; document.getElementById("openFailBox").style.display = "none"; }
     else if (lastFailure && activeFileObj && activeFileObj.path === lastFailure.path) {
@@ -8373,7 +8581,7 @@
       .replace(/\bMac ?/g, "Windows ");
   }
   // Never touch user content (file names, documents, tables, previews): only app chrome is translated.
-  const WIN_SKIP = "#leftNavList,#gridView,#filmstrip,#mdStage,#jsonStage,#csvStage,#pptxStage,#pdfStage,#singleView,#compareView,#hudFilename,#hudMeta,#hudIndex,#bookmarkList,#pathInput,[data-mac-only] .tool-header,textarea,script,style,code,pre";
+  const WIN_SKIP = "#leftNavList,#gridView,#filmstrip,#mdStage,#jsonStage,#csvStage,#pptxStage,#pdfStage,#gphotosStage,#singleView,#compareView,#hudFilename,#hudMeta,#hudIndex,#bookmarkList,#pathInput,[data-mac-only] .tool-header,textarea,script,style,code,pre";
   const WIN_SKIP_MIN = "textarea,script,style,code,pre";
   function winSkipped(node, force) {
     const el = node.nodeType === 1 ? node : node.parentElement;
@@ -8426,6 +8634,603 @@
     adaptUiForFileType = wrapAfter(adaptUiForFileType, () => winTextNode(document.getElementById("hudShortcuts")));
     applyAppLanguage = wrapAfter(applyAppLanguage, () =>
       document.querySelectorAll(".topbar-sys-btn,.topbar-center").forEach(el => winTextNode(el)));
+  }
+
+  // =========================================================================
+  // Google Photos Integration Controller (Cloud Browsing, Upload, & Albums)
+  // =========================================================================
+  let isGPhotosActive = false;
+  let gphotosStatus = { ok: true, connected: false, demo_mode: true, email: "" };
+  let gphotosAlbums = [];
+  let gphotosCurrentAlbumId = "";
+  let gphotosMediaItems = [];
+  let gphotosOrganizeTarget = null;
+  let gphotosPreviewCurrent = null;
+
+  async function openGooglePhotosView() {
+    isGPhotosActive = true;
+    openFailed = false;
+    const failBox = document.getElementById("openFailBox");
+    if (failBox) failBox.style.display = "none";
+
+    // Hide other stages
+    ["singleView", "compareView", "gridView", "mdStage", "jsonStage", "csvStage", "pptxStage", "pdfStage", "faceStrip", "filmstrip"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        if (id === "singleView" || id === "loupe" || id === "filmstrip") el.style.display = "none";
+        else el.classList.remove("visible");
+      }
+    });
+
+    // Hide right contextual functions while in Google Photos
+    ["photoRightFunctions", "mdRightFunctions", "jsonRightFunctions", "csvRightFunctions", "pptxRightFunctions", "pdfRightFunctions"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+
+    // Collapse right sidebar for full-width photo grid
+    const rSidebar = document.getElementById("rightSidebar");
+    if (rSidebar) rSidebar.classList.add("collapsed");
+
+    // Clear active mode buttons
+    ["modeSingleBtn", "modeGridBtn", "modeCompareBtn"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove("active");
+    });
+    const topGPhotosBtn = document.getElementById("btnTopGPhotos");
+    if (topGPhotosBtn) topGPhotosBtn.classList.add("active");
+
+    // Show Google Photos Stage
+    const stage = document.getElementById("gphotosStage");
+    if (stage) stage.classList.add("visible");
+
+    // Update Path Input indicator & Bookmarks highlight
+    const pathInput = document.getElementById("pathInput");
+    if (pathInput) pathInput.value = "📷 Google 相簿 (雲端相簿瀏覽、上傳與整理)";
+    renderBookmarks();
+
+    await refreshGooglePhotos();
+  }
+
+  function exitGooglePhotosView() {
+    isGPhotosActive = false;
+    const stage = document.getElementById("gphotosStage");
+    if (stage) stage.classList.remove("visible");
+    const topGPhotosBtn = document.getElementById("btnTopGPhotos");
+    if (topGPhotosBtn) topGPhotosBtn.classList.remove("active");
+
+    const rSidebar = document.getElementById("rightSidebar");
+    if (rSidebar) rSidebar.classList.remove("collapsed");
+
+    const pathInput = document.getElementById("pathInput");
+    if (pathInput && currentDir) pathInput.value = currentDir;
+
+    renderBookmarks();
+    setViewMode(viewMode || "grid");
+  }
+
+  async function refreshGooglePhotos() {
+    const gridEl = document.getElementById("gphotosGrid");
+    const chipsEl = document.getElementById("gphotosAlbumCardsBar");
+    const pillEl = document.getElementById("gphotosAccountPill");
+    const albumSelect = document.getElementById("gphotosAlbumSelect");
+
+    if (gridEl) gridEl.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:50px 20px; color:#94a3b8;"><span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:8px; font-size:18px;">⏳</span>正在載入 Google 相簿資料...</div>';
+
+    try {
+      // 1. Fetch Status
+      const sRes = await fetch("/api/gphotos/status");
+      gphotosStatus = await sRes.json();
+
+      if (pillEl) {
+        if (gphotosStatus.demo_mode) {
+          pillEl.innerHTML = '🧪 示範展示模式';
+          pillEl.style.background = 'rgba(245,158,11,0.2)';
+          pillEl.style.borderColor = 'rgba(245,158,11,0.4)';
+          pillEl.style.color = '#fcd34d';
+          pillEl.title = '目前為離線體驗模式，包含內建示範相簿與照片。可在連線設定中填寫 OAuth 憑證連接真實 Google 帳號。';
+        } else if (gphotosStatus.connected) {
+          pillEl.innerHTML = `🟢 已連線: ${escapeHtml(gphotosStatus.email || 'Google 帳號')}`;
+          pillEl.style.background = 'rgba(16,185,129,0.2)';
+          pillEl.style.borderColor = 'rgba(16,185,129,0.4)';
+          pillEl.style.color = '#6ee7b7';
+          pillEl.title = `已授權連接 ${gphotosStatus.email}`;
+        } else {
+          pillEl.innerHTML = '⚪ 未連線';
+          pillEl.style.background = 'rgba(148,163,184,0.2)';
+          pillEl.style.borderColor = 'rgba(148,163,184,0.4)';
+          pillEl.style.color = '#cbd5e1';
+        }
+      }
+
+      // 2. Fetch Albums
+      const aRes = await fetch("/api/gphotos/albums");
+      const aData = await aRes.json();
+      gphotosAlbums = (aData.ok && aData.albums) ? aData.albums : [];
+
+      // Render Album Select Dropdown
+      if (albumSelect) {
+        let optHtml = '<option value="">全部雲端相片</option>';
+        gphotosAlbums.forEach(a => {
+          optHtml += `<option value="${escapeHtml(a.id)}" ${a.id === gphotosCurrentAlbumId ? 'selected' : ''}>${escapeHtml(a.title)} (${a.totalMediaItems})</option>`;
+        });
+        albumSelect.innerHTML = optHtml;
+      }
+
+      // Render Album Chips Bar
+      if (chipsEl) {
+        let chipsHtml = `
+          <div class="gphotos-album-chip ${gphotosCurrentAlbumId === '' ? 'active' : ''}" onclick="selectGPhotosAlbum('')">
+            <span>🖼️ 全部相片</span>
+          </div>
+        `;
+        gphotosAlbums.forEach(a => {
+          const isAct = a.id === gphotosCurrentAlbumId;
+          chipsHtml += `
+            <div class="gphotos-album-chip ${isAct ? 'active' : ''}" onclick="selectGPhotosAlbum('${escapeQuotes(a.id)}')">
+              <span>📁 ${escapeHtml(a.title)}</span>
+              <span class="count">${a.totalMediaItems}</span>
+            </div>
+          `;
+        });
+        chipsEl.innerHTML = chipsHtml;
+      }
+
+      // 3. Fetch Media Items
+      const mUrl = gphotosCurrentAlbumId ? `/api/gphotos/media?album_id=${encodeURIComponent(gphotosCurrentAlbumId)}` : "/api/gphotos/media";
+      const mRes = await fetch(mUrl);
+      const mData = await mRes.json();
+      gphotosMediaItems = (mData.ok && mData.media) ? mData.media : [];
+
+      // Render Grid
+      if (!gphotosMediaItems || gphotosMediaItems.length === 0) {
+        gridEl.innerHTML = `
+          <div style="grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; color:#94a3b8; text-align:center;">
+            <span style="font-size:44px; margin-bottom:12px;">📷</span>
+            <div style="font-size:15px; font-weight:700; color:#fff; margin-bottom:6px;">此相簿目前沒有相片</div>
+            <div style="font-size:12px; margin-bottom:16px;">您可以點擊上方「📤 上傳本機照片」將相片備份至此相簿</div>
+            <button class="btn primary" onclick="openUploadToGPhotosModal()" style="font-size:12px; background:linear-gradient(135deg, #2563eb, #1d4ed8);">📤 立即上傳照片</button>
+          </div>
+        `;
+        return;
+      }
+
+      let cardsHtml = "";
+      gphotosMediaItems.forEach(item => {
+        const thumbUrl = item.baseUrl.startsWith("/") ? item.baseUrl : `${item.baseUrl}=w600-h400-c`;
+        const timeStr = item.creationTime ? item.creationTime.substring(0, 10) : "";
+        const dimStr = (item.width && item.height && item.width !== "0") ? `${item.width}×${item.height}` : "";
+
+        cardsHtml += `
+          <div class="gphotos-card">
+            <div class="gphotos-card-thumb-wrap" onclick="previewGPhoto('${escapeQuotes(item.id)}')">
+              <img class="gphotos-card-thumb" src="${escapeHtml(thumbUrl)}" loading="lazy" alt="${escapeHtml(item.filename)}" />
+              <div class="gphotos-card-actions" onclick="event.stopPropagation()">
+                <button class="btn" style="padding:4px 8px; font-size:11px;" onclick="previewGPhoto('${escapeQuotes(item.id)}')" title="4K 高畫質全螢幕預覽">🔍 預覽</button>
+                <button class="btn primary" style="padding:4px 8px; font-size:11px; background:linear-gradient(135deg, #2563eb, #1d4ed8);" onclick="loadGPhotoToLocalEditor('${escapeQuotes(item.id)}')" title="載入到圖片工坊進行 AI 人臉修復、超解析度或去背">📥 載入工坊</button>
+                <button class="btn purple" style="padding:4px 8px; font-size:11px;" onclick="openOrganizeModal('${escapeQuotes(item.id)}')" title="加入指定相簿">📁 相簿</button>
+              </div>
+            </div>
+            <div class="gphotos-card-meta">
+              <div class="gphotos-card-title" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</div>
+              <div class="gphotos-card-sub">
+                <span>${escapeHtml(timeStr)}</span>
+                <span>${escapeHtml(dimStr)}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      gridEl.innerHTML = cardsHtml;
+
+    } catch (e) {
+      if (gridEl) gridEl.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:50px 20px; color:#f87171;">❌ 載入 Google 相簿發生錯誤：${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function onGPhotosAlbumSelectChange(albumId) {
+    gphotosCurrentAlbumId = albumId || "";
+    refreshGooglePhotos();
+  }
+
+  function selectGPhotosAlbum(albumId) {
+    gphotosCurrentAlbumId = albumId || "";
+    const sel = document.getElementById("gphotosAlbumSelect");
+    if (sel) sel.value = gphotosCurrentAlbumId;
+    refreshGooglePhotos();
+  }
+
+  // Preview Modal
+  function previewGPhoto(mediaId) {
+    const item = gphotosMediaItems.find(m => m.id === mediaId);
+    if (!item) return;
+    gphotosPreviewCurrent = item;
+    const modal = document.getElementById("gphotosPreviewModal");
+    const img = document.getElementById("gphotosPreviewImg");
+    const title = document.getElementById("gphotosPreviewTitle");
+    const meta = document.getElementById("gphotosPreviewMeta");
+
+    const highResUrl = item.baseUrl.startsWith("/") ? item.baseUrl : `${item.baseUrl}=w2400-h1800`;
+    img.src = highResUrl;
+    title.textContent = item.filename;
+    meta.textContent = `${item.creationTime ? item.creationTime.substring(0, 10) : ''} ${item.width && item.height ? `(${item.width}×${item.height})` : ''} ${item.description ? '· ' + item.description : ''}`;
+
+    modal.style.display = "flex";
+  }
+
+  function closeGPhotosPreviewModal() {
+    const modal = document.getElementById("gphotosPreviewModal");
+    if (modal) modal.style.display = "none";
+    const img = document.getElementById("gphotosPreviewImg");
+    if (img) img.src = "";
+    gphotosPreviewCurrent = null;
+  }
+
+  function loadGPhotoToLocalEditorFromPreview() {
+    if (!gphotosPreviewCurrent) return;
+    const item = gphotosPreviewCurrent;
+    closeGPhotosPreviewModal();
+    loadGPhotoToLocalEditor(item.id);
+  }
+
+  function openOrganizeModalFromPreview() {
+    if (!gphotosPreviewCurrent) return;
+    const item = gphotosPreviewCurrent;
+    closeGPhotosPreviewModal();
+    openOrganizeModal(item.id);
+  }
+
+  // Load cloud photo to local editor
+  async function loadGPhotoToLocalEditor(mediaId) {
+    const item = gphotosMediaItems.find(m => m.id === mediaId) || gphotosPreviewCurrent;
+    if (!item) return;
+
+    showToast(`⏳ 正在下載「${item.filename}」至圖片工坊...`, 3000);
+    try {
+      const res = await fetch("/api/gphotos/load-to-local", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          baseUrl: item.baseUrl,
+          filename: item.filename
+        })
+      });
+      const data = await res.json();
+      if (!data.ok || !data.path) {
+        showToast("❌ 下載相片失敗: " + (data.error || "未知錯誤"));
+        return;
+      }
+
+      showToast("✅ 已下載至圖片工坊！開啟修圖、去背與 AI 工具...", 2500);
+      exitGooglePhotosView();
+      await loadDirectory(data.path, data.path, true);
+    } catch (e) {
+      showToast("❌ 下載相片發生錯誤: " + e.message);
+    }
+  }
+
+  // Upload Modal
+  function openUploadToGPhotosModal(filePath = null) {
+    const modal = document.getElementById("gphotosUploadModal");
+    const pathInput = document.getElementById("gphotosUploadPathInput");
+    const albumSelect = document.getElementById("gphotosUploadAlbumSelect");
+    const descInput = document.getElementById("gphotosUploadDescInput");
+    const statusBox = document.getElementById("gphotosUploadStatus");
+    const submitBtn = document.getElementById("gphotosUploadSubmitBtn");
+
+    if (statusBox) statusBox.style.display = "none";
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "開始上傳"; }
+    if (descInput) descInput.value = "";
+
+    // Determine target file
+    let target = filePath;
+    if (!target && activeFileObj && activeFileObj.type === "image" && activeFileObj.path) {
+      target = activeFileObj.path;
+    }
+    if (pathInput) pathInput.value = target || "";
+
+    // Populate album select
+    if (albumSelect) {
+      let optHtml = '<option value="">（不指定相簿，僅上傳至相簿庫）</option>';
+      gphotosAlbums.forEach(a => {
+        const isCur = a.id === gphotosCurrentAlbumId;
+        optHtml += `<option value="${escapeHtml(a.id)}" ${isCur ? 'selected' : ''}>${escapeHtml(a.title)}</option>`;
+      });
+      albumSelect.innerHTML = optHtml;
+    }
+
+    if (modal) modal.style.display = "flex";
+  }
+
+  function closeGPhotosUploadModal() {
+    const modal = document.getElementById("gphotosUploadModal");
+    if (modal) modal.style.display = "none";
+  }
+
+  async function browseGPhotosUploadFile() {
+    try {
+      const res = await fetch("/api/pick-path", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "file", default_dir: currentDir })
+      });
+      const data = await res.json();
+      if (data.ok && data.path) {
+        document.getElementById("gphotosUploadPathInput").value = data.path;
+      }
+    } catch (e) {}
+  }
+
+  async function submitUploadToGPhotos() {
+    const pathInput = document.getElementById("gphotosUploadPathInput");
+    const albumSelect = document.getElementById("gphotosUploadAlbumSelect");
+    const descInput = document.getElementById("gphotosUploadDescInput");
+    const statusBox = document.getElementById("gphotosUploadStatus");
+    const submitBtn = document.getElementById("gphotosUploadSubmitBtn");
+
+    const filePath = (pathInput.value || "").trim();
+    if (!filePath) {
+      alert("請先選擇或輸入本機圖片路徑");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "上傳中...";
+    if (statusBox) statusBox.style.display = "block";
+
+    try {
+      const res = await fetch("/api/gphotos/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: filePath,
+          album_id: albumSelect.value || "",
+          description: descInput.value || ""
+        })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        alert("上傳失敗: " + (data.error || "未知錯誤"));
+        submitBtn.disabled = false;
+        submitBtn.textContent = "開始上傳";
+        if (statusBox) statusBox.style.display = "none";
+        return;
+      }
+
+      showToast("✅ " + (data.message || "成功上傳相片至 Google 相簿！"));
+      closeGPhotosUploadModal();
+      if (isGPhotosActive) {
+        refreshGooglePhotos();
+      }
+    } catch (e) {
+      alert("上傳發生錯誤: " + e.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "開始上傳";
+      if (statusBox) statusBox.style.display = "none";
+    }
+  }
+
+  // Create Album Modal
+  function openNewAlbumModal() {
+    const modal = document.getElementById("gphotosNewAlbumModal");
+    const inp = document.getElementById("gphotosNewAlbumTitleInput");
+    if (inp) inp.value = "";
+    if (modal) modal.style.display = "flex";
+    setTimeout(() => { if (inp) inp.focus(); }, 100);
+  }
+
+  function closeGPhotosNewAlbumModal() {
+    const modal = document.getElementById("gphotosNewAlbumModal");
+    if (modal) modal.style.display = "none";
+  }
+
+  async function submitCreateGPhotosAlbum() {
+    const inp = document.getElementById("gphotosNewAlbumTitleInput");
+    const title = (inp.value || "").trim();
+    if (!title) {
+      alert("請輸入相簿名稱");
+      return;
+    }
+
+    const btn = document.getElementById("gphotosNewAlbumSubmitBtn");
+    btn.disabled = true;
+
+    try {
+      const res = await fetch("/api/gphotos/create-album", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title })
+      });
+      const data = await res.json();
+      btn.disabled = false;
+      if (!data.ok) {
+        alert("建立相簿失敗: " + (data.error || "未知錯誤"));
+        return;
+      }
+
+      showToast(`🎉 成功建立相簿「${title}」！`);
+      closeGPhotosNewAlbumModal();
+      if (data.album && data.album.id) {
+        gphotosCurrentAlbumId = data.album.id;
+      }
+      refreshGooglePhotos();
+    } catch (e) {
+      btn.disabled = false;
+      alert("建立相簿發生錯誤: " + e.message);
+    }
+  }
+
+  // Organize Photo Modal
+  function openOrganizeModal(mediaId) {
+    const item = gphotosMediaItems.find(m => m.id === mediaId);
+    if (!item) return;
+    gphotosOrganizeTarget = item;
+
+    const modal = document.getElementById("gphotosOrganizeModal");
+    const nameEl = document.getElementById("gphotosOrganizePhotoName");
+    const selectEl = document.getElementById("gphotosOrganizeAlbumSelect");
+
+    if (nameEl) nameEl.textContent = `相片：${item.filename}`;
+    if (selectEl) {
+      let optHtml = "";
+      gphotosAlbums.forEach(a => {
+        optHtml += `<option value="${escapeHtml(a.id)}">${escapeHtml(a.title)} (${a.totalMediaItems})</option>`;
+      });
+      if (gphotosAlbums.length === 0) {
+        optHtml = '<option value="">（尚無任何自訂相簿，請先建立相簿）</option>';
+      }
+      selectEl.innerHTML = optHtml;
+    }
+
+    if (modal) modal.style.display = "flex";
+  }
+
+  function closeGPhotosOrganizeModal() {
+    const modal = document.getElementById("gphotosOrganizeModal");
+    if (modal) modal.style.display = "none";
+    gphotosOrganizeTarget = null;
+  }
+
+  async function submitOrganizePhoto() {
+    if (!gphotosOrganizeTarget) return;
+    const selectEl = document.getElementById("gphotosOrganizeAlbumSelect");
+    const albumId = selectEl.value;
+    if (!albumId) {
+      alert("請先選擇目標相簿");
+      return;
+    }
+
+    const btn = document.getElementById("gphotosOrganizeSubmitBtn");
+    btn.disabled = true;
+
+    try {
+      const res = await fetch("/api/gphotos/organize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          album_id: albumId,
+          media_item_ids: [gphotosOrganizeTarget.id]
+        })
+      });
+      const data = await res.json();
+      btn.disabled = false;
+      if (!data.ok) {
+        alert("整理失敗: " + (data.error || "未知錯誤"));
+        return;
+      }
+
+      showToast("✅ " + (data.message || "已成功將相片加入相簿！"));
+      closeGPhotosOrganizeModal();
+      refreshGooglePhotos();
+    } catch (e) {
+      btn.disabled = false;
+      alert("整理相片失敗: " + e.message);
+    }
+  }
+
+  // Settings & OAuth Modal
+  async function openGPhotosSettingsModal() {
+    const modal = document.getElementById("gphotosSettingsModal");
+    const statusTitle = document.getElementById("gphotosSettingsStatusTitle");
+    const statusSub = document.getElementById("gphotosSettingsStatusSub");
+    const statusIcon = document.getElementById("gphotosSettingsStatusIcon");
+    const disconnectBtn = document.getElementById("gphotosDisconnectBtn");
+    const demoCheckbox = document.getElementById("gphotosDemoModeCheckbox");
+    const clientIdInp = document.getElementById("gphotosClientIdInput");
+
+    try {
+      const res = await fetch("/api/gphotos/status");
+      const data = await res.json();
+      gphotosStatus = data;
+
+      if (data.demo_mode) {
+        statusIcon.textContent = "🧪";
+        statusTitle.textContent = "連線狀態：示範展示模式 (Demo)";
+        statusSub.textContent = "使用內建日本賞櫻與 AI 相簿體驗，免 API Key";
+        disconnectBtn.style.display = "none";
+        demoCheckbox.checked = true;
+      } else if (data.connected) {
+        statusIcon.textContent = "🟢";
+        statusTitle.textContent = `連線狀態：已連線 (${data.email || 'Google 帳號'})`;
+        statusSub.textContent = `Token 有效期剩餘 ${Math.round(data.expires_in / 60)} 分鐘（自動刷新）`;
+        disconnectBtn.style.display = "inline-flex";
+        demoCheckbox.checked = false;
+      } else {
+        statusIcon.textContent = "🔌";
+        statusTitle.textContent = "連線狀態：尚未連線";
+        statusSub.textContent = data.has_credentials ? "已設定憑證，請點擊下方授權按鈕" : "未設定 Client ID / Secret";
+        disconnectBtn.style.display = "none";
+        demoCheckbox.checked = false;
+      }
+
+      if (data.client_id_preview && !clientIdInp.value) {
+        clientIdInp.value = data.client_id_preview;
+      }
+    } catch (e) {}
+
+    if (modal) modal.style.display = "flex";
+  }
+
+  function closeGPhotosSettingsModal() {
+    const modal = document.getElementById("gphotosSettingsModal");
+    if (modal) modal.style.display = "none";
+  }
+
+  async function onDemoModeToggle(checked) {
+    await saveGPhotosConfig(true);
+  }
+
+  async function saveGPhotosConfig(silent = false) {
+    const clientId = (document.getElementById("gphotosClientIdInput").value || "").trim();
+    const clientSecret = (document.getElementById("gphotosClientSecretInput").value || "").trim();
+    const demoMode = document.getElementById("gphotosDemoModeCheckbox").checked;
+
+    try {
+      const res = await fetch("/api/gphotos/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          demo_mode: demoMode
+        })
+      });
+      const data = await res.json();
+      if (!silent) {
+        showToast(data.ok ? "💾 Google 相簿設定已儲存！" : "❌ 儲存失敗: " + data.error);
+      }
+      openGPhotosSettingsModal();
+      if (isGPhotosActive) refreshGooglePhotos();
+    } catch (e) {
+      if (!silent) alert("儲存失敗: " + e.message);
+    }
+  }
+
+  async function connectGPhotosOAuth() {
+    await saveGPhotosConfig(true);
+    try {
+      const res = await fetch("/api/gphotos/auth-url");
+      const data = await res.json();
+      if (!data.ok || !data.auth_url) {
+        alert("無法取得授權網址: " + (data.error || "請先填寫正確的 Client ID 與 Client Secret"));
+        return;
+      }
+      window.open(data.auth_url, "_blank");
+      showToast("🌐 請在瀏覽器完成 Google 授權，完成後將自動導回 Toolbox！", 4500);
+    } catch (e) {
+      alert("連線失敗: " + e.message);
+    }
+  }
+
+  async function disconnectGPhotos() {
+    if (!confirm("確定要中斷與 Google 相簿的連線嗎？")) return;
+    try {
+      await fetch("/api/gphotos/disconnect", { method: "POST" });
+      showToast("🔌 已中斷 Google 相簿連線");
+      openGPhotosSettingsModal();
+      if (isGPhotosActive) refreshGooglePhotos();
+    } catch (e) {}
   }
 
   initApp();
@@ -8492,6 +9297,193 @@
         <button class="btn" onclick="closeUpdateModal()" style="padding:7px 14px; font-size:12px;">稍後再說</button>
         <button class="btn" id="btnModalManualDownload" onclick="openGitHubRelease()" style="padding:7px 14px; font-size:12px; border-color:rgba(255,255,255,0.2);">前往 GitHub</button>
         <button class="btn btn-primary" id="btnModalPerformUpdate" onclick="performAutoUpdate()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #f59e0b, #ec4899); border:none; color:#fff; font-weight:700; cursor:pointer;">⚡ 立即一鍵升級</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Photos Upload Modal -->
+  <div id="gphotosUploadModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.78); backdrop-filter:blur(8px); z-index:100000; align-items:center; justify-content:center;">
+    <div class="modal-card" style="background:#0b0f19; border:1px solid rgba(59,130,246,0.5); border-radius:16px; width:480px; max-width:92vw; padding:22px; box-shadow:0 25px 60px rgba(0,0,0,0.88);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">📤</span>
+          <h3 style="margin:0; font-size:16px; font-weight:700; color:#fff;">上傳照片至 Google 相簿</h3>
+        </div>
+        <button onclick="closeGPhotosUploadModal()" style="background:transparent; border:none; color:#64748b; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <label style="font-size:12px; color:var(--muted); margin-bottom:4px; display:block;">選取本機檔案：</label>
+          <div style="display:flex; gap:6px;">
+            <input id="gphotosUploadPathInput" type="text" class="path-input" style="flex:1; font-family:'SF Mono',Menlo,monospace; font-size:12px;" placeholder="請選擇或貼上本機圖片絕對路徑..." />
+            <button class="btn" onclick="browseGPhotosUploadFile()" style="font-size:12px; padding:4px 10px;">瀏覽…</button>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:12px; color:var(--muted); margin-bottom:4px; display:block;">目標相簿：</label>
+          <select id="gphotosUploadAlbumSelect" class="path-input" style="width:100%;">
+            <option value="">（不指定相簿，僅上傳至相簿庫）</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size:12px; color:var(--muted); margin-bottom:4px; display:block;">相片備註 / 說明（選填）：</label>
+          <input id="gphotosUploadDescInput" type="text" class="path-input" style="width:100%; box-sizing:border-box;" placeholder="例如：2026 櫻花季、AI 修圖成品、工作截圖..." />
+        </div>
+
+        <div id="gphotosUploadStatus" style="font-size:12px; min-height:18px; color:#93c5fd; display:none; padding:8px 10px; border-radius:8px; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); text-align:center;">
+          <span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">⏳</span> 正在上傳照片中...
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
+        <button class="btn" onclick="closeGPhotosUploadModal()">取消</button>
+        <button class="btn primary" id="gphotosUploadSubmitBtn" onclick="submitUploadToGPhotos()" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);">開始上傳</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Photos Create Album Modal -->
+  <div id="gphotosNewAlbumModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.78); backdrop-filter:blur(8px); z-index:100000; align-items:center; justify-content:center;">
+    <div class="modal-card" style="background:#0b0f19; border:1px solid rgba(16,185,129,0.5); border-radius:16px; width:420px; max-width:92vw; padding:22px; box-shadow:0 25px 60px rgba(0,0,0,0.88);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">➕</span>
+          <h3 style="margin:0; font-size:16px; font-weight:700; color:#fff;">建立新 Google 相簿</h3>
+        </div>
+        <button onclick="closeGPhotosNewAlbumModal()" style="background:transparent; border:none; color:#64748b; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; color:var(--muted); margin-bottom:4px; display:block;">相簿名稱：</label>
+        <input id="gphotosNewAlbumTitleInput" type="text" class="path-input" style="width:100%; box-sizing:border-box;" placeholder="例如：2026 北海道家族旅遊、證件照修圖..." onkeydown="if(event.key==='Enter')submitCreateGPhotosAlbum()" />
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
+        <button class="btn" onclick="closeGPhotosNewAlbumModal()">取消</button>
+        <button class="btn emerald" id="gphotosNewAlbumSubmitBtn" onclick="submitCreateGPhotosAlbum()">建立相簿</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Photos Organize Modal -->
+  <div id="gphotosOrganizeModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.78); backdrop-filter:blur(8px); z-index:100000; align-items:center; justify-content:center;">
+    <div class="modal-card" style="background:#0b0f19; border:1px solid rgba(168,85,247,0.5); border-radius:16px; width:440px; max-width:92vw; padding:22px; box-shadow:0 25px 60px rgba(0,0,0,0.88);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">📁</span>
+          <h3 style="margin:0; font-size:16px; font-weight:700; color:#fff;">將相片加入相簿</h3>
+        </div>
+        <button onclick="closeGPhotosOrganizeModal()" style="background:transparent; border:none; color:#64748b; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div id="gphotosOrganizePhotoName" style="font-size:12px; color:#cbd5e1; margin-bottom:8px; font-family:'SF Mono',Menlo,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+        <label style="font-size:12px; color:var(--muted); margin-bottom:4px; display:block;">選取目標相簿：</label>
+        <select id="gphotosOrganizeAlbumSelect" class="path-input" style="width:100%; box-sizing:border-box;"></select>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
+        <button class="btn" onclick="closeGPhotosOrganizeModal()">取消</button>
+        <button class="btn purple" id="gphotosOrganizeSubmitBtn" onclick="submitOrganizePhoto()">確認加入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Photos 4K Preview Modal -->
+  <div id="gphotosPreviewModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); backdrop-filter:blur(10px); z-index:100000; flex-direction:column; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this)closeGPhotosPreviewModal()">
+    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; max-width:1100px; margin-bottom:10px; color:#fff;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:18px;">📷</span>
+        <span id="gphotosPreviewTitle" style="font-weight:700; font-size:14px; max-width:450px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+        <span id="gphotosPreviewMeta" style="font-size:11px; color:#94a3b8;"></span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="btn primary" id="gphotosPreviewLoadLocalBtn" onclick="loadGPhotoToLocalEditorFromPreview()" style="font-size:12px; gap:4px; background:linear-gradient(135deg, #2563eb, #1d4ed8);">
+          <span>📥 載入到圖片工坊</span>
+        </button>
+        <button class="btn" id="gphotosPreviewOrganizeBtn" onclick="openOrganizeModalFromPreview()" style="font-size:12px; gap:4px;">
+          <span>📁 加入相簿</span>
+        </button>
+        <button class="btn" onclick="closeGPhotosPreviewModal()" style="font-size:12px; padding:4px 10px;">✕</button>
+      </div>
+    </div>
+    <div style="flex:1; display:flex; align-items:center; justify-content:center; max-width:1100px; width:100%; max-height:calc(100vh - 120px); overflow:hidden;">
+      <img id="gphotosPreviewImg" src="" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,0.8); border:1px solid rgba(255,255,255,0.1);" />
+    </div>
+  </div>
+
+  <!-- Google Photos Settings & OAuth Modal -->
+  <div id="gphotosSettingsModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.78); backdrop-filter:blur(8px); z-index:100000; align-items:center; justify-content:center;">
+    <div class="modal-card" style="background:#0b0f19; border:1px solid rgba(59,130,246,0.4); border-radius:16px; width:540px; max-width:94vw; max-height:90vh; overflow-y:auto; padding:24px; box-shadow:0 25px 60px rgba(0,0,0,0.9);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">⚙️</span>
+          <h3 style="margin:0; font-size:16px; font-weight:700; color:#fff;">Google 相簿連線與授權設定</h3>
+        </div>
+        <button onclick="closeGPhotosSettingsModal()" style="background:transparent; border:none; color:#64748b; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Current Status Banner -->
+      <div id="gphotosSettingsStatusBanner" style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="gphotosSettingsStatusIcon" style="font-size:20px;">🔌</span>
+          <div>
+            <div id="gphotosSettingsStatusTitle" style="font-size:13px; font-weight:700; color:#fff;">連線狀態：未連線</div>
+            <div id="gphotosSettingsStatusSub" style="font-size:11px; color:#94a3b8;">示範模式已啟用</div>
+          </div>
+        </div>
+        <button id="gphotosDisconnectBtn" class="btn" onclick="disconnectGPhotos()" style="font-size:11px; display:none; color:#f87171; border-color:rgba(248,113,113,0.3);">中斷連線</button>
+      </div>
+
+      <!-- Demo Mode Toggle -->
+      <div style="margin-bottom:16px; padding:10px 12px; border-radius:8px; background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.2);">
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#e2e8f0; cursor:pointer;">
+          <input type="checkbox" id="gphotosDemoModeCheckbox" style="margin-top:2px;" onchange="onDemoModeToggle(this.checked)" />
+          <div>
+            <strong>啟用示範展示模式 (Demo Mode)</strong>
+            <div style="color:var(--muted); font-size:11px; margin-top:2px;">
+              無需建立 Google Cloud 帳號或填寫 API Key，立即展示日本賞櫻、AI 修復成果相簿、雲端網格瀏覽與模擬上傳/整理功能。
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <!-- Google Cloud OAuth Credentials Form -->
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+        <div style="font-size:12px; font-weight:700; color:#fff;">Google Cloud OAuth 憑證：</div>
+        <div>
+          <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:3px;">Client ID：</label>
+          <input id="gphotosClientIdInput" type="text" class="path-input" style="width:100%; box-sizing:border-box; font-family:'SF Mono',Menlo,monospace; font-size:11px;" placeholder="例如：xxxx.apps.googleusercontent.com" />
+        </div>
+        <div>
+          <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:3px;">Client Secret：</label>
+          <input id="gphotosClientSecretInput" type="password" class="path-input" style="width:100%; box-sizing:border-box; font-family:'SF Mono',Menlo,monospace; font-size:11px;" placeholder="輸入 Client Secret" />
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" onclick="saveGPhotosConfig(false)" style="font-size:12px; flex:1; justify-content:center;">💾 儲存憑證</button>
+          <button class="btn primary" id="gphotosOAuthConnectBtn" onclick="connectGPhotosOAuth()" style="font-size:12px; flex:2; justify-content:center; background:linear-gradient(135deg, #2563eb, #1d4ed8);">
+            <span>🔗 前往 Google OAuth 授權連線</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Setup Guide -->
+      <details style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px; font-size:11px; color:#94a3b8; line-height:1.6;">
+        <summary style="cursor:pointer; color:#93c5fd; font-weight:600; margin-bottom:6px;">📖 如何取得 Google Cloud OAuth 憑證？(3 步驟快速教學)</summary>
+        <ol style="margin:0; padding-left:18px;">
+          <li>前往 <a href="https://console.cloud.google.com/" target="_blank" style="color:#60a5fa;">Google Cloud Console</a> 建立專案，在「API 與服務」>「資料庫」搜尋並啟用 <strong>Photos Library API</strong>。</li>
+          <li>在「OAuth 同意畫面」將使用者類型設定為「外部」，並在「測試使用者」加入您自己的 Gmail 地址。</li>
+          <li>在「憑證」建立「OAuth 用戶端 ID」，應用程式類型選「網頁應用程式」，並在「已授權的重新導向 URI」填入：<br/>
+            <code style="background:#0f172a; padding:2px 6px; border-radius:4px; color:#38bdf8; user-select:all; display:inline-block; margin-top:2px;">http://127.0.0.1:18765/api/gphotos/oauth-callback</code>
+          </li>
+        </ol>
+      </details>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
+        <button class="btn" onclick="closeGPhotosSettingsModal()">關閉</button>
       </div>
     </div>
   </div>
