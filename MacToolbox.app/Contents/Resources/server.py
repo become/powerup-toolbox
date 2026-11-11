@@ -183,34 +183,59 @@ def compare_versions(v1, v2):
 def check_github_update(repo=None, branch=None):
     """Check GitHub main branch dist/version.json for available updates."""
     import urllib.request
+    import base64
     repo = repo or DEFAULT_GITHUB_REPO
     branch = branch or DEFAULT_GITHUB_BRANCH
-    raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/dist/version.json"
-    req = urllib.request.Request(
-        raw_url,
+    remote_data = None
+
+    # Priority 1: GitHub Contents API (Instant 0-delay real-time commit data)
+    api_url = f"https://api.github.com/repos/{repo}/contents/dist/version.json?ref={branch}"
+    req_api = urllib.request.Request(
+        api_url,
         headers={"User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=3.5) as resp:
+        with urllib.request.urlopen(req_api, timeout=3.5) as resp:
             if resp.status == 200:
-                remote_data = json.loads(resp.read().decode("utf-8"))
-                remote_ver = remote_data.get("version", "0.0.0")
-                has_update = compare_versions(remote_ver, APP_VERSION) > 0
-                return {
-                    "ok": True,
-                    "repo": repo,
-                    "branch": branch,
-                    "current_version": APP_VERSION,
-                    "latest_version": remote_ver,
-                    "has_update": has_update,
-                    "release_date": remote_data.get("release_date", ""),
-                    "changelog": remote_data.get("changelog", []),
-                    "dmg_url": remote_data.get("dmg_url", f"https://raw.githubusercontent.com/{repo}/{branch}/dist/MacToolbox-latest.dmg"),
-                    "pkg_url": remote_data.get("pkg_url", f"https://raw.githubusercontent.com/{repo}/{branch}/dist/MacToolbox-latest.pkg"),
-                    "source": "github"
-                }
-    except Exception as e:
-        # Fallback to local dist/version.json if offline or before remote repo is public
+                raw_api = json.loads(resp.read().decode("utf-8"))
+                content_b64 = raw_api.get("content", "")
+                if content_b64:
+                    remote_data = json.loads(base64.b64decode(content_b64).decode("utf-8"))
+    except Exception:
+        pass
+
+    # Priority 2: Raw GitHub URL fallback
+    if not remote_data:
+        raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/dist/version.json"
+        req_raw = urllib.request.Request(
+            raw_url,
+            headers={"User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)"}
+        )
+        try:
+            with urllib.request.urlopen(req_raw, timeout=3.5) as resp:
+                if resp.status == 200:
+                    remote_data = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            pass
+
+    if remote_data:
+        remote_ver = remote_data.get("version", "0.0.0")
+        has_update = compare_versions(remote_ver, APP_VERSION) > 0
+        return {
+            "ok": True,
+            "repo": repo,
+            "branch": branch,
+            "current_version": APP_VERSION,
+            "latest_version": remote_ver,
+            "has_update": has_update,
+            "release_date": remote_data.get("release_date", ""),
+            "changelog": remote_data.get("changelog", []),
+            "dmg_url": remote_data.get("dmg_url", f"https://raw.githubusercontent.com/{repo}/{branch}/dist/MacToolbox-latest.dmg"),
+            "pkg_url": remote_data.get("pkg_url", f"https://raw.githubusercontent.com/{repo}/{branch}/dist/MacToolbox-latest.pkg"),
+            "source": "github"
+        }
+
+    # Priority 3: Fallback to local dist/version.json if offline or before remote repo is public
         local_vfile = os.path.join(TOOLBOX_DIR, "dist", "version.json")
         if os.path.isfile(local_vfile):
             try:
