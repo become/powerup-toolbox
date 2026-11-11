@@ -33,7 +33,7 @@ jobs:
       - name: Build Windows Portable Zip
         shell: pwsh
         run: |
-          powershell -ExecutionPolicy Bypass -File windows/build_windows.ps1 -Python python
+          powershell -ExecutionPolicy Bypass -File windows/build_windows.ps1
 
       - name: Determine Tag & Title
         id: meta

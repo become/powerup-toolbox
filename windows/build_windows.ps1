@@ -8,7 +8,12 @@ param([string]$Python = "")
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
-if (-not $Python) {
+
+if ($Python) {
+  $resolved = Get-Command $Python -ErrorAction SilentlyContinue
+  if ($resolved) { $Python = $resolved.Source }
+}
+if (-not $Python -or -not (Test-Path $Python)) {
   $pyCmd = Get-Command python -ErrorAction SilentlyContinue
   if ($pyCmd) { $Python = $pyCmd.Source }
   else { $Python = Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe" }
