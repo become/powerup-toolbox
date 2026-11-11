@@ -4,17 +4,22 @@
  Output: build_win\ (work files), release_win\PowerUpToolbox\ (onedir), release_win\PowerUpToolbox-portable.zip
  Optional: -Python <path to python.exe>
 #>
-param([string]$Python = (Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe"))
+param([string]$Python = "")
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+if (-not $Python) {
+  $pyCmd = Get-Command python -ErrorAction SilentlyContinue
+  if ($pyCmd) { $Python = $pyCmd.Source }
+  else { $Python = Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe" }
+}
 if (-not (Test-Path $Python)) { throw "Python not found: $Python" }
 
 & $Python -m pip install --quiet pyinstaller pywebview pillow openpyxl python-docx python-pptx pypdfium2 msoffcrypto-tool
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 
 # PyInstaller does not syntax-check bundled modules; fail early instead of shipping a broken exe.
-& $Python -m py_compile (Join-Path $Root "server.py") (Join-Path $Root "windows\launcher.py") (Join-Path $Root "windows\win_support.py")
+& $Python -m py_compile (Join-Path $Root "server.py") (Join-Path $Root "windows\launcher.py") (Join-Path $Root "windows\win_support.py") (Join-Path $Root "gphotos.py")
 if ($LASTEXITCODE -ne 0) { throw "syntax check failed" }
 
 $Work = Join-Path $Root "build_win"

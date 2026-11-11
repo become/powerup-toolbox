@@ -114,6 +114,43 @@
     color: #fff;
     white-space: nowrap;
   }
+  .app-version-badge {
+    font-size: 10px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #94a3b8;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: all 0.2s ease;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.2;
+  }
+  .app-version-badge:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(96, 165, 250, 0.5);
+    color: #93c5fd;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+  }
+  .app-version-badge.has-update {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: #f59e0b;
+    color: #fbbf24;
+    animation: pulseGlow 2s infinite;
+  }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    50% { box-shadow: 0 0 0 5px rgba(245, 158, 11, 0); }
+  }
+  .has-update-pill {
+    animation: pulseGlow 2s infinite;
+  }
   .mode-pill {
     font-size: 11px;
     font-weight: 700;
@@ -1997,6 +2034,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.0 · 點擊手動檢查更新">v2.8.0</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2081,8 +2119,8 @@
 
     <!-- Always-Available System Actions (Anchored to Right, Never Cut Off) -->
     <div class="topbar-right">
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="showUpdateModal()" style="display:none; align-items:center; gap:5px; background:linear-gradient(135deg, rgba(245,158,11,0.25), rgba(236,72,153,0.25)); border:1px solid #f59e0b; color:#fbbf24; border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer;" title="發現新版本！點擊查看並一鍵升級">
-        <span>⚡</span><span class="label-text"> 發現新版 <strong id="lblUpdateVersion">v2.7</strong></span>
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.0)">
+        <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
         <span>🌐</span><span class="label-text" id="appLangLabel"> EN</span>
@@ -8356,6 +8394,7 @@
       sysFinder: " Finder",
       sysPanel: " 面板",
       sysTour: " 引導",
+      sysCheckUpdate: " 檢查更新",
       toastSwitched: "🌐 已切換介面語言為：繁體中文"
     },
     "en": {
@@ -8389,6 +8428,7 @@
       sysFinder: " Finder",
       sysPanel: " Panel",
       sysTour: " Guide",
+      sysCheckUpdate: " Updates",
       toastSwitched: "🌐 Interface language switched to: English"
     }
   };
@@ -8434,6 +8474,11 @@
     if (pdfPageBtn) pdfPageBtn.innerHTML = d.pdfPage;
     const pdfTextBtn = document.getElementById("pdfModeTextBtn");
     if (pdfTextBtn) pdfTextBtn.innerHTML = d.pdfText;
+
+    const lblUpdatePill = document.getElementById("lblUpdatePill");
+    if (lblUpdatePill && (!latestUpdateInfo || !latestUpdateInfo.has_update)) {
+      lblUpdatePill.textContent = d.sysCheckUpdate || (lang === "en" ? " Updates" : " 檢查更新");
+    }
   }
 
   function toggleAppLanguage() {
@@ -8447,25 +8492,65 @@
      ========================================================= */
   let latestUpdateInfo = null;
 
+  function handleUpdatePillClick() {
+    if (latestUpdateInfo && latestUpdateInfo.has_update) {
+      showUpdateModal(false);
+    } else {
+      checkAppUpdates(false);
+    }
+  }
+
   async function checkAppUpdates(silent = true) {
+    if (!silent) {
+      showToast("⏳ 正在檢查版本更新...");
+    }
     try {
       const res = await fetch('/api/check-update');
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
+        const curVer = data.current_version || "2.8.0";
+        const badge = document.getElementById("appVersionBadge");
+        if (badge) {
+          badge.textContent = "v" + curVer;
+        }
         const pill = document.getElementById("btnAppUpdatePill");
-        const lbl = document.getElementById("lblUpdateVersion");
+        const lbl = document.getElementById("lblUpdatePill");
         if (data.has_update) {
-          if (lbl) lbl.textContent = "v" + data.latest_version;
-          if (pill) pill.style.display = "inline-flex";
+          if (badge) badge.classList.add("has-update");
+          if (pill) {
+            pill.classList.add("has-update-pill");
+            pill.style.background = "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(236,72,153,0.25))";
+            pill.style.borderColor = "#f59e0b";
+            pill.style.color = "#fbbf24";
+            pill.title = `發現新版本 v${data.latest_version}！點擊查看並一鍵升級`;
+          }
+          if (lbl) {
+            lbl.innerHTML = ` 發現新版 <strong>v${data.latest_version}</strong>`;
+          }
           if (!silent) {
-            showUpdateModal();
+            showUpdateModal(false);
           }
         } else {
-          if (pill) pill.style.display = "none";
-          if (!silent) {
-            showToast("✅ 目前已是最新版本 (v" + data.current_version + ")");
+          if (badge) badge.classList.remove("has-update");
+          if (pill) {
+            pill.classList.remove("has-update-pill");
+            pill.style.background = "";
+            pill.style.borderColor = "rgba(255,255,255,0.18)";
+            pill.style.color = "";
+            pill.title = `手動檢查版本更新 (目前版本 v${curVer})`;
           }
+          if (lbl) {
+            lbl.textContent = (typeof appCurrentLang !== 'undefined' && appCurrentLang === "en") ? " Updates" : " 檢查更新";
+          }
+          if (!silent) {
+            showToast(`✅ 目前已是最新版本 (v${curVer})`);
+            showUpdateModal(true);
+          }
+        }
+      } else {
+        if (!silent) {
+          showToast("⚠️ " + (data && data.error ? data.error : "檢查更新失敗，請檢查網路連線"));
         }
       }
     } catch (e) {
@@ -8475,15 +8560,51 @@
     }
   }
 
-  function showUpdateModal() {
-    if (!latestUpdateInfo) return;
+  function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    document.getElementById("modalUpdateVersionBadge").textContent =
-      `目前版本: v${latestUpdateInfo.current_version} ➔ 最新版本: v${latestUpdateInfo.latest_version}`;
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.0";
+    const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
+    const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
+
+    const titleEl = document.getElementById("modalUpdateTitle");
+    const badgeEl = document.getElementById("modalUpdateVersionBadge");
+    const clTitleEl = document.getElementById("modalChangelogTitle");
     const list = document.getElementById("modalChangelogList");
+    const btnPerform = document.getElementById("btnModalPerformUpdate");
+    const btnCancel = document.getElementById("btnModalCancel");
+    const statusBox = document.getElementById("updateDownloadStatus");
+    if (statusBox) statusBox.style.display = "none";
+
+    if (!hasUpd) {
+      if (titleEl) titleEl.innerHTML = "✅ PowerUp Toolbox 目前已是最新版本";
+      if (badgeEl) badgeEl.textContent = `目前版本: v${curVer}（最新穩定版）${latestUpdateInfo && latestUpdateInfo.release_date ? ' · 釋出日期: ' + latestUpdateInfo.release_date : ''}`;
+      if (clTitleEl) clTitleEl.textContent = `✨ 目前版本功能亮點 (v${curVer})：`;
+      if (btnPerform) btnPerform.style.display = "none";
+      if (btnCancel) btnCancel.textContent = "關閉";
+    } else {
+      if (titleEl) titleEl.innerHTML = "🎉 發現 PowerUp Toolbox 新版本！";
+      if (badgeEl) badgeEl.textContent = `目前版本: v${curVer} ➔ 最新版本: v${latestVer}`;
+      if (clTitleEl) clTitleEl.textContent = "更新亮點與改進：";
+      if (btnPerform) {
+        btnPerform.style.display = "inline-flex";
+        btnPerform.disabled = false;
+        btnPerform.textContent = "⚡ 立即一鍵升級";
+      }
+      if (btnCancel) btnCancel.textContent = "稍後再說";
+    }
+
     if (list) {
-      list.innerHTML = (latestUpdateInfo.changelog || []).map(item => `<li>${escapeHtml(item)}</li>`).join("");
+      const logs = (latestUpdateInfo && latestUpdateInfo.changelog && latestUpdateInfo.changelog.length > 0)
+        ? latestUpdateInfo.changelog
+        : [
+            "📷 Google 相簿深度整合：雲端相簿快速瀏覽、一鍵上傳備份與相簿分類整理",
+            "⚡ 支援介面常駐版本號顯示與隨時手動檢查更新功能",
+            "🍎 macOS / Safari 高解析度圖標與 Favicon 載入優化，修復分頁持續 loading 問題",
+            "🚀 跨平台支援 (macOS 及 Windows 10/11) 與免安裝可攜架構",
+            "🔒 密碼保護檔案（Excel、Word、PowerPoint、PDF）免解密即時預覽"
+          ];
+      list.innerHTML = logs.map(item => `<li>${escapeHtml(item)}</li>`).join("");
     }
     modal.style.display = "flex";
   }
@@ -9297,7 +9418,7 @@
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end;">
-        <button class="btn" onclick="closeUpdateModal()" style="padding:7px 14px; font-size:12px;">稍後再說</button>
+        <button class="btn" id="btnModalCancel" onclick="closeUpdateModal()" style="padding:7px 14px; font-size:12px;">稍後再說</button>
         <button class="btn" id="btnModalManualDownload" onclick="openGitHubRelease()" style="padding:7px 14px; font-size:12px; border-color:rgba(255,255,255,0.2);">前往 GitHub</button>
         <button class="btn btn-primary" id="btnModalPerformUpdate" onclick="performAutoUpdate()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #f59e0b, #ec4899); border:none; color:#fff; font-weight:700; cursor:pointer;">⚡ 立即一鍵升級</button>
       </div>

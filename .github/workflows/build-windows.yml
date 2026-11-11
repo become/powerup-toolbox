@@ -1,0 +1,70 @@
+name: Build and Release Windows Portable
+
+on:
+  push:
+    tags:
+      - 'win-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag (e.g. win-v2.8.0)'
+        required: true
+        default: 'win-v2.8.0'
+      notes:
+        description: 'Release Notes'
+        required: false
+        default: 'PowerUp Toolbox for Windows v2.8.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Build Windows Portable Zip
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File windows/build_windows.ps1 -Python python
+
+      - name: Determine Tag & Title
+        id: meta
+        shell: pwsh
+        run: |
+          $ver = (Get-Content "windows/VERSION" -Raw).Trim()
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ github.event.inputs.tag }}" } else { "${{ github.ref_name }}" }
+          if (-not $tag) { $tag = "win-v$ver" }
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Create or Update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $ver = "${{ steps.meta.outputs.version }}"
+          $zip = "release_win/PowerUpToolbox-portable.zip"
+          $title = "PowerUp Toolbox for Windows v$ver"
+          $notes = if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ github.event.inputs.notes }}") {
+            "${{ github.event.inputs.notes }}"
+          } else {
+            "- Google 相簿深度整合：雲端相簿快速瀏覽、一鍵上傳備份與相簿分類整理`n- 介面版本號顯示與常駐手動檢查更新功能`n- 品牌圖標與高解析度 Retina Favicon 全平台完美相容`n- 跨平台檔案快速預覽、加密文件免解密即時檢視"
+          }
+          
+          $exists = gh release view $tag --repo ${{ github.repository }} 2>$null
+          if ($exists) {
+            Write-Host "Updating existing release $tag..."
+            gh release upload $tag $zip --repo ${{ github.repository }} --clobber
+          } else {
+            Write-Host "Creating new release $tag..."
+            gh release create $tag $zip --repo ${{ github.repository }} --title $title --notes $notes
+          }
