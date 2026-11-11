@@ -4,10 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="2.7"
+VERSION="2.8"
 APP_NAME="MacToolbox.app"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
+
+# Keep Info.plist versions synchronized
+plutil -replace CFBundleShortVersionString -string "${VERSION}.0" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
+plutil -replace CFBundleVersion -string "28" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 
 echo "🔨 [1/5] 編譯 macOS 原生二進位執行檔 (Vision Helper & App Launcher)..."
 swiftc -O "$ROOT_DIR/mac_vision_helper.swift" -o "$ROOT_DIR/mac_vision_helper"
@@ -110,10 +114,10 @@ cat << EOF > "$DIST_DIR/version.json"
   "dmg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.dmg",
   "pkg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.pkg",
   "changelog": [
+    "📷 Google 相簿深度整合：雲端相簿快速瀏覽、一鍵上傳備份、相簿分類整理與免 API Key 示範展示模式",
+    "🍎 macOS 顯示與體驗優化：修復 Safari / Chrome 左上角圖標與 Favicon 多格式支援，消除分頁持續 loading 轉圈",
+    "☁️ 雲端硬碟自動偵測掛載：自動整合 Google Drive 與 iCloud Drive 本機目錄至快捷書籤",
     "🚀 PowerUp Toolbox 跨平台正式版：全面支援 macOS 與 Windows 10/11",
-    "🛡️ 企業級安全強化：本機 Token 鑑權、Strict CSP、DOMPurify 與離線安全沙盒",
-    "🖼️ 海量照片極速網格瀏覽模式 (3,000+ 張照片 0 秒瞬顯) 與原寸自適應檢視",
-    "📑 Markdown / Office / PDF / JSON / CSV 全功能即時預覽與雙欄編輯",
     "⚡ 跨平台一鍵自動更新引擎 (GitHub Release / main 分支發布)"
   ]
 }
