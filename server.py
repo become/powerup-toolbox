@@ -2068,7 +2068,12 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         buf = b"".join(getattr(self, "_headers_buffer", [])).lower()
         if b"x-content-type-options" not in buf:
             self.send_header("X-Content-Type-Options", "nosniff")
-        if b"content-security-policy" not in buf and b"content-type: application/pdf" not in buf:
+        path = getattr(self, "path", "")
+        clean_path = path.split("?")[0]
+        is_asset = clean_path.startswith("/assets/") or clean_path in (
+            "/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png"
+        )
+        if b"content-security-policy" not in buf and b"content-type: application/pdf" not in buf and not is_asset:
             self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox")
         super().end_headers()
 
@@ -2270,6 +2275,25 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.wfile.write(content)
             return
 
+        if route in ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png"):
+            fname = "apple-touch-icon.png" if "apple-touch-icon" in route else "favicon.ico"
+            ctype = "image/png" if fname.endswith(".png") else "image/x-icon"
+            ico_file = os.path.join(TOOLBOX_DIR, "assets", fname)
+            if os.path.isfile(ico_file):
+                try:
+                    with open(ico_file, "rb") as f:
+                        data = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Cache-Control", "public, max-age=86400")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                except Exception:
+                    pass
+
         if route.startswith("/assets/"):
             rel_sub = route[len("/assets/"):].lstrip("/")
             asset_file = os.path.abspath(os.path.join(TOOLBOX_DIR, "assets", rel_sub))
@@ -2299,6 +2323,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-Type", ctype)
                     self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Cache-Control", "public, max-age=86400")
                     self.send_header("X-Content-Type-Options", "nosniff")
                     self.end_headers()
                     self.wfile.write(data)
