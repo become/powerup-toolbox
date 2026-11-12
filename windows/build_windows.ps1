@@ -24,7 +24,7 @@ if (-not (Test-Path $Python)) { throw "Python not found: $Python" }
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 
 # PyInstaller does not syntax-check bundled modules; fail early instead of shipping a broken exe.
-& $Python -m py_compile (Join-Path $Root "server.py") (Join-Path $Root "windows\launcher.py") (Join-Path $Root "windows\win_support.py") (Join-Path $Root "gphotos.py")
+& $Python -m py_compile (Join-Path $Root "server.py") (Join-Path $Root "windows\launcher.py") (Join-Path $Root "windows\win_support.py") (Join-Path $Root "gphotos.py") (Join-Path $Root "local_albums.py")
 if ($LASTEXITCODE -ne 0) { throw "syntax check failed" }
 
 $Work = Join-Path $Root "build_win"

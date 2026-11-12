@@ -13,7 +13,7 @@ datas = [
     (os.path.join(WIN, "VERSION"), "."),
 ]
 
-hiddenimports = ["win_support", "server", "gphotos", "xlrd", "openpyxl", "PIL", "PIL.Image"]
+hiddenimports = ["win_support", "server", "gphotos", "local_albums", "xlrd", "openpyxl", "PIL", "PIL.Image"]
 for pkg in ("docx", "pptx", "xlrd"):
     try:
         hiddenimports += collect_submodules(pkg)

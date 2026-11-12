@@ -4,6 +4,7 @@
 Pure stdlib. Must NOT import server.py (server imports this module).
 Contains: paths, version, HKCU file-association registration, portable auto-update.
 """
+import hashlib
 import json
 import os
 import re
@@ -13,6 +14,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -23,6 +25,11 @@ ASSET_NAME = "PowerUpToolbox-portable.zip"
 TAG_PREFIX = "win-v"
 GITHUB_REPO = "become/powerup-toolbox"
 DEFAULT_API = "https://api.github.com/repos/%s/releases/latest" % GITHUB_REPO
+# Primary update source: the official website. The manifest sits next to the zip:
+#   {"version": "2.8.1", "release_date": "YYYY-MM-DD", "sha256": "<hex of the zip>", "size": 123, "changelog": ["..."]}
+# GitHub Releases (above) stays only as a fallback until the repository goes private.
+OFFICIAL_MANIFEST = "https://powerup.dancingarden.com/downloads/toolbox/win-version.json"
+OFFICIAL_PAGE = "https://powerup.dancingarden.com/toolbox"
 
 # Mirror of server.py *_EXTS (what detect_file_type can handle).
 SUPPORTED_EXTS = sorted({
@@ -338,9 +345,42 @@ def refresh_registration_if_moved():
 def _http_json(url, timeout=6):
     req = urllib.request.Request(url, headers={
         "User-Agent": "PowerUpToolbox-Win/%s (AutoUpdater)" % current_version(),
-        "Accept": "application/vnd.github+json"})
+        "Accept": "application/json, application/vnd.github+json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
+        return json.loads(r.read(2 * 1024 * 1024).decode("utf-8-sig"))
+
+
+def _official_manifest_url():
+    """https only (plain http is accepted for a loopback test server set through POWERUP_WIN_UPDATE_URL)."""
+    url = os.environ.get("POWERUP_WIN_UPDATE_URL") or OFFICIAL_MANIFEST
+    u = urllib.parse.urlsplit(url)
+    if u.scheme == "https" or (u.scheme == "http" and u.hostname in ("127.0.0.1", "localhost")):
+        return url
+    raise ValueError("update manifest URL must be https")
+
+
+def _check_official(cur):
+    """Read the website manifest. Raises on any problem so the caller can fall back to GitHub Releases.
+    The download URL is never taken from the manifest: it is always ASSET_NAME in the manifest's own folder."""
+    murl = _official_manifest_url()
+    m = _http_json(murl)
+    if not isinstance(m, dict):
+        raise ValueError("bad manifest")
+    latest = str(m.get("version", ""))
+    sha = str(m.get("sha256", "")).strip().lower()
+    if not re.fullmatch(r"\d+(\.\d+){0,3}", latest) or not re.fullmatch(r"[0-9a-f]{64}", sha):
+        raise ValueError("bad manifest")
+    log = m.get("changelog")
+    changelog = [str(x)[:300] for x in log if isinstance(x, str) and x.strip()][:12] if isinstance(log, list) else []
+    return {
+        "ok": True, "has_update": compare_versions(latest, cur) > 0, "latest_version": latest,
+        "release_date": str(m.get("release_date", ""))[:10],
+        "changelog": changelog,
+        "dmg_url": OFFICIAL_PAGE,                     # frontend's "open download page" button
+        "pkg_url": urllib.parse.urljoin(murl, ASSET_NAME) + "?v=" + latest,
+        "sha256": sha,
+        "repo": "", "branch": "", "current_version": cur, "source": "official_website",
+    }
 
 
 def _find_release():
@@ -358,6 +398,10 @@ def _find_release():
 
 def check_update():
     cur = current_version()
+    try:
+        return _check_official(cur)
+    except Exception as e:
+        print("official update check failed, falling back to GitHub Releases: %r" % (e,), flush=True)
     base = {"repo": GITHUB_REPO, "branch": "", "current_version": cur, "source": "github-releases"}
     try:
         rel = _find_release()
@@ -431,12 +475,13 @@ Log "relaunched"
 '''
 
 
-def _stage_update(url):
+def _stage_update(url, sha256=None):
     upd = os.path.join(data_dir(), "updates")
     os.makedirs(upd, exist_ok=True)
     zpath = os.path.join(upd, ASSET_NAME)
     req = urllib.request.Request(url, headers={"User-Agent": "PowerUpToolbox-Win/%s" % current_version()})
     UPDATE_STATE.update(state="downloading", message="下載中", downloaded=0, total=0)
+    digest = hashlib.sha256()
     with urllib.request.urlopen(req, timeout=60) as r, open(zpath, "wb") as out:
         UPDATE_STATE["total"] = int(r.headers.get("Content-Length") or 0)
         while True:
@@ -444,8 +489,15 @@ def _stage_update(url):
             if not chunk:
                 break
             out.write(chunk)
+            digest.update(chunk)
             UPDATE_STATE["downloaded"] += len(chunk)
     UPDATE_STATE.update(state="verifying", message="驗證更新檔")
+    if sha256 and digest.hexdigest().lower() != sha256.lower():
+        try:
+            os.remove(zpath)
+        except OSError:
+            pass
+        raise RuntimeError("zip checksum mismatch")
     with zipfile.ZipFile(zpath) as z:
         bad = z.testzip()
         if bad:
@@ -493,10 +545,10 @@ def _system_exe(rel):
     return winpath.system_exe(rel)
 
 
-def _do_update(url):
+def _do_update(url, sha256=None):
     try:
         UPDATE_STATE.update(state="downloading", message="下載中")
-        upd, new_dir = _stage_update(url)
+        upd, new_dir = _stage_update(url, sha256)
         ps1 = os.path.join(upd, "updater.ps1")
         with open(ps1, "w", encoding="utf-8-sig") as f:
             f.write(_UPDATER_PS1)
@@ -536,14 +588,14 @@ def perform_update():
     if not d:
         return {"ok": False, "message": "僅免安裝版 exe 支援自動更新"}
     if not _dir_writable(d) or not _dir_writable(os.path.dirname(d)):
-        return {"ok": False, "message": "程式目錄不可寫入，無法自動更新，請至 GitHub Releases 手動下載"}
+        return {"ok": False, "message": "程式目錄不可寫入，無法自動更新，請至官網手動下載"}
     info = check_update()   # re-resolve server-side; never trust a URL from the page
     if not info.get("ok") or not info.get("has_update") or not info.get("pkg_url"):
         return {"ok": False, "message": "目前沒有可用的更新"}
     if not _UPDATE_LOCK.acquire(blocking=False):
         return {"ok": True, "win": True, "message": "更新已在進行中"}
     UPDATE_STATE.update(state="downloading", message="準備下載", downloaded=0, total=0)
-    threading.Thread(target=_do_update, args=(info["pkg_url"],), daemon=True).start()
+    threading.Thread(target=_do_update, args=(info["pkg_url"], info.get("sha256")), daemon=True).start()
     return {"ok": True, "win": True, "message": "已開始下載 v%s，完成後程式會自動關閉並以新版重新啟動。" % info["latest_version"]}
 
 

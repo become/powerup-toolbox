@@ -114,14 +114,12 @@ cat << EOF > "$DIST_DIR/version.json"
   "latest_pkg": "MacToolbox-latest.pkg",
   "dmg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.dmg",
   "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg",
-  "fallback_dmg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.dmg",
-  "fallback_pkg_url": "https://raw.githubusercontent.com/become/powerup-toolbox/main/dist/MacToolbox-latest.pkg",
   "changelog": [
     "📷 本機真實相簿工坊：100% 讀取電腦真實照片庫（Downloads、Desktop、macOS Photos 圖庫與自訂相簿），支援 Finder 整合與修圖",
     "☁️ Google 相簿雲端同步：支援個人 OAuth 憑證連線，一鍵備份照片至 Google 雲端",
     "🍎 macOS 顯示與體驗優化：修復 Safari / Chrome 左上角圖標與 Favicon 多格式支援，消除持續 loading",
     "🌐 官網獨立發布支援：支援 powerup.dancingarden.com 官方高速更新節點，原始碼完全保密",
-    "⚡ 跨平台一鍵自動更新引擎 (支援官方 CDN 與 GitHub 分支雙備援)"
+    "⚡ 跨平台一鍵自動更新引擎 (官方高速更新節點)"
   ]
 }
 EOF

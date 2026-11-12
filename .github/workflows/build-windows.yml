@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release Tag (e.g. win-v2.8.0)'
+        description: 'Release Tag (e.g. win-v2.8.1)'
         required: true
-        default: 'win-v2.8.0'
+        default: 'win-v2.8.1'
       notes:
         description: 'Release Notes'
         required: false
-        default: 'PowerUp Toolbox for Windows v2.8.0'
+        default: 'PowerUp Toolbox for Windows v2.8.1'
 
 permissions:
   contents: write

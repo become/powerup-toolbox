@@ -323,6 +323,10 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(SCRATCH_DIR, exist_ok=True)
 os.makedirs(CAPTURES_DIR, exist_ok=True)
 
+if local_albums:
+    local_albums.CAPTURES_DIR = CAPTURES_DIR
+    local_albums.ENTRY_FILTER = lambda full: entry_is_unsafe_link(full)   # resolved at call time (defined below)
+
 IMAGE_EXTS = {".jpg", ".jpeg", ".jfif", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".svg"}
 MD_EXTS = {".md", ".markdown", ".mdx"}
 JSON_EXTS = {".json", ".jsonl", ".ndjson", ".geojson"}
@@ -2458,6 +2462,11 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/local-albums/photos":
             album_id = qs.get("album_id", [""])[0]
             album_path = qs.get("album_path", [""])[0]
+            if album_path:
+                album_path = safe_or_none(album_path)      # same door as every other request-derived path
+                if not album_path:
+                    self.send_json({"ok": False, "error": "不允許的相簿路徑"})
+                    return
             self.send_json(local_albums.get_album_photos(album_id, album_path) if local_albums else {"ok": False, "error": "本機相簿模組未載入"})
             return
 
@@ -3155,11 +3164,34 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             album_path = body.get("album_path", "")
             photo_paths = body.get("photo_paths", [])
             mode = body.get("mode", "copy")
-            self.send_json(local_albums.add_photos_to_album(album_path, photo_paths, mode) if local_albums else {"ok": False, "error": "本機相簿模組未載入"})
+            if not local_albums:
+                self.send_json({"ok": False, "error": "本機相簿模組未載入"})
+                return
+            # Writes are confined to the listed albums; every source goes through the path whitelist.
+            album_path = safe_or_none(album_path) if isinstance(album_path, str) and album_path else None
+            if not album_path or not local_albums.is_known_album_path(album_path):
+                self.send_json({"ok": False, "error": "只能加入相簿清單中的相簿"})
+                return
+            if not isinstance(photo_paths, list):
+                photo_paths = []
+            safe_sources = []
+            for src in photo_paths[:2000]:
+                s_ok = safe_or_none(src) if isinstance(src, str) and src else None
+                if s_ok and IS_WINDOWS:
+                    s_ok = winpath.long_path(s_ok)     # expand 8.3 short names BEFORE the extension is judged (X~1.JPG = x.jpgx)
+                    if path_is_unsafe(s_ok):
+                        s_ok = None
+                if s_ok:
+                    safe_sources.append(s_ok)
+            self.send_json(local_albums.add_photos_to_album(album_path, safe_sources, "move" if mode == "move" else "copy"))
             return
 
         if route == "/api/local-albums/reveal":
             path = body.get("path", "")
+            if IS_WINDOWS:
+                # never os.startfile() a request-supplied path (it would execute programs): show it in Explorer instead
+                self.send_json({"ok": bool(isinstance(path, str) and path and reveal_in_file_manager(path))})
+                return
             self.send_json({"ok": local_albums.reveal_in_system(path) if local_albums else False})
             return
 
