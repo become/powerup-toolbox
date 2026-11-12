@@ -2034,7 +2034,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.0 · 點擊手動檢查更新">v2.8.0</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.1 · 點擊手動檢查更新">v2.8.1</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2119,7 +2119,7 @@
 
     <!-- Always-Available System Actions (Anchored to Right, Never Cut Off) -->
     <div class="topbar-right">
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.0)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.1)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -2466,6 +2466,7 @@
           <button class="btn" onclick="openNewAlbumModal()" style="font-size:12px; gap:4px;" title="建立新的相簿資料夾">
             <span>➕ 建立相簿</span>
           </button>
+          <button class="btn" id="albumsThumbToggleBtn" onclick="toggleShowThumbs()" style="font-size:12px; gap:4px;">🖼️ 顯示縮圖</button>
           <button class="btn" id="btnRevealAlbumFolder" onclick="revealCurrentAlbumInFinder()" style="font-size:12px; gap:4px;" title="在系統 Finder 中檢視此相簿目錄">
             <span>📂 Finder 開啟</span>
           </button>
@@ -2947,6 +2948,14 @@
     renderGridView();
     renderFilmstrip();
     updateThumbUi();
+    try { if (isGPhotosActive) refreshGooglePhotos(); } catch (e) {}   // albums view follows the same privacy switch
+  }
+  // Albums view thumbnail: honours showThumbs (hidden by default, reset on every launch) like the grid / filmstrip.
+  function albumThumbHtml(src, alt, fallback) {
+    if (!showThumbs) {
+      return `<div class="gphotos-card-thumb" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; width:100%; height:100%; min-height:120px; color:#94a3b8; font-size:11px;" title="${escapeHtml(thumbText("hint"))}"><span style="font-size:26px;">🖼️</span><span>${escapeHtml(thumbText("hint"))}</span></div>`;
+    }
+    return `<img class="gphotos-card-thumb" src="${escapeHtml(src)}" loading="lazy" alt="${escapeHtml(alt)}"${fallback ? ` onerror="this.onerror=null; this.src='/assets/app_icon.png';"` : ""} />`;
   }
   function toggleShowThumbs() { setShowThumbs(!showThumbs); }
   function setAutoGridOnEnter(on) {
@@ -2957,6 +2966,8 @@
   function updateThumbUi() {
     const b = document.getElementById("thumbToggleBtn");
     if (b) { b.textContent = showThumbs ? thumbText("btnOn") : thumbText("btnOff"); b.classList.toggle("active", showThumbs); }
+    const ab = document.getElementById("albumsThumbToggleBtn");
+    if (ab) { ab.textContent = showThumbs ? thumbText("btnOn") : thumbText("btnOff"); ab.classList.toggle("active", showThumbs); }
     const c1 = document.getElementById("chkShowThumbs"); if (c1) c1.checked = showThumbs;
     const c2 = document.getElementById("chkAutoGrid"); if (c2) c2.checked = autoGridOnEnter;
     const l1 = document.getElementById("lblShowThumbs"); if (l1) l1.textContent = thumbText("label");
@@ -3396,7 +3407,7 @@
     if (caret) caret.textContent = bookmarksCollapsed ? "▶" : "▼";
 
     el.innerHTML = bookmarksData.map(b => {
-      const isAct = isGPhotosActive ? (b.special === "gphotos" || b.path === "gphotos://") : (sidebarTab === "folder" && currentDir === b.path);
+      const isAct = isGPhotosActive ? (b.special === "gphotos" || b.special === "albums" || b.path === "gphotos://" || b.path === "albums://") : (sidebarTab === "folder" && currentDir === b.path);
       return `
         <div class="bm-chip ${isAct ? 'active' : ''}" onclick="onBookmarkClick('${escapeQuotes(b.path)}')" title="${escapeHtml(b.full_name || b.name)} (${escapeHtml(b.path)})">
           <span>${escapeHtml(b.icon)}</span>
@@ -3412,6 +3423,10 @@
   }
 
   function onBookmarkClick(path) {
+    if (path === "albums://" || path === "albums") {
+      openAlbumsView("local");
+      return;
+    }
     if (path === "gphotos://" || path === "gphotos") {
       openGooglePhotosView();
       return;
@@ -3581,6 +3596,10 @@
   }
 
   async function loadDirectory(path = "", focusFile = null, forceOpen = false) {
+    if (path === "albums://" || path === "albums") {
+      openAlbumsView("local");
+      return;
+    }
     if (path === "gphotos://" || path === "gphotos") {
       openGooglePhotosView();
       return;
@@ -8521,7 +8540,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.0";
+        const curVer = data.current_version || "2.8.1";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -8575,7 +8594,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.0";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.1";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -8640,7 +8659,7 @@
       try { s = await (await fetch('/api/update-status')).json(); }
       catch (e) { if (statusBox) statusBox.innerHTML = "🔄 程式正在重新啟動以套用更新…"; return; }  // server gone = app is restarting
       if (s.state === "error") {
-        if (statusBox) statusBox.innerHTML = `<span style="color:#f87171;">❌ ${escapeHtml(s.message || '更新失敗')}<br>請稍後重試，或點選「前往 GitHub」手動下載。</span>`;
+        if (statusBox) statusBox.innerHTML = `<span style="color:#f87171;">❌ ${escapeHtml(s.message || '更新失敗')}<br>請稍後重試，或點選「前往官網」手動下載。</span>`;
         if (btn) btn.disabled = false;
         return;
       }
@@ -8681,7 +8700,7 @@
       setTimeout(closeUpdateModal, 3500);
     } catch (e) {
       if (statusBox) {
-        statusBox.innerHTML = `❌ 下載失敗，請點選「前往 GitHub」手動下載安裝。`;
+        statusBox.innerHTML = `❌ 下載失敗，請點選「前往官網」手動下載安裝。`;
       }
       if (btn) btn.disabled = false;
     }
@@ -8977,10 +8996,10 @@
         cardsHtml += `
           <div class="gphotos-card">
             <div class="gphotos-card-thumb-wrap" onclick="openPhotoInToolbox('${escapeQuotes(p.path)}')">
-              <img class="gphotos-card-thumb" src="${escapeHtml(p.thumb_url)}" loading="lazy" alt="${escapeHtml(p.filename)}" onerror="this.src='/assets/app_icon.png';" />
+              ${albumThumbHtml(p.thumb_url, p.filename, true)}
               <div class="gphotos-card-actions" onclick="event.stopPropagation()">
                 <button class="btn primary" style="padding:4px 8px; font-size:11px; background:linear-gradient(135deg, #2563eb, #1d4ed8);" onclick="openPhotoInToolbox('${escapeQuotes(p.path)}')" title="以萬用檢視器全尺寸開啟，支援 AI 人臉修復、超解析度與去背">🔍 檢視修圖</button>
-                <button class="btn" style="padding:4px 8px; font-size:11px;" onclick="revealPhotoInFinder('${escapeQuotes(p.path)}')" title="在 Finder 中顯示原圖檔案">📂 Finder</button>
+                <button class="btn" style="padding:4px 8px; font-size:11px;" onclick="revealPhotoInFinder('${escapeQuotes(p.path)}')" title="${T("在 Finder 中顯示原圖檔案")}">${T("📂 Finder")}</button>
                 <button class="btn purple" style="padding:4px 8px; font-size:11px;" onclick="openUploadToGPhotosModal('${escapeQuotes(p.path)}')" title="備份至 Google 雲端相簿">☁️ 雲端備份</button>
               </div>
             </div>
@@ -9001,10 +9020,14 @@
     }
   }
 
+  function refreshGooglePhotos() {
+    return albumsCurrentMode === "local" ? refreshLocalAlbums() : refreshCloudAlbums();
+  }
+
   function selectLocalAlbum(albumId) {
+    const a = localAlbumsList.find(x => x.id === albumId) || localAlbumsList.find(x => x.path === albumId);   // callers pass an id or a path
+    if (a) { albumId = a.id; currentLocalAlbumPath = a.path; }
     currentLocalAlbumId = albumId;
-    const a = localAlbumsList.find(x => x.id === albumId);
-    if (a) currentLocalAlbumPath = a.path;
     const sel = document.getElementById("gphotosAlbumSelect");
     if (sel) sel.value = albumId;
     refreshLocalAlbums();
@@ -9139,7 +9162,7 @@
         cardsHtml += `
           <div class="gphotos-card">
             <div class="gphotos-card-thumb-wrap" onclick="previewGPhoto('${escapeQuotes(item.id)}')">
-              <img class="gphotos-card-thumb" src="${escapeHtml(thumbUrl)}" loading="lazy" alt="${escapeHtml(item.filename)}" />
+              ${albumThumbHtml(thumbUrl, item.filename, false)}
               <div class="gphotos-card-actions" onclick="event.stopPropagation()">
                 <button class="btn" style="padding:4px 8px; font-size:11px;" onclick="previewGPhoto('${escapeQuotes(item.id)}')">🔍 預覽</button>
                 <button class="btn primary" style="padding:4px 8px; font-size:11px; background:linear-gradient(135deg, #2563eb, #1d4ed8);" onclick="loadGPhotoToLocalEditor('${escapeQuotes(item.id)}')">📥 載入工坊</button>
@@ -9275,7 +9298,7 @@
         let optHtml = "";
         localAlbumsList.forEach(a => {
           const isCur = a.path === currentLocalAlbumPath;
-          optHtml += `<option value="${escapeHtml(a.path)}" ${isCur ? 'selected' : ''}>${escapeHtml(a.icon)} ${escapeHtml(a.name)} (${a.count} 張)</option>`;
+          optHtml += `<option value="${escapeHtml(a.path)}" ${isCur ? 'selected' : ''}>${escapeHtml(a.name)} (${a.count} 張)</option>`;
         });
         if (localAlbumsList.length === 0) {
           optHtml = '<option value="">（尚無自訂相簿，請先建立相簿）</option>';
@@ -9438,7 +9461,7 @@
     if (albumsCurrentMode === "local") {
       if (titleEl) titleEl.textContent = "建立新本機相簿";
       if (labelEl) labelEl.textContent = "相簿名稱：";
-      if (hintEl) hintEl.textContent = "實體相簿將建立在 ~/Pictures/PowerUp_Albums 目錄下";
+      if (hintEl) hintEl.textContent = IS_WIN ? "實體相簿將建立在「圖片」資料夾的 PowerUp_Albums 目錄下" : "實體相簿將建立在 ~/Pictures/PowerUp_Albums 目錄下";
       if (inp) inp.placeholder = "例如：2026 日本賞櫻之旅、證件修圖、設計素材...";
       if (submitBtn) submitBtn.textContent = "建立本機相簿";
     } else {
@@ -9754,7 +9777,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.0</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.1</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
@@ -9769,12 +9792,12 @@
       </div>
 
       <div id="updateDownloadStatus" style="display:none; margin-bottom:16px; padding:12px; border-radius:10px; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); font-size:12px; color:#93c5fd; text-align:center;">
-        <span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">⏳</span> 正在自 GitHub 下載更新包...
+        <span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">⏳</span> 正在下載更新包...
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end;">
         <button class="btn" id="btnModalCancel" onclick="closeUpdateModal()" style="padding:7px 14px; font-size:12px;">稍後再說</button>
-        <button class="btn" id="btnModalManualDownload" onclick="openGitHubRelease()" style="padding:7px 14px; font-size:12px; border-color:rgba(255,255,255,0.2);">前往 GitHub</button>
+        <button class="btn" id="btnModalManualDownload" onclick="openGitHubRelease()" style="padding:7px 14px; font-size:12px; border-color:rgba(255,255,255,0.2);">前往官網</button>
         <button class="btn btn-primary" id="btnModalPerformUpdate" onclick="performAutoUpdate()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #f59e0b, #ec4899); border:none; color:#fff; font-weight:700; cursor:pointer;">⚡ 立即一鍵升級</button>
       </div>
     </div>
