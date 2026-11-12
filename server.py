@@ -3279,6 +3279,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     req = urllib.request.Request(pkg_url, headers={"User-Agent": f"MacToolbox/{APP_VERSION}"})
                     with urllib.request.urlopen(req, timeout=45.0) as resp, open(dest, "wb") as out:
                         shutil.copyfileobj(resp, out)
+                    _mac_popen(["/usr/bin/xattr", "-cr", dest])
                     _mac_popen(["/usr/bin/open", dest])
                 except Exception as err:
                     print(f"Auto-update download error: {err}")

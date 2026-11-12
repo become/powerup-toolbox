@@ -62,6 +62,9 @@ cp -R "$ROOT_DIR/$APP_NAME" "$PKG_ROOT/$APP_NAME"
 cat << 'EOF' > "$PKG_SCRIPTS/postinstall"
 #!/usr/bin/env bash
 APP_PATH="/Applications/MacToolbox.app"
+if [ -d "$APP_PATH" ]; then
+    xattr -cr "$APP_PATH" 2>/dev/null || true
+fi
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 if [ -x "$LSREGISTER" ] && [ -d "$APP_PATH" ]; then
     "$LSREGISTER" -f "$APP_PATH" || true
