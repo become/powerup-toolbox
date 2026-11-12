@@ -184,31 +184,54 @@ def compare_versions(v1, v2):
         return -1
     return 0
 
+OFFICIAL_UPDATE_URL = os.environ.get("POWERUP_UPDATE_URL", "https://powerup.dancingarden.com/downloads/toolbox/version.json")
+
 def check_github_update(repo=None, branch=None):
-    """Check GitHub main branch dist/version.json for available updates."""
+    """Check official website or GitHub for available updates.
+    Priority 1: Official website https://powerup.dancingarden.com/downloads/toolbox/version.json (fast, secure, private repo safe)
+    Priority 2: GitHub Contents API
+    Priority 3: Raw GitHub URL fallback
+    Priority 4: Local dist/version.json fallback
+    """
     import urllib.request
     import base64
     repo = repo or DEFAULT_GITHUB_REPO
     branch = branch or DEFAULT_GITHUB_BRANCH
     remote_data = None
+    update_source = "official_website"
 
-    # Priority 1: GitHub Contents API (Instant 0-delay real-time commit data)
-    api_url = f"https://api.github.com/repos/{repo}/contents/dist/version.json?ref={branch}"
-    req_api = urllib.request.Request(
-        api_url,
-        headers={"User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)"}
-    )
+    # Priority 1: Official Website Update Endpoint (Works even when GitHub repo is Private!)
     try:
-        with urllib.request.urlopen(req_api, timeout=3.5) as resp:
+        req_official = urllib.request.Request(
+            OFFICIAL_UPDATE_URL,
+            headers={"User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)"}
+        )
+        with urllib.request.urlopen(req_official, timeout=3.5) as resp:
             if resp.status == 200:
-                raw_api = json.loads(resp.read().decode("utf-8"))
-                content_b64 = raw_api.get("content", "")
-                if content_b64:
-                    remote_data = json.loads(base64.b64decode(content_b64).decode("utf-8"))
+                remote_data = json.loads(resp.read().decode("utf-8"))
+                update_source = "official_website"
     except Exception:
-        pass
+        remote_data = None
 
-    # Priority 2: Raw GitHub URL fallback
+    # Priority 2: GitHub Contents API (Instant 0-delay real-time commit data)
+    if not remote_data:
+        api_url = f"https://api.github.com/repos/{repo}/contents/dist/version.json?ref={branch}"
+        req_api = urllib.request.Request(
+            api_url,
+            headers={"User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)"}
+        )
+        try:
+            with urllib.request.urlopen(req_api, timeout=3.5) as resp:
+                if resp.status == 200:
+                    raw_api = json.loads(resp.read().decode("utf-8"))
+                    content_b64 = raw_api.get("content", "")
+                    if content_b64:
+                        remote_data = json.loads(base64.b64decode(content_b64).decode("utf-8"))
+                        update_source = "github_api"
+        except Exception:
+            pass
+
+    # Priority 3: Raw GitHub URL fallback
     if not remote_data:
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/dist/version.json"
         req_raw = urllib.request.Request(
@@ -219,12 +242,15 @@ def check_github_update(repo=None, branch=None):
             with urllib.request.urlopen(req_raw, timeout=3.5) as resp:
                 if resp.status == 200:
                     remote_data = json.loads(resp.read().decode("utf-8"))
+                    update_source = "github_raw"
         except Exception:
             pass
 
     if remote_data:
         remote_ver = remote_data.get("version", "0.0.0")
         has_update = compare_versions(remote_ver, APP_VERSION) > 0
+        default_dmg = "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.dmg"
+        default_pkg = "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
         return {
             "ok": True,
             "repo": repo,
@@ -234,42 +260,43 @@ def check_github_update(repo=None, branch=None):
             "has_update": has_update,
             "release_date": remote_data.get("release_date", ""),
             "changelog": remote_data.get("changelog", []),
-            "dmg_url": remote_data.get("dmg_url", f"https://raw.githubusercontent.com/{repo}/{branch}/dist/MacToolbox-latest.dmg"),
-            "pkg_url": remote_data.get("pkg_url", f"https://raw.githubusercontent.com/{repo}/{branch}/dist/MacToolbox-latest.pkg"),
-            "source": "github"
+            "dmg_url": remote_data.get("dmg_url", default_dmg),
+            "pkg_url": remote_data.get("pkg_url", default_pkg),
+            "source": update_source
         }
 
-    # Priority 3: Fallback to local dist/version.json if offline or before remote repo is public
-        local_vfile = os.path.join(TOOLBOX_DIR, "dist", "version.json")
-        if os.path.isfile(local_vfile):
-            try:
-                with open(local_vfile, "r", encoding="utf-8") as f:
-                    local_data = json.load(f)
-                remote_ver = local_data.get("version", APP_VERSION)
-                return {
-                    "ok": True,
-                    "repo": repo,
-                    "branch": branch,
-                    "current_version": APP_VERSION,
-                    "latest_version": remote_ver,
-                    "has_update": compare_versions(remote_ver, APP_VERSION) > 0,
-                    "release_date": local_data.get("release_date", ""),
-                    "changelog": local_data.get("changelog", []),
-                    "dmg_url": local_data.get("dmg_url", ""),
-                    "pkg_url": local_data.get("pkg_url", ""),
-                    "source": "local_fallback",
-                    "note": f"GitHub check fallback: {str(e)}"
-                }
-            except Exception:
-                pass
-        return {
-            "ok": False,
-            "repo": repo,
-            "branch": branch,
-            "current_version": APP_VERSION,
-            "has_update": False,
-            "error": str(e)
-        }
+    # Priority 4: Fallback to local dist/version.json if offline
+    local_vfile = os.path.join(TOOLBOX_DIR, "dist", "version.json")
+    if os.path.isfile(local_vfile):
+        try:
+            with open(local_vfile, "r", encoding="utf-8") as f:
+                local_data = json.load(f)
+            remote_ver = local_data.get("version", APP_VERSION)
+            return {
+                "ok": True,
+                "repo": repo,
+                "branch": branch,
+                "current_version": APP_VERSION,
+                "latest_version": remote_ver,
+                "has_update": compare_versions(remote_ver, APP_VERSION) > 0,
+                "release_date": local_data.get("release_date", ""),
+                "changelog": local_data.get("changelog", []),
+                "dmg_url": local_data.get("dmg_url", ""),
+                "pkg_url": local_data.get("pkg_url", ""),
+                "source": "local_fallback"
+            }
+        except Exception:
+            pass
+    return {
+        "ok": False,
+        "repo": repo,
+        "branch": branch,
+        "current_version": APP_VERSION,
+        "latest_version": APP_VERSION,
+        "has_update": False,
+        "error": "無法連線至官方更新伺服器或 GitHub",
+        "source": "failed"
+    }
 
 if IS_APP_BUNDLE:
     USER_SUPPORT_DIR = os.path.expanduser("~/Library/Application Support/MacToolbox")
@@ -3211,9 +3238,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if route == "/api/perform-update":
             pkg_url = body.get("pkg_url")
             if not pkg_url:
-                repo = body.get("repo") or DEFAULT_GITHUB_REPO
-                branch = body.get("branch") or DEFAULT_GITHUB_BRANCH
-                pkg_url = f"https://raw.githubusercontent.com/{repo}/{branch}/dist/MacToolbox-latest.pkg"
+                pkg_url = "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
 
             def do_download_and_install():
                 import urllib.request
