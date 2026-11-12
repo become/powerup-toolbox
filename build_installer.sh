@@ -114,6 +114,24 @@ cat << EOF > "$DIST_DIR/version.json"
   "latest_pkg": "MacToolbox-latest.pkg",
   "dmg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.dmg",
   "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg",
+  "windows_version": "2.8.1",
+  "windows_zip": "PowerUpToolbox-portable.zip",
+  "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
+  "macos": {
+    "version": "${VERSION}.0",
+    "min_macos": "12.0",
+    "latest_dmg": "MacToolbox-latest.dmg",
+    "latest_pkg": "MacToolbox-latest.pkg",
+    "dmg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.dmg",
+    "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
+  },
+  "windows": {
+    "version": "2.8.1",
+    "latest_zip": "PowerUpToolbox-portable.zip",
+    "zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
+    "sha256": "c1b76dfc0461095c8fbe9062abcddc43f22c61be0733e0abc8ff9cb11fe49aea",
+    "size": 40860815
+  },
   "changelog": [
     "📷 本機真實相簿工坊：100% 讀取電腦真實照片庫（Downloads、Desktop、macOS Photos 圖庫與自訂相簿），支援 Finder 整合與修圖",
     "☁️ Google 相簿雲端同步：支援個人 OAuth 憑證連線，一鍵備份照片至 Google 雲端",

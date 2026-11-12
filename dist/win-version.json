@@ -1,0 +1,15 @@
+{
+  "version": "2.8.1",
+  "name": "PowerUp Toolbox for Windows",
+  "release_date": "2026-11-12",
+  "asset": "PowerUpToolbox-portable.zip",
+  "sha256": "c1b76dfc0461095c8fbe9062abcddc43f22c61be0733e0abc8ff9cb11fe49aea",
+  "size": 40860815,
+  "download_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
+  "changelog": [
+    "📷 本機相簿工坊：瀏覽下載、桌面、圖片資料夾中的照片，建立自訂相簿",
+    "🔒 相簿畫面遵守「縮圖預設隱藏」隱私設定，新增縮圖開關",
+    "🌐 更新來源改為官方網站，並加入下載檔案完整性驗證 (SHA-256)",
+    "⚡ 修正相簿書籤無法開啟與多項穩定性問題"
+  ]
+}
