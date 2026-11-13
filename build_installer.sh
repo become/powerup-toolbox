@@ -15,6 +15,7 @@ plutil -replace CFBundleVersion -string "282" "$ROOT_DIR/$APP_NAME/Contents/Info
 
 echo "🔨 [1/5] 編譯 macOS 原生二進位執行檔 (Vision Helper & App Launcher)..."
 swiftc -O "$ROOT_DIR/mac_vision_helper.swift" -o "$ROOT_DIR/mac_vision_helper"
+rm -rf "$ROOT_DIR/$APP_NAME/Contents/MacOS"
 mkdir -p "$ROOT_DIR/$APP_NAME/Contents/MacOS"
 mkdir -p "$ROOT_DIR/$APP_NAME/Contents/Resources"
 swiftc -O "$ROOT_DIR/app_launcher.swift" -o "$ROOT_DIR/$APP_NAME/Contents/MacOS/MacToolbox"
@@ -50,8 +51,20 @@ chmod +x "$ROOT_DIR/$APP_NAME/Contents/Resources/mac_vision_helper"
 chmod +x "$ROOT_DIR/$APP_NAME/Contents/Resources/set_default_handlers"
 chmod +x "$ROOT_DIR/$APP_NAME/Contents/Resources/server.py"
 
-# Ad-hoc sign the app bundle so macOS Gatekeeper / LaunchServices accepts it cleanly
-codesign --force --deep --sign - "$ROOT_DIR/$APP_NAME" >/dev/null 2>&1 || true
+# Official Apple Developer ID Signing & Notarization
+SIGN_IDENTITY="Developer ID Application: FITs Inc. (2ZLWWY5NS3)"
+NOTARY_PROFILE="mactoolbox-notary"
+
+if security find-identity -p codesigning -v | grep -q "$SIGN_IDENTITY"; then
+    echo "🔏 [3.5/5] 使用官方 Apple Developer ID 簽名 ($SIGN_IDENTITY)..."
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$ROOT_DIR/$APP_NAME/Contents/Resources/mac_vision_helper"
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$ROOT_DIR/$APP_NAME/Contents/Resources/set_default_handlers"
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$ROOT_DIR/$APP_NAME/Contents/MacOS/MacToolbox"
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$ROOT_DIR/$APP_NAME"
+else
+    echo "⚠️  未偵測到官方簽名憑證，使用 Ad-hoc 簽名..."
+    codesign --force --deep --sign - "$ROOT_DIR/$APP_NAME" >/dev/null 2>&1 || true
+fi
 
 echo "💿 [4/5] 製作 macOS 標準安裝套件 (.pkg)..."
 PKG_ROOT="$BUILD_TMP/pkg_root/Applications"
@@ -102,6 +115,22 @@ hdiutil create \
     "$DMG_OUT" >/dev/null
 
 rm -rf "$BUILD_TMP"
+
+if security find-identity -p codesigning -v | grep -q "$SIGN_IDENTITY"; then
+    echo "🔏 簽署 DMG 映像檔 ($SIGN_IDENTITY)..."
+    codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_OUT" >/dev/null 2>&1 || true
+
+    echo "🍏 提交 Apple 雲端公證 (xcrun notarytool)..."
+    NOTARY_OUT=$(xcrun notarytool submit "$DMG_OUT" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1 || true)
+    echo "$NOTARY_OUT"
+    if echo "$NOTARY_OUT" | grep -q "status: Accepted"; then
+        echo "📎 釘選公證票據 (xcrun stapler staple)..."
+        xcrun stapler staple "$DMG_OUT" || true
+        echo "🎉 Apple 雲端公證與票據釘選完成！"
+    else
+        echo "⚠️  公證尚未完成，請檢查輸出。"
+    fi
+fi
 
 echo "📡 [6/7] 更新部署版本清單 (dist/version.json & latest 軟連結)..."
 cp -f "$DIST_DIR/MacToolbox-${VERSION}.dmg" "$DIST_DIR/MacToolbox-latest.dmg"

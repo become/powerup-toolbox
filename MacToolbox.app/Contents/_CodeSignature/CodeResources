@@ -78,7 +78,7 @@
 		</data>
 		<key>Resources/mac_vision_helper</key>
 		<data>
-		/ac4uNCAydffrPHJADaOXf4sFMw=
+		uhWYgbUmjb01E5ji1LWDq52ur2Y=
 		</data>
 		<key>Resources/sample_demo.csv</key>
 		<data>
@@ -106,7 +106,7 @@
 		</data>
 		<key>Resources/set_default_handlers</key>
 		<data>
-		TJuls8OJCwHxdGX6tF+PAIUFdn8=
+		abMYF/uxBl2xyGEF/iHVmHEpnvc=
 		</data>
 		<key>Resources/winpath.py</key>
 		<data>
@@ -159,15 +159,6 @@
 	</dict>
 	<key>files2</key>
 	<dict>
-		<key>MacOS/mac_vision_helper</key>
-		<dict>
-			<key>cdhash</key>
-			<data>
-			PfqJOcAa7jGUxCmq/XF0CZKqsqI=
-			</data>
-			<key>requirement</key>
-			<string>cdhash H"3dfa8939c01aee3194c429aafd71740992aab2a2"</string>
-		</dict>
 		<key>Resources/AppIcon.icns</key>
 		<dict>
 			<key>hash2</key>
@@ -298,7 +289,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			GQs+90Ukphb5eJ+4vtUAMKBQ606EltFNgQLkFHZhP7U=
+			ZmcnKaF8vkqJNQ+fo3uYHBzGiLqK20ut0whgKGhbKFE=
 			</data>
 		</dict>
 		<key>Resources/sample_demo.csv</key>
@@ -347,7 +338,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			6PxsejnxV6eqH0ZFjT+qBOTr6J9ATdOK9ASUgb8TZN0=
+			RKscYKuuvq3BNae73+OG+/hVshKtLASB8SJm4hLYUVo=
 			</data>
 		</dict>
 		<key>Resources/winpath.py</key>
