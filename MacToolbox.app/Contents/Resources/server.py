@@ -49,7 +49,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.1"
+APP_VERSION = "2.8.2"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -2837,17 +2837,22 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             raw_path = qs.get("path", [""])[0].strip()
             recursive = qs.get("recursive", ["0"])[0] == "1"
             if not raw_path:
-                desktop = os.path.expanduser("~/Desktop")
-                has_desktop_supported = False
-                if not path_is_unsafe(desktop) and os.path.isdir(desktop):
-                    try:
-                        has_desktop_supported = any(
-                            not e.startswith(".") and detect_file_type(e) is not None
-                            for e in os.listdir(desktop)
-                        )
-                    except Exception:
-                        pass
-                raw_path = desktop if has_desktop_supported else TOOLBOX_DIR
+                candidates = [
+                    os.path.expanduser("~/Desktop"),
+                    os.path.expanduser("~/Pictures"),
+                    os.path.expanduser("~/Downloads"),
+                ]
+                for cand in candidates:
+                    if not path_is_unsafe(cand) and os.path.isdir(cand):
+                        try:
+                            if any(not e.startswith(".") and detect_file_type(e) is not None for e in os.listdir(cand)):
+                                raw_path = cand
+                                break
+                        except Exception:
+                            pass
+                if not raw_path:
+                    desktop = os.path.expanduser("~/Desktop")
+                    raw_path = desktop if os.path.isdir(desktop) else os.path.expanduser("~")
 
             target = safe_fs_path(raw_path)
             focus_file = None
