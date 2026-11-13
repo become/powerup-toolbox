@@ -22,8 +22,8 @@
     "version": "2.8.1",
     "latest_zip": "PowerUpToolbox-portable.zip",
     "zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
-    "sha256": "c1b76dfc0461095c8fbe9062abcddc43f22c61be0733e0abc8ff9cb11fe49aea",
-    "size": 40860815
+    "sha256": "6c5834b258a9cd9ab6e4e9fa3cc3812e1cee13e4fda1db956fb9f728b4b77b7c",
+    "size": 39897952
   },
   "changelog": [
     "📷 本機真實相簿工坊：100% 讀取電腦真實照片庫（Downloads、Desktop、macOS Photos 圖庫與自訂相簿），支援 Finder 整合與修圖",

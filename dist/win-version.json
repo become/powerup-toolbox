@@ -3,8 +3,8 @@
   "name": "PowerUp Toolbox for Windows",
   "release_date": "2026-11-12",
   "asset": "PowerUpToolbox-portable.zip",
-  "sha256": "c1b76dfc0461095c8fbe9062abcddc43f22c61be0733e0abc8ff9cb11fe49aea",
-  "size": 40860815,
+  "sha256": "6c5834b258a9cd9ab6e4e9fa3cc3812e1cee13e4fda1db956fb9f728b4b77b7c",
+  "size": 39897952,
   "download_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "changelog": [
     "📷 本機相簿工坊：瀏覽下載、桌面、圖片資料夾中的照片，建立自訂相簿",

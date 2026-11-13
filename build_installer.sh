@@ -107,6 +107,20 @@ echo "📡 [6/7] 更新部署版本清單 (dist/version.json & latest 軟連結)
 cp -f "$DIST_DIR/MacToolbox-${VERSION}.dmg" "$DIST_DIR/MacToolbox-latest.dmg"
 cp -f "$DIST_DIR/MacToolbox-${VERSION}-Installer.pkg" "$DIST_DIR/MacToolbox-latest.pkg"
 
+# Windows build facts come from dist/win-version.json (written by windows/publish_website.ps1 on the
+# Windows machine); never hard-code them here or they drift from the zip the website actually serves.
+WIN_MANIFEST="$DIST_DIR/win-version.json"
+win_field() {
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get(sys.argv[2], ""))' "$WIN_MANIFEST" "$1" 2>/dev/null || true
+}
+WIN_VERSION="$(win_field version)"
+WIN_SHA256="$(win_field sha256)"
+WIN_SIZE="$(win_field size)"
+WIN_SIZE="${WIN_SIZE:-0}"
+if [ -z "$WIN_VERSION" ] || [ -z "$WIN_SHA256" ]; then
+  echo "⚠️  無法讀取 $WIN_MANIFEST（檔案不存在、格式錯誤或沒有 python3）：version.json 的 windows 區塊將是空值，同步到官網前請先修正！" >&2
+fi
+
 cat << EOF > "$DIST_DIR/version.json"
 {
   "version": "${VERSION}",
@@ -117,7 +131,7 @@ cat << EOF > "$DIST_DIR/version.json"
   "latest_pkg": "MacToolbox-latest.pkg",
   "dmg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.dmg",
   "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg",
-  "windows_version": "2.8.1",
+  "windows_version": "${WIN_VERSION}",
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
@@ -129,11 +143,11 @@ cat << EOF > "$DIST_DIR/version.json"
     "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
   },
   "windows": {
-    "version": "2.8.1",
+    "version": "${WIN_VERSION}",
     "latest_zip": "PowerUpToolbox-portable.zip",
     "zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
-    "sha256": "c1b76dfc0461095c8fbe9062abcddc43f22c61be0733e0abc8ff9cb11fe49aea",
-    "size": 40860815
+    "sha256": "${WIN_SHA256}",
+    "size": ${WIN_SIZE}
   },
   "changelog": [
     "📷 本機真實相簿工坊：100% 讀取電腦真實照片庫（Downloads、Desktop、macOS Photos 圖庫與自訂相簿），支援 Finder 整合與修圖",

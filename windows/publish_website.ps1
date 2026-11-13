@@ -57,9 +57,26 @@ Write-Host "SHA256  : $sha"
 Write-Host "Dest    : $dest"
 if ($DryRun) { Write-Host "[DryRun] manifest would be:"; Write-Host $json; exit 0 }
 
+$utf8 = New-Object System.Text.UTF8Encoding($false)   # no BOM (PowerShell 5.1's -Encoding utf8 would add one)
 Copy-Item -LiteralPath $zip -Destination (Join-Path $dest $asset) -Force
-# UTF-8 without BOM (PowerShell 5.1's -Encoding utf8 would add one)
-[System.IO.File]::WriteAllText((Join-Path $dest "win-version.json"), $json + "`n", (New-Object System.Text.UTF8Encoding($false)))
+[System.IO.File]::WriteAllText((Join-Path $dest "win-version.json"), $json + "`n", $utf8)
 $check = (Get-FileHash -LiteralPath (Join-Path $dest $asset) -Algorithm SHA256).Hash.ToLower()
 if ($check -ne $sha) { throw "copied zip does not match its checksum" }
-Write-Host "Staged. Next: commit + push the website repo, then run its deploy workflow."
+# Same manifest in this repo: build_installer.sh (Mac) reads it to fill the "windows" block of version.json.
+[System.IO.File]::WriteAllText((Join-Path $Root "dist\win-version.json"), $json + "`n", $utf8)
+
+# Keep the Windows facts inside the shared version.json files in step (text edit only: the rest of the file,
+# written by build_installer.sh on the Mac, is left byte-for-byte as it is).
+function Update-WindowsBlock([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path)) { return }
+  $t = [System.IO.File]::ReadAllText($Path, $utf8)
+  if ($t -notmatch '"windows"\s*:\s*\{') { return }
+  $n = [regex]::Replace($t, '("windows_version"\s*:\s*")[^"]*(")', ('${1}' + $ver + '${2}'))
+  $n = [regex]::Replace($n, '(?s)("windows"\s*:\s*\{[^{}]*?"version"\s*:\s*")[^"]*(")', ('${1}' + $ver + '${2}'))
+  $n = [regex]::Replace($n, '(?s)("windows"\s*:\s*\{[^{}]*?"sha256"\s*:\s*")[^"]*(")', ('${1}' + $sha + '${2}'))
+  $n = [regex]::Replace($n, '(?s)("windows"\s*:\s*\{[^{}]*?"size"\s*:\s*)\d+', ('${1}' + $size))
+  if ($n -ne $t) { [System.IO.File]::WriteAllText($Path, $n, $utf8); Write-Host "Updated windows block: $Path" }
+}
+Update-WindowsBlock (Join-Path $dest "version.json")
+Update-WindowsBlock (Join-Path $Root "dist\version.json")
+Write-Host "Staged. Next: commit + push both repos (this one: dist\*.json), then run the website deploy workflow."
