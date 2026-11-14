@@ -49,7 +49,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.4"
+APP_VERSION = "2.8.5"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -350,6 +350,11 @@ else:
     CAPTURES_DIR = os.path.join(TOOLBOX_DIR, "captures")
 
 HELPER_BIN = os.path.join(TOOLBOX_DIR, "mac_vision_helper")
+DEFAULT_HANDLERS_BIN = os.path.join(TOOLBOX_DIR, "set_default_handlers")
+if not os.path.isfile(DEFAULT_HANDLERS_BIN):
+    alt = "/Users/become/Claude/Projects/toolbox/set_default_handlers"
+    if os.path.isfile(alt):
+        DEFAULT_HANDLERS_BIN = alt
 
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(SCRATCH_DIR, exist_ok=True)
@@ -2512,6 +2517,20 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.send_json({"ok": True, **LAST_OPEN_REQUEST})
             return
 
+        if route == "/api/file-handlers":
+            if sys.platform != "darwin":
+                self.send_json({"ok": True, "mac_only": True, "items": []})
+                return
+            if not os.path.isfile(DEFAULT_HANDLERS_BIN):
+                self.send_json({"ok": False, "error": "set_default_handlers 執行檔未找到"})
+                return
+            try:
+                out = subprocess.check_output([DEFAULT_HANDLERS_BIN], timeout=10)
+                self.send_json(json.loads(out.decode("utf-8")))
+            except Exception as e:
+                self.send_json({"ok": False, "error": str(e)})
+            return
+
         if route == "/api/gphotos/status":
             self.send_json(gphotos.get_status() if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
             return
@@ -3432,6 +3451,22 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     os._exit(0)
             threading.Thread(target=do_restart, daemon=True).start()
             self.send_json({"ok": True, "message": "正在重新啟動..."})
+            return
+
+        if route == "/api/file-handlers":
+            if sys.platform != "darwin":
+                self.send_json({"ok": True, "mac_only": True})
+                return
+            if not os.path.isfile(DEFAULT_HANDLERS_BIN):
+                self.send_json({"ok": False, "error": "set_default_handlers 執行檔未找到"})
+                return
+            keys = body.get("keys", [])
+            raw_arg = ",".join(keys)
+            try:
+                out = subprocess.check_output([DEFAULT_HANDLERS_BIN, "--apply", raw_arg], timeout=15)
+                self.send_json(json.loads(out.decode("utf-8")))
+            except Exception as e:
+                self.send_json({"ok": False, "error": str(e)})
             return
 
         if route == "/api/pdf-interact":

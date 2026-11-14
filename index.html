@@ -2108,7 +2108,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.4 · 點擊手動檢查更新">v2.8.4</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.5 · 點擊手動檢查更新">v2.8.5</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2210,7 +2210,10 @@
 
     <!-- Always-Available System Actions (Anchored to Right, Never Cut Off) -->
     <div class="topbar-right">
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.4)">
+      <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
+        <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
+      </button>
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.5)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -9103,7 +9106,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.4";
+        const curVer = data.current_version || "2.8.5";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -9173,7 +9176,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.4";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.5";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -9237,8 +9240,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.4";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.4";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.5";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.5";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -9415,6 +9418,147 @@
       }
       if (btn) btn.disabled = false;
     }
+  }
+
+  /* =========================================================
+     File Associations & Default Handler Management
+     ========================================================= */
+  let fileAssocItems = [];
+
+  async function openFileAssociationModal(isFirstLaunch = false) {
+    const modal = document.getElementById("fileAssocModal");
+    const container = document.getElementById("fileAssocListContainer");
+    const titleEl = document.getElementById("modalFileAssocTitle");
+    const subEl = document.getElementById("modalFileAssocSub");
+    const statusMsg = document.getElementById("fileAssocStatusMsg");
+    if (!modal || !container) return;
+
+    if (titleEl) {
+      titleEl.textContent = isFirstLaunch ? "👋 歡迎使用！請自訂預設開啟程式" : "📂 自訂預設開啟程式（檔案關聯）";
+    }
+    if (subEl) {
+      subEl.textContent = isFirstLaunch
+        ? "初次安裝指引：勾選您希望直接點兩下由本工具開啟的檔案（隨時可於右上角「預設開啟」進行調整）"
+        : "您可以自由勾選由 PowerUp Toolbox 預設開啟的副檔名";
+    }
+    if (statusMsg) statusMsg.textContent = "";
+
+    container.innerHTML = `<div style="text-align:center; padding:30px; color:#94a3b8; font-size:12px;"><span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">⏳</span> 正在查詢系統檔案關聯狀態...</div>`;
+    modal.style.display = "flex";
+
+    try {
+      const res = await fetch('/api/file-handlers');
+      const data = await res.json();
+      if (!data.ok || !data.items) {
+        container.innerHTML = `<div style="text-align:center; padding:20px; color:#f87171; font-size:12px;">❌ 無法取得檔案關聯資訊：${escapeHtml(data.error || '不支援的系統')}</div>`;
+        return;
+      }
+      fileAssocItems = data.items;
+      renderFileAssocList(isFirstLaunch);
+    } catch (e) {
+      container.innerHTML = `<div style="text-align:center; padding:20px; color:#f87171; font-size:12px;">❌ 查詢失敗，請重試</div>`;
+    }
+  }
+
+  function renderFileAssocList(isFirstLaunch = false) {
+    const container = document.getElementById("fileAssocListContainer");
+    if (!container) return;
+
+    const groups = {};
+    for (const item of fileAssocItems) {
+      const cat = item.category_name || "其他檔案";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    }
+
+    let html = "";
+    for (const [catName, list] of Object.entries(groups)) {
+      html += `<div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:12px;">
+        <div style="font-size:12px; font-weight:800; color:#cbd5e1; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          <span>${escapeHtml(catName)}</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:8px;">`;
+
+      for (const item of list) {
+        const checked = isFirstLaunch ? Boolean(item.recommended) : Boolean(item.is_default);
+        const isCurrentToolbox = item.is_default;
+        const isHtml = (item.key === "html");
+
+        html += `
+          <label style="display:flex; align-items:flex-start; gap:9px; background:rgba(0,0,0,0.3); border:1px solid ${isHtml ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)'}; border-radius:8px; padding:8px 10px; cursor:pointer; user-select:none; transition:all 0.15s ease;">
+            <input type="checkbox" class="file-assoc-chk" data-key="${item.key}" ${checked ? 'checked' : ''} style="margin-top:2px; cursor:pointer; accent-color:#3b82f6;">
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:2px;">
+                <span style="font-size:12px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.name)}</span>
+                ${item.recommended ? '<span style="background:rgba(59,130,246,0.25); color:#93c5fd; font-size:9px; padding:1px 5px; border-radius:4px; font-weight:700;">推薦</span>' : ''}
+                ${isHtml ? '<span style="background:rgba(245,158,11,0.2); color:#fcd34d; font-size:9px; padding:1px 5px; border-radius:4px;">保留瀏覽器</span>' : ''}
+              </div>
+              <div style="font-size:11px; color:#94a3b8; font-family:'SF Mono',Menlo,monospace; margin-bottom:4px;">${escapeHtml(item.exts.join(" "))}</div>
+              <div style="font-size:10px;">
+                ${isCurrentToolbox
+                  ? '<span style="background:rgba(16,185,129,0.18); color:#34d399; padding:2px 6px; border-radius:4px; font-weight:600;">✓ 目前：PowerUp Toolbox</span>'
+                  : `<span style="background:rgba(255,255,255,0.06); color:#94a3b8; padding:2px 6px; border-radius:4px;">目前：${escapeHtml(item.current_app || '系統預設')}</span>`
+                }
+              </div>
+            </div>
+          </label>
+        `;
+      }
+      html += `</div></div>`;
+    }
+
+    container.innerHTML = html;
+  }
+
+  function quickSelectAssoc(mode) {
+    const chks = document.querySelectorAll(".file-assoc-chk");
+    chks.forEach(chk => {
+      const key = chk.getAttribute("data-key");
+      const item = fileAssocItems.find(it => it.key === key);
+      if (mode === "all") {
+        chk.checked = true;
+      } else if (mode === "none") {
+        chk.checked = false;
+      } else if (mode === "recommended") {
+        chk.checked = item ? Boolean(item.recommended) : false;
+      }
+    });
+  }
+
+  async function saveFileAssociations() {
+    const btn = document.getElementById("btnSaveFileAssoc");
+    const statusMsg = document.getElementById("fileAssocStatusMsg");
+    const chks = document.querySelectorAll(".file-assoc-chk:checked");
+    const selectedKeys = Array.from(chks).map(c => c.getAttribute("data-key"));
+
+    if (btn) btn.disabled = true;
+    if (statusMsg) statusMsg.innerHTML = `<span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:4px;">⏳</span> 正在套用檔案關聯設定...`;
+
+    try {
+      const res = await fetch('/api/file-handlers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys: selectedKeys })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        if (statusMsg) statusMsg.innerHTML = `<span style="color:#f87171;">❌ 套用失敗：${escapeHtml(data.error || '未知錯誤')}</span>`;
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      localStorage.setItem("powerup_file_assoc_configured_v1", "1");
+      showToast("✅ 預設開啟程式設定已成功套用！");
+      closeFileAssociationModal();
+    } catch (e) {
+      if (statusMsg) statusMsg.innerHTML = `<span style="color:#f87171;">❌ 套用失敗，請稍後重試</span>`;
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function closeFileAssociationModal() {
+    const modal = document.getElementById("fileAssocModal");
+    if (modal) modal.style.display = "none";
   }
 
   /* =========================================================
@@ -10488,7 +10632,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.4</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.5</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
@@ -10511,6 +10655,47 @@
         <button class="btn" id="btnModalManualDownload" onclick="openGitHubRelease()" style="padding:7px 14px; font-size:12px; border-color:rgba(255,255,255,0.2);">前往官網</button>
         <button class="btn btn-primary" id="btnModalPerformUpdate" onclick="performAutoUpdate()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #f59e0b, #ec4899); border:none; color:#fff; font-weight:700; cursor:pointer;">⚡ 立即一鍵升級</button>
         <button class="btn btn-primary emerald" id="btnModalRestart" onclick="restartAppNow()" style="display:none; padding:7px 18px; font-size:12px; background:#10b981; border:none; color:#fff; font-weight:700; cursor:pointer;">🔄 立即重新啟動</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Association Modal -->
+  <div id="fileAssocModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.82); backdrop-filter:blur(10px); z-index:99999; align-items:center; justify-content:center;">
+    <div class="modal-card" style="background:#0b0f19; border:1px solid rgba(59,130,246,0.4); border-radius:18px; width:580px; max-width:94vw; max-height:88vh; display:flex; flex-direction:column; padding:22px; box-shadow:0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(59,130,246,0.15);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:26px;">📂</span>
+          <div>
+            <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalFileAssocTitle">自訂預設開啟程式（檔案關聯）</h3>
+            <span style="font-size:12px; color:#94a3b8;" id="modalFileAssocSub">您可以自由選擇由 PowerUp Toolbox 預設開啟的副檔名</span>
+          </div>
+        </div>
+        <button onclick="closeFileAssociationModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
+      </div>
+
+      <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.22); border-radius:10px; padding:10px 14px; margin-bottom:12px; font-size:12px; color:#93c5fd; line-height:1.5;">
+        💡 <strong>貼心建議</strong>：您可以隨時在此勾選或取消。例如 <strong>HTML</strong> 建議保留由瀏覽器（Google Chrome）開啟；取消勾選的類型會自動恢復為系統預設或原應用程式。
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div style="display:flex; gap:8px; margin-bottom:12px; font-size:11px;">
+        <button class="btn" onclick="quickSelectAssoc('recommended')" style="padding:4px 10px; border-color:#3b82f6; color:#60a5fa; font-weight:700;">🌟 推薦設定 (MD/CSV/JSON/簡報)</button>
+        <button class="btn" onclick="quickSelectAssoc('all')" style="padding:4px 8px;">全部選取</button>
+        <button class="btn" onclick="quickSelectAssoc('none')" style="padding:4px 8px;">全部取消</button>
+      </div>
+
+      <!-- Scrollable list of formats -->
+      <div id="fileAssocListContainer" style="flex:1; overflow-y:auto; padding-right:6px; display:flex; flex-direction:column; gap:12px; min-height:180px; max-height:48vh;">
+        <div style="text-align:center; padding:30px; color:#94a3b8; font-size:12px;">載入設定中...</div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08);">
+        <span id="fileAssocStatusMsg" style="font-size:12px; color:#94a3b8;"></span>
+        <div style="display:flex; gap:10px;">
+          <button class="btn" onclick="closeFileAssociationModal()" style="padding:7px 14px; font-size:12px;">稍後再說</button>
+          <button class="btn btn-primary" id="btnSaveFileAssoc" onclick="saveFileAssociations()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #2563eb, #1d4ed8); border:none; color:#fff; font-weight:700; cursor:pointer;">💾 儲存並套用設定</button>
+        </div>
       </div>
     </div>
   </div>

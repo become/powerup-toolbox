@@ -1,7 +1,7 @@
 {
-  "version": "2.8.4",
+  "version": "2.8.5",
   "name": "PowerUp Toolbox",
-  "release_date": "2026-11-14",
+  "release_date": "2026-11-15",
   "min_macos": "12.0",
   "latest_dmg": "MacToolbox-latest.dmg",
   "latest_pkg": "MacToolbox-latest.pkg",
@@ -11,7 +11,7 @@
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
-    "version": "2.8.4",
+    "version": "2.8.5",
     "min_macos": "12.0",
     "latest_dmg": "MacToolbox-latest.dmg",
     "latest_pkg": "MacToolbox-latest.pkg",
@@ -26,10 +26,10 @@
     "size": 39897952
   },
   "changelog": [
-    "🔄 全新升級重啟詢問機制：更新安裝完成後主動彈出對話框，詢問「立即重新啟動」或「稍後手動重啟」，告別舊版進程殘留",
+    "📂 自訂預設開啟程式管理：初次安裝主動彈窗引導挑選，支援隨時於右上角「預設開啟」微調，精準保留 HTML 為 Google Chrome、自訂其他副檔名關聯",
+    "🔄 全新升級重啟詢問機制：更新安裝完成後主動詢問「立即重新啟動」或「稍後手動重啟」，告別舊版進程殘留",
     "💻 程式碼與文字語言好讀版：原生支援 Java / Groovy / GSP / HTML / JS / CSS / TXT，提供語法高亮、符號大綱 TOC 跳轉、字體縮放與 ⌘E/⌘S 即時編輯儲存",
     "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證認證",
-    "📷 本機真實相簿工坊：100% 讀取電腦真實相簿與 macOS Photos，支援 Finder 整合與修圖",
-    "☁️ Google 相簿雲端同步：支援個人憑證授權與相簿快速備份"
+    "📷 本機真實相簿工坊與 Google 相簿雲端同步"
   ]
 }

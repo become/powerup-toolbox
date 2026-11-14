@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="2.8.4"
+VERSION="2.8.5"
 APP_NAME="MacToolbox.app"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
 
 # Keep Info.plist versions synchronized
 plutil -replace CFBundleShortVersionString -string "${VERSION}" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
-plutil -replace CFBundleVersion -string "284" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
+plutil -replace CFBundleVersion -string "285" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 
 echo "🔨 [1/5] 編譯 macOS 原生二進位執行檔 (Vision Helper & App Launcher)..."
 swiftc -O "$ROOT_DIR/mac_vision_helper.swift" -o "$ROOT_DIR/mac_vision_helper"
@@ -81,9 +81,6 @@ fi
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 if [ -x "$LSREGISTER" ] && [ -d "$APP_PATH" ]; then
     "$LSREGISTER" -f "$APP_PATH" || true
-fi
-if [ -x "$APP_PATH/Contents/Resources/set_default_handlers" ]; then
-    su -l "${USER:-$(stat -f%Su /dev/console)}" -c "\"$APP_PATH/Contents/Resources/set_default_handlers\"" >/dev/null 2>&1 || true
 fi
 
 CONSOLE_USER="${USER:-$(stat -f%Su /dev/console)}"
@@ -206,11 +203,11 @@ cat << EOF > "$DIST_DIR/version.json"
     "size": ${WIN_SIZE}
   },
   "changelog": [
-    "🔄 全新升級重啟詢問機制：更新安裝完成後主動彈出對話框，詢問「立即重新啟動」或「稍後手動重啟」，告別舊版進程殘留",
+    "📂 自訂預設開啟程式管理：初次安裝主動彈窗引導挑選，支援隨時於右上角「預設開啟」微調，精準保留 HTML 為 Google Chrome、自訂其他副檔名關聯",
+    "🔄 全新升級重啟詢問機制：更新安裝完成後主動詢問「立即重新啟動」或「稍後手動重啟」，告別舊版進程殘留",
     "💻 程式碼與文字語言好讀版：原生支援 Java / Groovy / GSP / HTML / JS / CSS / TXT，提供語法高亮、符號大綱 TOC 跳轉、字體縮放與 ⌘E/⌘S 即時編輯儲存",
     "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證認證",
-    "📷 本機真實相簿工坊：100% 讀取電腦真實相簿與 macOS Photos，支援 Finder 整合與修圖",
-    "☁️ Google 相簿雲端同步：支援個人憑證授權與相簿快速備份"
+    "📷 本機真實相簿工坊與 Google 相簿雲端同步"
   ]
 }
 EOF
