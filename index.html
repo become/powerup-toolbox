@@ -32,7 +32,7 @@
     --purple: #8b5cf6;
   }
   * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
-  input, textarea, .md-rendered, .md-rendered *, .json-stage, .json-stage *, .pptx-stage, .pptx-stage * { user-select: text; -webkit-user-select: text; }
+  input, textarea, .md-rendered, .md-rendered *, .code-stage, .code-stage *, .json-stage, .json-stage *, .pptx-stage, .pptx-stage * { user-select: text; -webkit-user-select: text; }
   body {
     margin: 0; padding: 0;
     background: var(--bg-0);
@@ -204,6 +204,11 @@
     background: rgba(244, 63, 94, 0.22);
     border: 1px solid rgba(244, 63, 94, 0.55);
     color: #fda4af;
+  }
+  .mode-pill.code {
+    background: rgba(99, 102, 241, 0.22);
+    border: 1px solid rgba(99, 102, 241, 0.55);
+    color: #a5b4fc;
   }
 
   .path-bar {
@@ -956,6 +961,75 @@
   .gfm-alert-important { border-color: #8b5cf6; background: rgba(139,92,246,0.1); }
   .gfm-alert-warning { border-color: #f59e0b; background: rgba(245,158,11,0.1); }
   .gfm-alert-caution { border-color: #f43f5e; background: rgba(244,63,94,0.1); }
+
+  /* Code Stage & Language Reader Mode */
+  .code-stage {
+    flex: 1; display: none; overflow: hidden; background: #0d1117; color: #e6edf3;
+  }
+  .code-stage.visible { display: flex; }
+  .code-editor-pane {
+    flex: 1; border-right: 1px solid var(--border);
+    display: none; flex-direction: column; background: #090c12;
+  }
+  .code-editor-pane.visible { display: flex; }
+  .code-textarea {
+    flex: 1; width: 100%; background: transparent; border: none;
+    color: #e2e8f0; padding: 18px 20px;
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+    font-size: 13.5px; line-height: 1.6; resize: none; outline: none; tab-size: 4;
+  }
+  .code-scroll-container {
+    flex: 1; overflow: auto; padding: 14px 0 60px 0; scroll-behavior: smooth;
+    background: #0d1117;
+  }
+  .code-rendered {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+    font-size: 13.5px; line-height: 1.6;
+    white-space: pre;
+    tab-size: 4;
+  }
+  .code-rendered.wrap-lines {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .code-line {
+    display: flex; min-height: 22px; line-height: 22px;
+    transition: background 0.15s ease;
+  }
+  .code-line:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .code-line.highlighted {
+    background: rgba(59, 130, 246, 0.22) !important;
+    outline: 1px solid rgba(59, 130, 246, 0.5);
+  }
+  .code-line-num {
+    min-width: 54px; width: 54px; padding: 0 12px 0 6px;
+    text-align: right; user-select: none; color: #484f58;
+    font-size: 12px; cursor: pointer; flex-shrink: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    margin-right: 16px;
+  }
+  .code-line-num:hover {
+    color: #8b949e;
+  }
+  .code-line-content {
+    flex: 1; padding-right: 24px;
+  }
+  .code-symbol-item {
+    display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 6px;
+    font-size: 12px; cursor: pointer; transition: background 0.12s;
+    color: #cbd5e1; user-select: none;
+  }
+  .code-symbol-item:hover {
+    background: rgba(255, 255, 255, 0.06); color: #fff;
+  }
+  .code-symbol-badge {
+    font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; flex-shrink: 0;
+  }
+  .code-symbol-line {
+    margin-left: auto; color: var(--muted); font-size: 11px; flex-shrink: 0;
+  }
 
   /* JSON Text Editor with Line Gutter like jsoneditoronline */
   .json-code-wrapper {
@@ -2034,7 +2108,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.2 · 點擊手動檢查更新">v2.8.2</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.3 · 點擊手動檢查更新">v2.8.3</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2058,6 +2132,23 @@
           <button class="btn" id="mdSplitEditBtn" onclick="setMdEditMode(true)">✏️ 雙欄編輯 <span class="kbd">⌘E</span></button>
         </div>
         <button class="btn primary" id="mdSaveBtn" style="display:none;" onclick="saveMarkdownFile()">💾 儲存 <span class="kbd">⌘S</span></button>
+      </div>
+
+      <!-- 2.5 Code / Plaintext Top Controls -->
+      <div id="codeTopControls" style="display:none; align-items:center; gap:6px; flex-shrink:0;">
+        <span id="codeLangBadge" style="background:rgba(99,102,241,0.18); color:#a5b4fc; border:1px solid rgba(99,102,241,0.4); padding:2px 8px; border-radius:6px; font-weight:700; font-size:11px;">☕ Java</span>
+        <div class="btn-group" id="codeEditModeGroup">
+          <button class="btn active" id="codeViewOnlyBtn" onclick="setCodeEditMode(false)">📖 閱讀</button>
+          <button class="btn" id="codeEditBtn" onclick="setCodeEditMode(true)">✏️ 編輯 <span class="kbd">⌘E</span></button>
+        </div>
+        <button class="btn primary" id="codeSaveBtn" style="display:none;" onclick="saveCodeFile()">💾 儲存 <span class="kbd">⌘S</span></button>
+        <button class="btn" id="codeCopyBtn" onclick="copyCodeContent()">📋 複製代碼</button>
+        <button class="btn" id="codeWrapBtn" onclick="toggleCodeWrap()" title="切換自動換行">↵ 換行</button>
+        <div class="btn-group">
+          <button class="btn" onclick="adjustCodeFontSize(-1)" title="縮小字體">A-</button>
+          <span id="codeFontSizeBadge" style="font-size:11px; padding:2px 6px; color:var(--muted); display:inline-flex; align-items:center;">13.5px</span>
+          <button class="btn" onclick="adjustCodeFontSize(1)" title="放大字體">A+</button>
+        </div>
       </div>
 
       <!-- 3. JSON Top Controls -->
@@ -2119,7 +2210,7 @@
 
     <!-- Always-Available System Actions (Anchored to Right, Never Cut Off) -->
     <div class="topbar-right">
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.2)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.3)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -2216,6 +2307,10 @@
           <button class="type-pill" id="typeMdBtn" onclick="setTypeFilter('markdown')">
             <span>📝 MD</span>
             <span class="cnt" id="cntMd">0</span>
+          </button>
+          <button class="type-pill" id="typeCodeBtn" onclick="setTypeFilter('code')" title="篩選程式碼與文字檔 (Java / Groovy / GSP / HTML / JS / CSS / TXT...)">
+            <span>💻 程式碼</span>
+            <span class="cnt" id="cntCode">0</span>
           </button>
           <button class="type-pill" id="typeJsonBtn" onclick="setTypeFilter('json')" title="篩選 JSON / XML / PLIST 結構檔">
             <span>🧩 JSON/XML</span>
@@ -2341,6 +2436,16 @@
         </div>
         <div class="md-scroll-container" id="mdScrollContainer">
           <div class="md-rendered" id="mdRendered"></div>
+        </div>
+      </div>
+
+      <!-- 2.5 Code / Plaintext Reader & Editor Stage -->
+      <div class="code-stage" id="codeStage">
+        <div class="code-editor-pane" id="codeEditorPane">
+          <textarea id="codeTextarea" class="code-textarea" placeholder="在此編輯程式碼..." spellcheck="false" oninput="onCodeEditorInput()" onkeydown="handleCodeTextareaKeydown(event)"></textarea>
+        </div>
+        <div class="code-scroll-container" id="codeScrollContainer">
+          <div class="code-rendered" id="codeRendered"></div>
         </div>
       </div>
 
@@ -2648,6 +2753,32 @@
         </div>
       </div>
 
+      <!-- 2.5 Code / Plaintext Functions Panel -->
+      <div id="codeRightFunctions" style="display:none;">
+        <div class="tool-card">
+          <div class="tool-header">
+            <span>🎨 程式碼偏好設定</span>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">字體大小與排版：</div>
+          <div class="grid-2">
+            <button class="btn" onclick="adjustCodeFontSize(-1)">A- 縮小字體</button>
+            <button class="btn" onclick="adjustCodeFontSize(1)">A+ 放大字體</button>
+          </div>
+          <div class="grid-2" style="margin-top:4px;">
+            <button class="btn" id="codeWrapToggleRightBtn" onclick="toggleCodeWrap()">↵ 切換自動換行</button>
+            <button class="btn emerald" onclick="copyCodeContent()">📋 複製完整代碼</button>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <span>📑 結構大綱 (Symbols / TOC)</span>
+            <span id="codeSymbolsCount" style="color:var(--emerald); font-size:11px;"></span>
+          </div>
+          <div id="codeSymbolsList" style="display:flex; flex-direction:column; gap:2px; max-height:420px; overflow-y:auto;"></div>
+        </div>
+      </div>
+
       <!-- 3. JSON Inspector & Schema Panel -->
       <div id="jsonRightFunctions" style="display:none;">
         <div class="tool-card">
@@ -2898,9 +3029,23 @@
 <script>
   mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });
 
+  if (typeof hljs !== "undefined") {
+    try {
+      hljs.registerAliases(["groovy", "gradle"], { languageName: "java" });
+      hljs.registerAliases(["gsp", "html", "htm", "xhtml", "vue", "svelte"], { languageName: "xml" });
+      hljs.registerAliases(["js", "cjs", "mjs", "jsx"], { languageName: "javascript" });
+      hljs.registerAliases(["ts", "tsx"], { languageName: "typescript" });
+      hljs.registerAliases(["sh", "zsh"], { languageName: "bash" });
+      hljs.registerAliases(["properties", "conf", "env"], { languageName: "ini" });
+      hljs.registerAliases(["yml"], { languageName: "yaml" });
+    } catch (e) {
+      console.warn("Highlight.js alias registration failed", e);
+    }
+  }
+
   // Unified State
-  let currentFileType = "image"; // "image" | "markdown" | "json" | "csv"
-  let typeFilter = "all";        // "all" | "image" | "markdown" | "json" | "csv"
+  let currentFileType = "image"; // "image" | "markdown" | "code" | "json" | "csv"
+  let typeFilter = "all";        // "all" | "image" | "markdown" | "code" | "json" | "csv"
   let sidebarTab = "folder";     // "folder" | "recent"
   let sortBy = "name";           // "name" | "mtime" | "size"
   let sortAsc = true;
@@ -3245,11 +3390,12 @@
     // } catch (e) {}
   }
 
-  // Morph UI between Image, Markdown, Word, JSON, XML, CSV, Excel, PowerPoint & PDF Modes automatically!
+  // Morph UI between Image, Markdown, Code, Word, JSON, XML, CSV, Excel, PowerPoint & PDF Modes automatically!
   function adaptUiForFileType(fileType) {
     currentFileType = fileType;
     const isImg = fileType === "image";
     const isMd = fileType === "markdown";
+    const isCode = fileType === "code";
     const isDocx = fileType === "docx";
     const isJson = fileType === "json";
     const isXml = fileType === "xml";
@@ -3263,6 +3409,7 @@
     const modeLabels = {
       image: "🖼️ 圖片模式",
       markdown: "📝 Markdown 模式",
+      code: "💻 程式碼模式",
       docx: "📘 Word 文件模式",
       json: "🧩 JSON 模式",
       xml: "🏷️ XML 結構模式",
@@ -3276,6 +3423,7 @@
     // Top bar controls
     document.getElementById("photoTopControls").style.display = isImg ? "flex" : "none";
     document.getElementById("mdTopControls").style.display = (isMd || isDocx) ? "flex" : "none";
+    document.getElementById("codeTopControls").style.display = isCode ? "flex" : "none";
     document.getElementById("jsonTopControls").style.display = (isJson || isXml) ? "flex" : "none";
     document.getElementById("csvTopControls").style.display = (isCsv || isXlsx) ? "flex" : "none";
     document.getElementById("pptxTopControls").style.display = isPptx ? "flex" : "none";
@@ -3289,6 +3437,7 @@
 
     // Center stages
     document.getElementById("mdStage").classList.toggle("visible", isMd || isDocx);
+    document.getElementById("codeStage").classList.toggle("visible", isCode);
     document.getElementById("jsonStage").classList.toggle("visible", isJson || isXml);
     document.getElementById("csvStage").classList.toggle("visible", isCsv || isXlsx);
     document.getElementById("pptxStage").classList.toggle("visible", isPptx);
@@ -3303,6 +3452,7 @@
       document.getElementById("singleView").style.display = "none";
       document.getElementById("compareView").classList.remove("visible");
       document.getElementById("mdStage").classList.remove("visible");
+      document.getElementById("codeStage").classList.remove("visible");
       document.getElementById("jsonStage").classList.remove("visible");
       document.getElementById("csvStage").classList.remove("visible");
       document.getElementById("pptxStage").classList.remove("visible");
@@ -3334,6 +3484,7 @@
     syncTopBar();
     document.getElementById("photoRightFunctions").style.display = isImg ? "block" : "none";
     document.getElementById("mdRightFunctions").style.display = (isMd || isDocx) ? "block" : "none";
+    document.getElementById("codeRightFunctions").style.display = isCode ? "block" : "none";
     document.getElementById("jsonRightFunctions").style.display = (isJson || isXml) ? "block" : "none";
     document.getElementById("csvRightFunctions").style.display = (isCsv || isXlsx) ? "block" : "none";
     document.getElementById("pptxRightFunctions").style.display = isPptx ? "block" : "none";
@@ -3362,6 +3513,13 @@
       document.getElementById("hudShortcuts").innerHTML =
         `<span>縮圖牆: <span class="kbd">Esc</span></span>
          <span>切換檔案: <span class="kbd">←</span> <span class="kbd">→</span></span>
+         <span>儲存: <span class="kbd">⌘S</span></span>
+         <span>刪除: <span class="kbd">⌘⌫</span> / 直接刪: <span class="kbd">⌘⇧⌫</span></span>`;
+    } else if (isCode) {
+      document.getElementById("hudShortcuts").innerHTML =
+        `<span>縮圖牆: <span class="kbd">Esc</span></span>
+         <span>切換檔案: <span class="kbd">←</span> <span class="kbd">→</span></span>
+         <span>切換編輯: <span class="kbd">⌘E</span></span>
          <span>儲存: <span class="kbd">⌘S</span></span>
          <span>刪除: <span class="kbd">⌘⌫</span> / 直接刪: <span class="kbd">⌘⇧⌫</span></span>`;
     } else if (isMd || isDocx) {
@@ -3589,6 +3747,7 @@
     document.getElementById("typeAllBtn").classList.toggle("active", t === "all");
     document.getElementById("typeImgBtn").classList.toggle("active", t === "image");
     document.getElementById("typeMdBtn").classList.toggle("active", t === "markdown");
+    document.getElementById("typeCodeBtn").classList.toggle("active", t === "code");
     document.getElementById("typeJsonBtn").classList.toggle("active", t === "json");
     document.getElementById("typeCsvBtn").classList.toggle("active", t === "csv");
     document.getElementById("typeOfficeBtn").classList.toggle("active", t === "office");
@@ -3638,7 +3797,7 @@
       (typeFilter === data.focus_type);
     if (target && data.focus_type && !focusMatchesFilter) {
       typeFilter = "all";
-      ["typeAllBtn", "typeImgBtn", "typeMdBtn", "typeJsonBtn", "typeCsvBtn", "typeOfficeBtn"].forEach(id => {
+      ["typeAllBtn", "typeImgBtn", "typeMdBtn", "typeCodeBtn", "typeJsonBtn", "typeCsvBtn", "typeOfficeBtn"].forEach(id => {
         document.getElementById(id).classList.toggle("active", id === "typeAllBtn");
       });
     }
@@ -3677,6 +3836,7 @@
 
     const imgCount = kwMatched.filter(x => x.type === "image").length;
     const mdCount = kwMatched.filter(x => x.type === "markdown").length;
+    const codeCount = kwMatched.filter(x => x.type === "code").length;
     const jsonCount = kwMatched.filter(x => isStructuredType(x.type)).length;
     const csvCount = kwMatched.filter(x => x.type === "csv").length;
     const officeCount = kwMatched.filter(x => isOfficeType(x.type)).length;
@@ -3684,6 +3844,7 @@
     document.getElementById("cntAll").textContent = kwMatched.length;
     document.getElementById("cntImg").textContent = imgCount;
     document.getElementById("cntMd").textContent = mdCount;
+    document.getElementById("cntCode").textContent = codeCount;
     document.getElementById("cntJson").textContent = jsonCount;
     document.getElementById("cntCsv").textContent = csvCount;
     document.getElementById("cntOffice").textContent = officeCount;
@@ -3813,6 +3974,9 @@
     } else if (item.type === "json") {
       adaptUiForFileType("json");
       await loadAndRenderJson(item.path);
+    } else if (item.type === "code") {
+      adaptUiForFileType("code");
+      await loadAndRenderCode(item.path);
     } else if (item.type === "markdown") {
       adaptUiForFileType("markdown");
       await loadAndRenderMarkdown(item.path);
@@ -3843,6 +4007,7 @@
     if (type === "csv") return "📊";
     if (type === "xml") return "🏷️";
     if (type === "json") return "🧩";
+    if (type === "code") return "💻";
     if (type === "markdown") return "📝";
     return "🖼️";
   }
@@ -6844,7 +7009,7 @@
   }
 
   const MODE_PILL_LABELS = {
-    image: "🖼️ 圖片模式", markdown: "📝 Markdown 模式", docx: "📘 Word 文件模式", json: "🧩 JSON 模式",
+    image: "🖼️ 圖片模式", markdown: "📝 Markdown 模式", code: "💻 程式碼模式", docx: "📘 Word 文件模式", json: "🧩 JSON 模式",
     xml: "🏷️ XML 結構模式", csv: "📊 CSV 表格模式", xlsx: "📗 Excel 試算表模式", pptx: "📽️ PowerPoint 簡報模式",
     pdf: "📕 PDF 文件模式"
   };
@@ -6868,6 +7033,7 @@
     const g = viewMode === "grid", t = currentFileType, hideCtl = g || openFailed;
     const show = (id, on, disp) => { const el = document.getElementById(id); if (el) el.style.display = on ? (disp || "flex") : "none"; };
     show("mdTopControls", !hideCtl && (t === "markdown" || t === "docx"));
+    show("codeTopControls", !hideCtl && t === "code");
     show("jsonTopControls", !hideCtl && (t === "json" || t === "xml"));
     show("csvTopControls", !hideCtl && (t === "csv" || t === "xlsx"));
     show("pptxTopControls", !hideCtl && t === "pptx");
@@ -6968,7 +7134,7 @@
     if (path && activeFileObj && activeFileObj.path !== path) return;   // a newer file was opened meanwhile
     lastFailure = { msg, path, encrypted, canUnlock };
     openFailed = true;
-    ["mdStage", "jsonStage", "csvStage", "pptxStage", "pdfStage", "gphotosStage"].forEach(id => {
+    ["mdStage", "codeStage", "jsonStage", "csvStage", "pptxStage", "pdfStage", "gphotosStage"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.remove("visible");
     });
@@ -7006,10 +7172,10 @@
 
   function syncRightPanels() {
     const t = currentFileType, g = viewMode === "grid" || openFailed;
-    const isImg = t === "image", isMd = t === "markdown" || t === "docx", isJson = t === "json" || t === "xml";
+    const isImg = t === "image", isMd = t === "markdown" || t === "docx", isCode = t === "code", isJson = t === "json" || t === "xml";
     const isCsv = t === "csv" || t === "xlsx", isPptx = t === "pptx", isPdf = t === "pdf";
     const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = (on && !g) ? "block" : "none"; };
-    show("photoRightFunctions", isImg); show("mdRightFunctions", isMd); show("jsonRightFunctions", isJson);
+    show("photoRightFunctions", isImg); show("mdRightFunctions", isMd); show("codeRightFunctions", isCode); show("jsonRightFunctions", isJson);
     show("csvRightFunctions", isCsv); show("pptxRightFunctions", isPptx); show("pdfRightFunctions", isPdf);
   }
 
@@ -7038,6 +7204,7 @@
       document.getElementById("singleView").style.display = "none";
       document.getElementById("compareView").classList.remove("visible");
       document.getElementById("mdStage").classList.remove("visible");
+      document.getElementById("codeStage").classList.remove("visible");
       document.getElementById("jsonStage").classList.remove("visible");
       document.getElementById("csvStage").classList.remove("visible");
       document.getElementById("pptxStage").classList.remove("visible");
@@ -7715,6 +7882,377 @@
   }
 
   /* =========================================================
+     2.5 CODE & PLAINTEXT READER FUNCTIONS (語言好讀版)
+     ========================================================= */
+  let currentCodePath = "";
+  let currentCodeRaw = "";
+  let currentCodeLang = "plaintext";
+  let currentCodeMtimeNs = 0;
+  let codeFontSize = 13.5;
+  let codeWordWrap = false;
+  let codeEditMode = false;
+
+  const CODE_LANG_LABELS = {
+    java: "☕ Java",
+    groovy: "🌱 Groovy",
+    gsp: "📄 GSP (Grails)",
+    html: "🌐 HTML",
+    javascript: "⚡ JavaScript",
+    typescript: "🔷 TypeScript",
+    css: "🎨 CSS",
+    scss: "🎨 SCSS",
+    less: "🎨 Less",
+    sql: "🗄️ SQL",
+    python: "🐍 Python",
+    bash: "💻 Shell / Bash",
+    properties: "⚙️ Properties",
+    ini: "⚙️ INI / Config",
+    yaml: "📋 YAML",
+    plaintext: "📝 純文字 (TXT)",
+  };
+
+  const CODE_LANG_MAP = {
+    ".java": "java",
+    ".groovy": "groovy",
+    ".gradle": "groovy",
+    ".gsp": "gsp",
+    ".html": "html",
+    ".htm": "html",
+    ".xhtml": "html",
+    ".js": "javascript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".css": "css",
+    ".scss": "scss",
+    ".sass": "scss",
+    ".less": "less",
+    ".txt": "plaintext",
+    ".text": "plaintext",
+    ".log": "plaintext",
+    ".py": "python",
+    ".sh": "bash",
+    ".bash": "bash",
+    ".zsh": "bash",
+    ".sql": "sql",
+    ".properties": "properties",
+    ".env": "properties",
+    ".conf": "properties",
+    ".ini": "ini",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".vue": "html",
+    ".svelte": "html"
+  };
+
+  function detectCodeLangFromPath(p) {
+    if (!p) return "plaintext";
+    const dotIdx = p.lastIndexOf(".");
+    if (dotIdx === -1) return "plaintext";
+    const ext = p.substring(dotIdx).toLowerCase();
+    return CODE_LANG_MAP[ext] || "plaintext";
+  }
+
+  async function loadAndRenderCode(path) {
+    if (!path) return;
+    const res = await fetch(`/api/code?path=${encodeURIComponent(path)}`);
+    const data = await res.json();
+    if (!data.ok) {
+      if (!(data.encrypted && activeOpenIsAuto)) showToast("❌ " + (data.error || "無法開啟檔案"));
+      return showOpenFailure(data.error || "無法開啟檔案", path, data.encrypted, data.can_unlock);
+    }
+
+    currentCodePath = data.path;
+    currentCodeRaw = data.content;
+    currentCodeMtimeNs = data.mtime_ns;
+    currentCodeLang = data.lang || detectCodeLangFromPath(data.path);
+
+    const langLabel = CODE_LANG_LABELS[currentCodeLang] || `💻 ${currentCodeLang.toUpperCase()}`;
+    const badgeEl = document.getElementById("codeLangBadge");
+    if (badgeEl) badgeEl.textContent = langLabel;
+
+    const pill = document.getElementById("currentModePill");
+    if (pill) pill.textContent = langLabel;
+
+    document.getElementById("hudMeta").textContent =
+      `${data.lines} 行 · ${data.chars} 字 · ${(data.size / 1024).toFixed(1)} KB`;
+    document.getElementById("hudExtraBadge").textContent = "● 語法高亮就緒";
+
+    const textarea = document.getElementById("codeTextarea");
+    if (textarea) textarea.value = currentCodeRaw;
+
+    renderCodeHighlight();
+    buildCodeSymbolsOutline(currentCodeRaw, currentCodeLang);
+  }
+
+  function splitHighlightedLines(html) {
+    const lines = html.split("\n");
+    const result = [];
+    let openTags = [];
+
+    const tagRegex = /(<\/?span[^>]*>)/g;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const prefix = openTags.join("");
+
+      let match;
+      const newOpenTags = [...openTags];
+      tagRegex.lastIndex = 0;
+      while ((match = tagRegex.exec(line)) !== null) {
+        const tag = match[1];
+        if (tag.startsWith("</")) {
+          newOpenTags.pop();
+        } else {
+          newOpenTags.push(tag);
+        }
+      }
+
+      let suffix = "";
+      for (let j = 0; j < newOpenTags.length; j++) {
+        suffix += "</span>";
+      }
+
+      result.push(prefix + line + suffix);
+      openTags = newOpenTags;
+    }
+    return result;
+  }
+
+  function renderCodeHighlight() {
+    const rendered = document.getElementById("codeRendered");
+    if (!rendered) return;
+
+    let highlightedHtml = "";
+    if (currentCodeLang && currentCodeLang !== "plaintext" && typeof hljs !== "undefined") {
+      try {
+        highlightedHtml = hljs.highlight(currentCodeRaw, { language: currentCodeLang, ignoreIllegals: true }).value;
+      } catch (e) {
+        highlightedHtml = escapeHtml(currentCodeRaw);
+      }
+    } else {
+      highlightedHtml = escapeHtml(currentCodeRaw);
+    }
+
+    const lines = splitHighlightedLines(highlightedHtml);
+    const htmlRows = lines.map((l, i) => {
+      const lineNum = i + 1;
+      return `<div class="code-line" id="code-line-${lineNum}">` +
+        `<span class="code-line-num" data-line="${lineNum}" onclick="highlightCodeLine(${lineNum})">${lineNum}</span>` +
+        `<span class="code-line-content">${l || "&nbsp;"}</span>` +
+      `</div>`;
+    }).join("");
+
+    rendered.innerHTML = htmlRows;
+    rendered.style.fontSize = codeFontSize + "px";
+    rendered.classList.toggle("wrap-lines", codeWordWrap);
+  }
+
+  function highlightCodeLine(lineNum) {
+    document.querySelectorAll(".code-line.highlighted").forEach(el => el.classList.remove("highlighted"));
+    const lineEl = document.getElementById(`code-line-${lineNum}`);
+    if (lineEl) {
+      lineEl.classList.add("highlighted");
+      lineEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function jumpToCodeLine(lineNum) {
+    if (codeEditMode) setCodeEditMode(false);
+    highlightCodeLine(lineNum);
+  }
+
+  function extractCodeSymbols(code, lang) {
+    const lines = code.split("\n");
+    const symbols = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const lineNum = i + 1;
+      const rawLine = lines[i];
+      const trimmed = rawLine.trim();
+      if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) continue;
+
+      if (lang === "java" || lang === "groovy") {
+        if (trimmed.startsWith("package ")) {
+          symbols.push({ line: lineNum, type: "pkg", color: "#818cf8", name: trimmed.replace(/;$/, "") });
+          continue;
+        }
+        const classMatch = trimmed.match(/(?:public\s+|protected\s+|private\s+|abstract\s+|static\s+|final\s+)*(class|interface|enum|record|trait)\s+([A-Za-z0-9_]+)/);
+        if (classMatch) {
+          symbols.push({ line: lineNum, type: classMatch[1], color: "#38bdf8", name: `${classMatch[1]} ${classMatch[2]}` });
+          continue;
+        }
+        const methodMatch = trimmed.match(/(?:public|protected|private|static|final|synchronized|abstract|default|def)\s+(?:[\w<>\[\],?]+(?:\s+[\w<>\[\],?]+)*\s+)?([A-Za-z0-9_]+)\s*\(([^)]*)\)\s*(?:throws\s+[^{]+)?\s*\{?/);
+        if (methodMatch && !["if", "while", "for", "switch", "catch", "synchronized"].includes(methodMatch[1])) {
+          const sig = methodMatch[2].length > 25 ? (methodMatch[2].substring(0, 22) + "...") : methodMatch[2];
+          symbols.push({ line: lineNum, type: "fn", color: "#34d399", name: `${methodMatch[1]}(${sig})` });
+          continue;
+        }
+      } else if (lang === "gsp" || lang === "html") {
+        const gTagMatch = trimmed.match(/<g:([a-zA-Z0-9_-]+)([^>]*)>/);
+        if (gTagMatch) {
+          symbols.push({ line: lineNum, type: "gsp", color: "#f472b6", name: `<g:${gTagMatch[1]}>` });
+          continue;
+        }
+        const idMatch = trimmed.match(/<([a-zA-Z0-9_-]+)\s+[^>]*id=["\x27]([^"\x27]+)["\x27]/);
+        if (idMatch) {
+          symbols.push({ line: lineNum, type: "id", color: "#fbbf24", name: `<${idMatch[1]} #${idMatch[2]}>` });
+          continue;
+        }
+        const headMatch = trimmed.match(/<(h[1-4]|header|nav|main|footer|section|article|template|script|style)[^>]*>/i);
+        if (headMatch) {
+          symbols.push({ line: lineNum, type: "tag", color: "#60a5fa", name: `<${headMatch[1]}>` });
+          continue;
+        }
+      } else if (lang === "javascript" || lang === "typescript") {
+        const cls = trimmed.match(/class\s+([A-Za-z0-9_]+)/);
+        if (cls) { symbols.push({ line: lineNum, type: "class", color: "#38bdf8", name: `class ${cls[1]}` }); continue; }
+        const fn = trimmed.match(/(?:export\s+)?(?:async\s+)?function\s*([A-Za-z0-9_]+)\s*\(([^)]*)\)/);
+        if (fn) { symbols.push({ line: lineNum, type: "fn", color: "#34d399", name: `fn ${fn[1]}()` }); continue; }
+        const arrow = trimmed.match(/(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/);
+        if (arrow) { symbols.push({ line: lineNum, type: "arrow", color: "#a78bfa", name: `${arrow[1]} = () =>` }); continue; }
+      } else if (lang === "css" || lang === "scss" || lang === "less") {
+        const cssMatch = trimmed.match(/^([^{]+)\{/);
+        if (cssMatch && !trimmed.startsWith("/*")) {
+          symbols.push({ line: lineNum, type: "css", color: "#fb923c", name: cssMatch[1].trim() });
+        }
+      }
+    }
+    return symbols;
+  }
+
+  function buildCodeSymbolsOutline(code, lang) {
+    const symbols = extractCodeSymbols(code, lang);
+    const listEl = document.getElementById("codeSymbolsList");
+    const countEl = document.getElementById("codeSymbolsCount");
+
+    if (countEl) countEl.textContent = `${symbols.length} 標記`;
+
+    if (symbols.length === 0) {
+      listEl.innerHTML = `<div style="color:var(--muted); font-size:11px; padding:6px 0;">（無可辨識結構標記）</div>`;
+      return;
+    }
+
+    listEl.innerHTML = symbols.map(s => `
+      <div class="code-symbol-item" onclick="jumpToCodeLine(${s.line})" title="${escapeHtml(s.name)} (第 ${s.line} 行)">
+        <span class="code-symbol-badge" style="background:${s.color || '#64748b'}; color:#0f172a;">${s.type}</span>
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${escapeHtml(s.name)}</span>
+        <span class="code-symbol-line">L${s.line}</span>
+      </div>
+    `).join("");
+  }
+
+  function setCodeEditMode(enabled) {
+    codeEditMode = enabled;
+    const viewBtn = document.getElementById("codeViewOnlyBtn");
+    const editBtn = document.getElementById("codeEditBtn");
+    const saveBtn = document.getElementById("codeSaveBtn");
+    const editorPane = document.getElementById("codeEditorPane");
+
+    if (viewBtn) viewBtn.classList.toggle("active", !enabled);
+    if (editBtn) editBtn.classList.toggle("active", enabled);
+    if (saveBtn) saveBtn.style.display = enabled ? "inline-flex" : "none";
+    if (editorPane) editorPane.classList.toggle("visible", enabled);
+
+    if (enabled) {
+      const textarea = document.getElementById("codeTextarea");
+      if (textarea) {
+        textarea.value = currentCodeRaw;
+        textarea.style.fontSize = codeFontSize + "px";
+        textarea.focus();
+      }
+    } else {
+      renderCodeHighlight();
+      buildCodeSymbolsOutline(currentCodeRaw, currentCodeLang);
+    }
+  }
+
+  function onCodeEditorInput() {
+    const textarea = document.getElementById("codeTextarea");
+    if (!textarea) return;
+    currentCodeRaw = textarea.value;
+    document.getElementById("hudExtraBadge").textContent = "● 已修改 (未存檔)";
+  }
+
+  function handleCodeTextareaKeydown(e) {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const ta = e.target;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const spaces = "    ";
+      ta.value = ta.value.substring(0, start) + spaces + ta.value.substring(end);
+      ta.selectionStart = ta.selectionEnd = start + spaces.length;
+      onCodeEditorInput();
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      saveCodeFile();
+    }
+  }
+
+  async function saveCodeFile() {
+    if (!currentCodePath) return;
+    const res = await fetch("/api/code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: currentCodePath, content: currentCodeRaw }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      currentCodeMtimeNs = data.mtime_ns;
+      document.getElementById("hudExtraBadge").textContent = "● 已存檔";
+      showToast("💾 " + data.message);
+      renderCodeHighlight();
+      buildCodeSymbolsOutline(currentCodeRaw, currentCodeLang);
+    } else {
+      showToast("❌ " + (data.error || "儲存失敗"));
+    }
+  }
+
+  async function copyCodeContent() {
+    if (!currentCodeRaw) return;
+    try {
+      await navigator.clipboard.writeText(currentCodeRaw);
+      showToast("📋 已複製完整程式碼到剪貼簿！");
+    } catch (e) {
+      const ta = document.createElement("textarea");
+      ta.value = currentCodeRaw;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      showToast("📋 已複製完整程式碼到剪貼簿！");
+    }
+  }
+
+  function adjustCodeFontSize(delta) {
+    codeFontSize = Math.max(11, Math.min(24, codeFontSize + delta));
+    const badge = document.getElementById("codeFontSizeBadge");
+    if (badge) badge.textContent = codeFontSize + "px";
+
+    const rendered = document.getElementById("codeRendered");
+    if (rendered) rendered.style.fontSize = codeFontSize + "px";
+
+    const textarea = document.getElementById("codeTextarea");
+    if (textarea) textarea.style.fontSize = codeFontSize + "px";
+  }
+
+  function toggleCodeWrap() {
+    codeWordWrap = !codeWordWrap;
+    const rendered = document.getElementById("codeRendered");
+    if (rendered) rendered.classList.toggle("wrap-lines", codeWordWrap);
+
+    const btn = document.getElementById("codeWrapBtn");
+    if (btn) btn.classList.toggle("active", codeWordWrap);
+
+    const rightBtn = document.getElementById("codeWrapToggleRightBtn");
+    if (rightBtn) rightBtn.classList.toggle("active", codeWordWrap);
+
+    showToast(codeWordWrap ? "↵ 已開啟自動換行" : "↔ 已關閉自動換行 (水平滾動)");
+  }
+
+  /* =========================================================
      SHARED NAVIGATION & KEYBOARD SHORTCUTS
      ========================================================= */
   function toggleRecursive() {
@@ -7779,6 +8317,7 @@
           saveScratchToPermanentFile();
         } else {
           if (currentFileType === "markdown") saveMarkdownFile();
+          else if (currentFileType === "code") saveCodeFile();
           else if (currentFileType === "json" || currentFileType === "xml") saveJsonFile();
           else if (currentFileType === "csv" || currentFileType === "xlsx") saveCsvFile();
         }
@@ -7946,6 +8485,28 @@
       }
       if (e.key === "ArrowRight") { e.preventDefault(); navSelect(currentIndex + 1); return; }
       if (e.key === "ArrowLeft") { e.preventDefault(); navSelect(currentIndex - 1); return; }
+      return;
+    }
+
+    // Code Mode Shortcuts
+    if (currentFileType === "code") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        setCodeEditMode(!codeEditMode);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveCodeFile();
+        return;
+      }
+      if (e.key === "ArrowRight") { e.preventDefault(); navSelect(currentIndex + 1); return; }
+      if (e.key === "ArrowLeft") { e.preventDefault(); navSelect(currentIndex - 1); return; }
+      if (e.key === "w" || e.key === "W") {
+        e.preventDefault();
+        toggleCodeWrap();
+        return;
+      }
       return;
     }
 
@@ -8540,7 +9101,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.2";
+        const curVer = data.current_version || "2.8.3";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -8594,7 +9155,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.2";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.3";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -8736,7 +9297,7 @@
       .replace(/\bMac ?/g, "Windows ");
   }
   // Never touch user content (file names, documents, tables, previews): only app chrome is translated.
-  const WIN_SKIP = "#leftNavList,#gridView,#filmstrip,#mdStage,#jsonStage,#csvStage,#pptxStage,#pdfStage,#gphotosStage,#singleView,#compareView,#hudFilename,#hudMeta,#hudIndex,#bookmarkList,#pathInput,[data-mac-only] .tool-header,textarea,script,style,code,pre";
+  const WIN_SKIP = "#leftNavList,#gridView,#filmstrip,#mdStage,#codeStage,#jsonStage,#csvStage,#pptxStage,#pdfStage,#gphotosStage,#singleView,#compareView,#hudFilename,#hudMeta,#hudIndex,#bookmarkList,#pathInput,[data-mac-only] .tool-header,textarea,script,style,code,pre";
   const WIN_SKIP_MIN = "textarea,script,style,code,pre";
   function winSkipped(node, force) {
     const el = node.nodeType === 1 ? node : node.parentElement;
@@ -8815,7 +9376,7 @@
     if (failBox) failBox.style.display = "none";
 
     // Hide other stages
-    ["singleView", "compareView", "gridView", "mdStage", "jsonStage", "csvStage", "pptxStage", "pdfStage", "faceStrip", "filmstrip"].forEach(id => {
+    ["singleView", "compareView", "gridView", "mdStage", "codeStage", "jsonStage", "csvStage", "pptxStage", "pdfStage", "faceStrip", "filmstrip"].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         if (id === "singleView" || id === "loupe" || id === "filmstrip") el.style.display = "none";
@@ -8824,7 +9385,7 @@
     });
 
     // Hide right contextual functions while in Albums Studio
-    ["photoRightFunctions", "mdRightFunctions", "jsonRightFunctions", "csvRightFunctions", "pptxRightFunctions", "pdfRightFunctions"].forEach(id => {
+    ["photoRightFunctions", "mdRightFunctions", "codeRightFunctions", "jsonRightFunctions", "csvRightFunctions", "pptxRightFunctions", "pdfRightFunctions"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = "none";
     });
@@ -9777,7 +10338,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.2</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.3</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>

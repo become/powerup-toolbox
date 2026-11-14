@@ -119,6 +119,54 @@
 				<string>com.apple.property-list</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>java</string>
+				<string>groovy</string>
+				<string>gsp</string>
+				<string>gradle</string>
+				<string>html</string>
+				<string>htm</string>
+				<string>xhtml</string>
+				<string>js</string>
+				<string>mjs</string>
+				<string>cjs</string>
+				<string>jsx</string>
+				<string>ts</string>
+				<string>tsx</string>
+				<string>css</string>
+				<string>scss</string>
+				<string>sass</string>
+				<string>less</string>
+				<string>txt</string>
+				<string>text</string>
+				<string>log</string>
+				<string>py</string>
+				<string>sh</string>
+				<string>bash</string>
+				<string>zsh</string>
+				<string>sql</string>
+				<string>properties</string>
+				<string>env</string>
+				<string>conf</string>
+				<string>ini</string>
+				<string>yaml</string>
+				<string>yml</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Source Code and Text Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.source-code</string>
+				<string>public.plain-text</string>
+				<string>public.html</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>MacToolbox</string>
@@ -131,9 +179,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.8.2</string>
+	<string>2.8.3</string>
 	<key>CFBundleVersion</key>
-	<string>282</string>
+	<string>283</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 </dict>

@@ -49,7 +49,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.2"
+APP_VERSION = "2.8.3"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -336,6 +336,16 @@ DOCX_EXTS = {".docx", ".doc", ".rtf"}
 XLSX_EXTS = {".xlsx", ".xlsm", ".xls"}
 XML_EXTS = {".xml", ".plist", ".rss", ".atom", ".wsdl", ".xsd", ".csproj", ".pom", ".jmx"}
 PDF_EXTS = {".pdf"}
+CODE_EXTS = {
+    ".java", ".groovy", ".gsp", ".gradle",
+    ".html", ".htm", ".xhtml",
+    ".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx",
+    ".css", ".scss", ".sass", ".less",
+    ".txt", ".text", ".log",
+    ".py", ".sh", ".bash", ".zsh",
+    ".sql", ".properties", ".env", ".conf", ".ini", ".yaml", ".yml",
+    ".vue", ".svelte"
+}
 
 # Ensure user site-packages and bundled vendor packages are importable inside .app bundle
 for _extra_site in [
@@ -358,6 +368,48 @@ def natural_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
 
 
+def detect_code_language(path):
+    if not path:
+        return "plaintext"
+    ext = os.path.splitext(path)[1].lower()
+    mapping = {
+        ".java": "java",
+        ".groovy": "groovy",
+        ".gradle": "groovy",
+        ".gsp": "gsp",
+        ".html": "html",
+        ".htm": "html",
+        ".xhtml": "html",
+        ".js": "javascript",
+        ".mjs": "javascript",
+        ".cjs": "javascript",
+        ".jsx": "javascript",
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".css": "css",
+        ".scss": "scss",
+        ".sass": "scss",
+        ".less": "less",
+        ".txt": "plaintext",
+        ".text": "plaintext",
+        ".log": "plaintext",
+        ".py": "python",
+        ".sh": "bash",
+        ".bash": "bash",
+        ".zsh": "bash",
+        ".sql": "sql",
+        ".properties": "properties",
+        ".env": "properties",
+        ".conf": "properties",
+        ".ini": "ini",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".vue": "html",
+        ".svelte": "html",
+    }
+    return mapping.get(ext, "plaintext")
+
+
 def detect_file_type(path):
     if not path:
         return None
@@ -378,6 +430,8 @@ def detect_file_type(path):
         return "xml"
     if ext in PDF_EXTS:
         return "pdf"
+    if ext in CODE_EXTS:
+        return "code"
     if ext in IMAGE_EXTS:
         return "image"
     return None
@@ -2541,7 +2595,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.send_json({"ok": True, "files": scan_recent_markdowns()})
             return
 
-        if route == "/api/md":
+        if route == "/api/md" or route == "/api/code":
             path = qs.get("path", [""])[0].strip()
             if not path:
                 self.send_json({"ok": False, "error": "未指定檔案路徑"}, 400)
@@ -2560,6 +2614,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     "name": os.path.basename(target),
                     "dir": os.path.dirname(target),
                     "content": content,
+                    "lang": detect_code_language(target),
                     "size": st.st_size,
                     "mtime": int(st.st_mtime),
                     "mtime_ns": st.st_mtime_ns,
@@ -2870,6 +2925,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             items = []
             images = []
             markdowns = []
+            codes = []
             jsons = []
             csvs = []
             skip_dirs = {".git", ".venv", "__pycache__", ".cache", "node_modules", ".next", "dist"}
@@ -2913,6 +2969,8 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                             images.append(obj)
                         elif ftype == "markdown":
                             markdowns.append(obj)
+                        elif ftype == "code":
+                            codes.append(obj)
                         elif ftype == "json":
                             jsons.append(obj)
                         elif ftype == "csv":
@@ -2945,6 +3003,8 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                                     images.append(obj)
                                 elif ftype == "markdown":
                                     markdowns.append(obj)
+                                elif ftype == "code":
+                                    codes.append(obj)
                                 elif ftype == "json":
                                     jsons.append(obj)
                                 elif ftype == "csv":
@@ -2967,6 +3027,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 "items": items,
                 "images": images,
                 "markdowns": markdowns,
+                "codes": codes,
                 "jsons": jsons,
                 "csvs": csvs,
             })
@@ -3427,7 +3488,7 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": str(e)}, 500)
             return
 
-        if route == "/api/md" or route == "/api/json":
+        if route in ("/api/md", "/api/json", "/api/code"):
             path = body.get("path", "").strip()
             content = body.get("content", "")
             if not path:

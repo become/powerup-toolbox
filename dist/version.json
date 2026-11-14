@@ -1,5 +1,5 @@
 {
-  "version": "2.8.2",
+  "version": "2.8.3",
   "name": "PowerUp Toolbox",
   "release_date": "2026-11-14",
   "min_macos": "12.0",
@@ -11,7 +11,7 @@
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
-    "version": "2.8.2",
+    "version": "2.8.3",
     "min_macos": "12.0",
     "latest_dmg": "MacToolbox-latest.dmg",
     "latest_pkg": "MacToolbox-latest.pkg",
@@ -26,10 +26,10 @@
     "size": 39897952
   },
   "changelog": [
+    "💻 程式碼與文字語言好讀版：原生支援 Java / Groovy / GSP / HTML / JS / CSS / TXT，提供黏性行號、語法高亮、符號大綱 TOC 跳轉、字體縮放、自動換行與 ⌘E/⌘S 即時編輯儲存",
+    "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證：通過 Hardened Runtime 與 Apple Notary Service 認證，徹底告別未知開發者提示",
     "📷 本機真實相簿工坊：100% 讀取電腦真實照片庫（Downloads、Desktop、macOS Photos 圖庫與自訂相簿），支援 Finder 整合與修圖",
     "☁️ Google 相簿雲端同步：支援個人 OAuth 憑證連線，一鍵備份照片至 Google 雲端",
-    "🍎 macOS 顯示與體驗優化：修復 Safari / Chrome 左上角圖標與 Favicon 多格式支援，消除持續 loading",
-    "🌐 官網獨立發布支援：支援 powerup.dancingarden.com 官方高速更新節點，原始碼完全保密",
     "⚡ 跨平台一鍵自動更新引擎 (官方高速更新節點)"
   ]
 }
