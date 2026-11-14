@@ -9392,13 +9392,17 @@
     }
     showToast("🔄 正在重新啟動 PowerUp Toolbox...");
     try {
-      await fetch('/api/restart', { method: 'POST' });
+      await fetch('/api/restart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
     } catch (e) {
       // server shuts down quickly
     }
     setTimeout(() => {
       try { window.close(); } catch(e){}
-    }, 1200);
+    }, 600);
   }
 
   function closeUpdateModal() {

@@ -2320,9 +2320,12 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         if not path.startswith("/api/"):
             return True
         if self.command == "POST":
-            ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-            if ctype != "application/json":
-                return self._deny(415, "application/json required")
+            if path == "/api/restart":
+                pass
+            else:
+                ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                if ctype != "application/json":
+                    return self._deny(415, "application/json required")
         candidates = _tokens_from_cookie(self.headers.get("Cookie"), port)
         if self.headers.get("X-PowerUp-Token"):
             candidates.append(self.headers.get("X-PowerUp-Token"))
@@ -3444,6 +3447,10 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     ppid = os.getppid()
                     try:
                         os.kill(ppid, signal.SIGTERM)
+                    except Exception:
+                        pass
+                    try:
+                        os.kill(ppid, signal.SIGKILL)
                     except Exception:
                         pass
                     os._exit(0)

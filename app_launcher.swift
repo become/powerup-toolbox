@@ -59,6 +59,10 @@ class WebDelegateHandler: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
         decisionHandler(.allow)
     }
+
+    func webViewDidClose(_ webView: WKWebView) {
+        NSApp.terminate(nil)
+    }
 }
 
 class MainWindowController: NSWindowController, NSWindowDelegate {
