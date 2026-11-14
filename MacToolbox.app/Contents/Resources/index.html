@@ -2108,7 +2108,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.5 · 點擊手動檢查更新">v2.8.5</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.6 · 點擊手動檢查更新">v2.8.6</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2213,7 +2213,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.5)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.6)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -7244,16 +7244,92 @@
     updateImageFitSizing();
   }
 
+  let stageGestureStartZoom = 1;
+
   function handleStageWheel(e) {
     e.preventDefault();
-    if (e.ctrlKey || e.metaKey || e.altKey || zoom > 1.01) {
-      const factor = e.deltaY < 0 ? 1.15 : 0.87;
-      zoom = Math.max(0.25, Math.min(15, zoom * factor));
-      if (Math.abs(zoom - 1) < 0.04) { zoom = 1; panX = 0; panY = 0; }
+
+    // 1. macOS Trackpad pinch-to-zoom (WebKit emits wheel event with ctrlKey during two-finger pinch)
+    if (e.ctrlKey) {
+      const zoomDelta = -e.deltaY * 0.012;
+      const factor = Math.exp(zoomDelta);
+      zoom = Math.max(0.2, Math.min(25, zoom * factor));
+      if (Math.abs(zoom - 1) < 0.03) {
+        zoom = 1; panX = 0; panY = 0;
+      }
       applyTransform();
-    } else {
-      if (e.deltaY > 10) navSelect(currentIndex + 1);
-      else if (e.deltaY < -10) navSelect(currentIndex - 1);
+      return;
+    }
+
+    // 2. Mouse wheel with Cmd/Meta or Alt
+    if (e.metaKey || e.altKey) {
+      const factor = e.deltaY < 0 ? 1.15 : 0.87;
+      zoom = Math.max(0.2, Math.min(25, zoom * factor));
+      if (Math.abs(zoom - 1) < 0.03) { zoom = 1; panX = 0; panY = 0; }
+      applyTransform();
+      return;
+    }
+
+    // 3. Two-finger trackpad panning when zoomed in
+    if (zoom > 1.05) {
+      panX -= e.deltaX;
+      panY -= e.deltaY;
+      applyTransform();
+      return;
+    }
+
+    // 4. Browsing to next/prev image when at 100% (with debounce threshold)
+    if (e.deltaY > 18) {
+      navSelect(currentIndex + 1);
+    } else if (e.deltaY < -18) {
+      navSelect(currentIndex - 1);
+    }
+  }
+
+  function initStageGestureListeners() {
+    const stage = document.getElementById("singleView");
+    if (stage) {
+      stage.addEventListener("gesturestart", function(e) {
+        e.preventDefault();
+        stageGestureStartZoom = zoom;
+      }, { passive: false });
+
+      stage.addEventListener("gesturechange", function(e) {
+        e.preventDefault();
+        zoom = Math.max(0.2, Math.min(25, stageGestureStartZoom * e.scale));
+        applyTransform();
+      }, { passive: false });
+
+      stage.addEventListener("gestureend", function(e) {
+        e.preventDefault();
+        if (Math.abs(zoom - 1) < 0.04) {
+          zoom = 1; panX = 0; panY = 0;
+        }
+        applyTransform();
+      }, { passive: false });
+    }
+
+    const cmpStage = document.getElementById("compareStage");
+    if (cmpStage) {
+      let cmpGestureStartZoom = 1;
+      cmpStage.addEventListener("gesturestart", function(e) {
+        e.preventDefault();
+        cmpGestureStartZoom = cmpZoom;
+      }, { passive: false });
+
+      cmpStage.addEventListener("gesturechange", function(e) {
+        e.preventDefault();
+        cmpZoom = Math.max(0.4, Math.min(20, cmpGestureStartZoom * e.scale));
+        applyCompareTransform();
+      }, { passive: false });
+
+      cmpStage.addEventListener("gestureend", function(e) {
+        e.preventDefault();
+        if (Math.abs(cmpZoom - 1) < 0.04) {
+          cmpZoom = 1; cmpPanX = 0; cmpPanY = 0;
+        }
+        applyCompareTransform();
+      }, { passive: false });
     }
   }
 
@@ -7664,9 +7740,18 @@
 
   function handleCompareWheel(e) {
     e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 0.87;
-    cmpZoom = Math.max(0.5, Math.min(10, cmpZoom * factor));
-    if (Math.abs(cmpZoom - 1) < 0.05) { cmpZoom = 1; cmpPanX = 0; cmpPanY = 0; }
+    if (e.ctrlKey) {
+      const zoomDelta = -e.deltaY * 0.012;
+      const factor = Math.exp(zoomDelta);
+      cmpZoom = Math.max(0.4, Math.min(20, cmpZoom * factor));
+    } else if (cmpZoom > 1.05) {
+      cmpPanX -= e.deltaX;
+      cmpPanY -= e.deltaY;
+    } else {
+      const factor = e.deltaY < 0 ? 1.15 : 0.87;
+      cmpZoom = Math.max(0.4, Math.min(20, cmpZoom * factor));
+    }
+    if (Math.abs(cmpZoom - 1) < 0.04) { cmpZoom = 1; cmpPanX = 0; cmpPanY = 0; }
     applyCompareTransform();
   }
 
@@ -9106,7 +9191,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.5";
+        const curVer = data.current_version || "2.8.6";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -9176,7 +9261,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.5";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.6";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -9240,8 +9325,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.5";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.5";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.6";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.6";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -9548,6 +9633,7 @@
       }
 
       localStorage.setItem("powerup_file_assoc_configured_v1", "1");
+      localStorage.setItem("powerup_file_assoc_prompted_done", "1");
       showToast("✅ 預設開啟程式設定已成功套用！");
       closeFileAssociationModal();
     } catch (e) {
@@ -9559,6 +9645,9 @@
   function closeFileAssociationModal() {
     const modal = document.getElementById("fileAssocModal");
     if (modal) modal.style.display = "none";
+    try {
+      localStorage.setItem("powerup_file_assoc_prompted_done", "1");
+    } catch(e){}
   }
 
   /* =========================================================
@@ -10584,6 +10673,17 @@
 
   initApp();
   applyAppLanguage(appCurrentLang);
+  initStageGestureListeners();
+
+  // First launch default file association prompt (only prompt once permanently across all versions):
+  try {
+    const hasConfiguredAssoc = localStorage.getItem("powerup_file_assoc_prompted_done") || localStorage.getItem("powerup_file_assoc_configured_v1");
+    if (!hasConfiguredAssoc) {
+      setTimeout(() => {
+        openFileAssociationModal(true);
+      }, 1200);
+    }
+  } catch(e){}
   if (window.location.search.includes("check_update=1")) {
     setTimeout(() => checkAppUpdates(false), 500);
   } else if (window.location.search.includes("albums=1") || window.location.search.includes("open_albums=1")) {
@@ -10632,7 +10732,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.5</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.6</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>

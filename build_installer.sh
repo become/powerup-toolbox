@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="2.8.5"
+VERSION="2.8.6"
 APP_NAME="MacToolbox.app"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
 
 # Keep Info.plist versions synchronized
 plutil -replace CFBundleShortVersionString -string "${VERSION}" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
-plutil -replace CFBundleVersion -string "285" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
+plutil -replace CFBundleVersion -string "286" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 
 echo "🔨 [1/5] 編譯 macOS 原生二進位執行檔 (Vision Helper & App Launcher)..."
 swiftc -O "$ROOT_DIR/mac_vision_helper.swift" -o "$ROOT_DIR/mac_vision_helper"
@@ -203,11 +203,11 @@ cat << EOF > "$DIST_DIR/version.json"
     "size": ${WIN_SIZE}
   },
   "changelog": [
+    "🖼️ 完整圖片預設開啟支援：新增常用圖片關聯（PNG / JPG / JPEG / WEBP / HEIC / GIF / SVG），點兩下直接在圖片工坊開啟，告別預覽程式切換",
     "📂 自訂預設開啟程式管理：初次安裝主動彈窗引導挑選，支援隨時於右上角「預設開啟」微調，精準保留 HTML 為 Google Chrome、自訂其他副檔名關聯",
     "🔄 全新升級重啟詢問機制：更新安裝完成後主動詢問「立即重新啟動」或「稍後手動重啟」，告別舊版進程殘留",
     "💻 程式碼與文字語言好讀版：原生支援 Java / Groovy / GSP / HTML / JS / CSS / TXT，提供語法高亮、符號大綱 TOC 跳轉、字體縮放與 ⌘E/⌘S 即時編輯儲存",
-    "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證認證",
-    "📷 本機真實相簿工坊與 Google 相簿雲端同步"
+    "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證認證"
   ]
 }
 EOF

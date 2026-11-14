@@ -8,6 +8,7 @@ struct FormatDef {
     let key: String
     let name: String
     let exts: [String]
+    let utis: [String]
     let category: String
     let categoryName: String
     let recommended: Bool
@@ -15,20 +16,30 @@ struct FormatDef {
 }
 
 let FORMATS: [FormatDef] = [
-    FormatDef(key: "md", name: "Markdown 筆記文件", exts: ["md", "markdown", "mdx"], category: "doc", categoryName: "📑 文件與簡報", recommended: true, defaultAppFallback: "com.apple.TextEdit"),
-    FormatDef(key: "csv", name: "CSV / TSV 試算數據", exts: ["csv", "tsv"], category: "data", categoryName: "📊 試算表與數據", recommended: true, defaultAppFallback: "com.apple.iWork.Numbers"),
-    FormatDef(key: "json", name: "JSON / JSONL 結構化資料", exts: ["json", "jsonl", "ndjson", "geojson"], category: "data", categoryName: "📊 試算表與數據", recommended: true, defaultAppFallback: "com.apple.TextEdit"),
-    FormatDef(key: "pptx", name: "PowerPoint 簡報", exts: ["pptx", "ppt"], category: "doc", categoryName: "📑 文件與簡報", recommended: true, defaultAppFallback: "com.apple.iWork.Keynote"),
-    FormatDef(key: "docx", name: "Word 文件", exts: ["docx", "doc"], category: "doc", categoryName: "📑 文件與簡報", recommended: false, defaultAppFallback: "com.apple.iWork.Pages"),
-    FormatDef(key: "xlsx", name: "Excel 試算表", exts: ["xlsx", "xlsm", "xls"], category: "data", categoryName: "📊 試算表與數據", recommended: false, defaultAppFallback: "com.apple.iWork.Numbers"),
-    FormatDef(key: "pdf", name: "PDF 文件", exts: ["pdf"], category: "doc", categoryName: "📑 文件與簡報", recommended: false, defaultAppFallback: "com.apple.Preview"),
-    FormatDef(key: "xml", name: "XML / Plist 標記資料", exts: ["xml", "plist", "rss", "atom"], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.apple.TextEdit"),
-    FormatDef(key: "java", name: "Java 原始碼", exts: ["java"], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.jetbrains.intellij"),
-    FormatDef(key: "groovy", name: "Groovy / Gradle 腳本", exts: ["groovy", "gradle"], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.jetbrains.intellij"),
-    FormatDef(key: "gsp", name: "GSP 頁面範本", exts: ["gsp"], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.jetbrains.intellij"),
-    FormatDef(key: "js", name: "JavaScript / CSS 樣式", exts: ["js", "mjs", "cjs", "jsx", "ts", "tsx", "css", "scss"], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.microsoft.VSCode"),
-    FormatDef(key: "html", name: "HTML 網頁檔", exts: ["html", "htm", "xhtml"], category: "web", categoryName: "🌐 網頁與純文字", recommended: false, defaultAppFallback: "com.google.Chrome"),
-    FormatDef(key: "txt", name: "純文字文件", exts: ["txt", "text", "log"], category: "web", categoryName: "🌐 網頁與純文字", recommended: false, defaultAppFallback: "com.apple.TextEdit")
+    // 🖼️ 圖片工坊與相片
+    FormatDef(key: "image_common", name: "常用圖片 (PNG / JPG / WEBP / HEIC / GIF)", exts: ["png", "jpg", "jpeg", "webp", "heic", "gif"], utis: ["public.image", "public.png", "public.jpeg", "org.webmproject.webp", "public.heic", "com.compuserve.gif"], category: "image", categoryName: "🖼️ 圖片工坊與相片", recommended: true, defaultAppFallback: "com.apple.Preview"),
+    FormatDef(key: "image_svg", name: "SVG 向量圖形", exts: ["svg"], utis: ["public.svg-image"], category: "image", categoryName: "🖼️ 圖片工坊與相片", recommended: false, defaultAppFallback: "com.apple.Safari"),
+    FormatDef(key: "image_pro", name: "專業影像 (TIFF, BMP)", exts: ["tiff", "tif", "bmp"], utis: ["public.tiff", "com.microsoft.bmp"], category: "image", categoryName: "🖼️ 圖片工坊與相片", recommended: false, defaultAppFallback: "com.apple.Preview"),
+
+    // 📑 文件與簡報
+    FormatDef(key: "md", name: "Markdown 筆記文件", exts: ["md", "markdown", "mdx"], utis: ["net.daringfireball.markdown"], category: "doc", categoryName: "📑 文件與簡報", recommended: true, defaultAppFallback: "com.apple.TextEdit"),
+    FormatDef(key: "csv", name: "CSV / TSV 試算數據", exts: ["csv", "tsv"], utis: ["public.comma-separated-values-text", "public.tab-separated-values-text"], category: "data", categoryName: "📊 試算表與數據", recommended: true, defaultAppFallback: "com.apple.iWork.Numbers"),
+    FormatDef(key: "json", name: "JSON / JSONL 結構化資料", exts: ["json", "jsonl", "ndjson", "geojson"], utis: ["public.json"], category: "data", categoryName: "📊 試算表與數據", recommended: true, defaultAppFallback: "com.apple.TextEdit"),
+    FormatDef(key: "pptx", name: "PowerPoint 簡報", exts: ["pptx", "ppt"], utis: ["org.openxmlformats.presentationml.presentation", "com.microsoft.powerpoint.ppt"], category: "doc", categoryName: "📑 文件與簡報", recommended: true, defaultAppFallback: "com.apple.iWork.Keynote"),
+    FormatDef(key: "docx", name: "Word 文件", exts: ["docx", "doc"], utis: ["org.openxmlformats.wordprocessingml.document", "com.microsoft.word.doc"], category: "doc", categoryName: "📑 文件與簡報", recommended: false, defaultAppFallback: "com.apple.iWork.Pages"),
+    FormatDef(key: "xlsx", name: "Excel 試算表", exts: ["xlsx", "xlsm", "xls"], utis: ["org.openxmlformats.spreadsheetml.sheet", "com.microsoft.excel.xls"], category: "data", categoryName: "📊 試算表與數據", recommended: false, defaultAppFallback: "com.apple.iWork.Numbers"),
+    FormatDef(key: "pdf", name: "PDF 文件", exts: ["pdf"], utis: ["com.adobe.pdf"], category: "doc", categoryName: "📑 文件與簡報", recommended: false, defaultAppFallback: "com.apple.Preview"),
+
+    // 📦 結構化與程式碼
+    FormatDef(key: "xml", name: "XML / Plist 標記資料", exts: ["xml", "plist", "rss", "atom"], utis: ["public.xml", "com.apple.property-list"], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.apple.TextEdit"),
+    FormatDef(key: "java", name: "Java 原始碼", exts: ["java"], utis: [], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.jetbrains.intellij"),
+    FormatDef(key: "groovy", name: "Groovy / Gradle 腳本", exts: ["groovy", "gradle"], utis: [], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.jetbrains.intellij"),
+    FormatDef(key: "gsp", name: "GSP 頁面範本", exts: ["gsp"], utis: [], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.jetbrains.intellij"),
+    FormatDef(key: "js", name: "JavaScript / CSS 樣式", exts: ["js", "mjs", "cjs", "jsx", "ts", "tsx", "css", "scss"], utis: [], category: "code", categoryName: "📦 結構化與程式碼", recommended: false, defaultAppFallback: "com.microsoft.VSCode"),
+
+    // 🌐 網頁與純文字
+    FormatDef(key: "html", name: "HTML 網頁檔", exts: ["html", "htm", "xhtml"], utis: ["public.html"], category: "web", categoryName: "🌐 網頁與純文字", recommended: false, defaultAppFallback: "com.google.Chrome"),
+    FormatDef(key: "txt", name: "純文字文件", exts: ["txt", "text", "log"], utis: [], category: "web", categoryName: "🌐 網頁與純文字", recommended: false, defaultAppFallback: "com.apple.TextEdit")
 ]
 
 func getUti(for ext: String) -> String? {
@@ -36,6 +47,16 @@ func getUti(for ext: String) -> String? {
         return t.identifier
     }
     return nil
+}
+
+func getAllUtis(for format: FormatDef) -> [String] {
+    var set = Set<String>(format.utis)
+    for ext in format.exts {
+        if let u = getUti(for: ext) {
+            set.insert(u)
+        }
+    }
+    return Array(set)
 }
 
 func getAppDisplayName(bundleId: String) -> String {
@@ -48,16 +69,14 @@ func getAppDisplayName(bundleId: String) -> String {
     return bundleId
 }
 
-func getCurrentHandler(for ext: String) -> String {
-    guard let uti = getUti(for: ext) else { return "" }
+func getCurrentHandler(for uti: String) -> String {
     if let handler = LSCopyDefaultRoleHandlerForContentType(uti as CFString, .all)?.takeRetainedValue() as String? {
         return handler
     }
     return ""
 }
 
-func findAlternativeHandler(for ext: String, fallback: String?) -> String? {
-    guard let uti = getUti(for: ext) else { return fallback }
+func findAlternativeHandler(for uti: String, fallback: String?) -> String? {
     if let list = LSCopyAllRoleHandlersForContentType(uti as CFString, .all)?.takeRetainedValue() as? [String] {
         for app in list {
             if app != BUNDLE_ID && !app.contains("mactoolbox") {
@@ -68,8 +87,7 @@ func findAlternativeHandler(for ext: String, fallback: String?) -> String? {
     return fallback
 }
 
-func setHandler(for ext: String, bundleId: String) -> Bool {
-    guard let uti = getUti(for: ext) else { return false }
+func setHandler(for uti: String, bundleId: String) -> Bool {
     let status = LSSetDefaultRoleHandlerForContentType(uti as CFString, [.viewer, .editor, .all], bundleId as CFString)
     return status == noErr
 }
@@ -77,8 +95,9 @@ func setHandler(for ext: String, bundleId: String) -> Bool {
 func getStatusList() -> [[String: Any]] {
     var result: [[String: Any]] = []
     for f in FORMATS {
-        let primaryExt = f.exts.first ?? f.key
-        let curBundle = getCurrentHandler(for: primaryExt)
+        let utis = getAllUtis(for: f)
+        let primaryUti = utis.first ?? (getUti(for: f.exts.first ?? f.key) ?? "")
+        let curBundle = getCurrentHandler(for: primaryUti)
         let isDefault = (curBundle == BUNDLE_ID)
         let appName = getAppDisplayName(bundleId: curBundle)
 
@@ -102,20 +121,21 @@ func applySelections(keys: Set<String>) -> ([String], [String]) {
     var reverted: [String] = []
 
     for f in FORMATS {
-        let primaryExt = f.exts.first ?? f.key
-        let curBundle = getCurrentHandler(for: primaryExt)
+        let utis = getAllUtis(for: f)
+        let primaryUti = utis.first ?? ""
+        let curBundle = getCurrentHandler(for: primaryUti)
         let wasDefault = (curBundle == BUNDLE_ID)
         let shouldBeDefault = keys.contains(f.key)
 
         if shouldBeDefault {
-            for ext in f.exts {
-                _ = setHandler(for: ext, bundleId: BUNDLE_ID)
+            for uti in utis {
+                _ = setHandler(for: uti, bundleId: BUNDLE_ID)
             }
             applied.append(f.key)
         } else if wasDefault {
-            if let alt = findAlternativeHandler(for: primaryExt, fallback: f.defaultAppFallback) {
-                for ext in f.exts {
-                    _ = setHandler(for: ext, bundleId: alt)
+            if let alt = findAlternativeHandler(for: primaryUti, fallback: f.defaultAppFallback) {
+                for uti in utis {
+                    _ = setHandler(for: uti, bundleId: alt)
                 }
                 reverted.append(f.key)
             }
