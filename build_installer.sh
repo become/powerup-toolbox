@@ -85,6 +85,33 @@ fi
 if [ -x "$APP_PATH/Contents/Resources/set_default_handlers" ]; then
     su -l "${USER:-$(stat -f%Su /dev/console)}" -c "\"$APP_PATH/Contents/Resources/set_default_handlers\"" >/dev/null 2>&1 || true
 fi
+
+CONSOLE_USER="${USER:-$(stat -f%Su /dev/console)}"
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+    su -l "$CONSOLE_USER" -c 'python3 -c "
+import plistlib, os, subprocess
+p = os.path.expanduser(\"~/Library/Preferences/com.apple.dock.plist\")
+try:
+    with open(p, \"rb\") as f:
+        data = plistlib.load(f)
+    changed = False
+    for a in data.get(\"persistent-apps\", []):
+        td = a.get(\"tile-data\", {})
+        fd = td.get(\"file-data\", {})
+        url = fd.get(\"_CFURLString\", \"\")
+        if \"MacToolbox\" in url and \"/Volumes/\" in url:
+            fd[\"_CFURLString\"] = \"file:///Applications/MacToolbox.app/\"
+            if \"book\" in td:
+                del td[\"book\"]
+            changed = True
+    if changed:
+        with open(p, \"wb\") as f:
+            plistlib.dump(data, f)
+        subprocess.run([\"killall\", \"Dock\"], check=False)
+except Exception:
+    pass
+" 2>/dev/null || true'
+fi
 exit 0
 EOF
 chmod +x "$PKG_SCRIPTS/postinstall"
