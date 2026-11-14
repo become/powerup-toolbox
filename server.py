@@ -49,7 +49,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.3"
+APP_VERSION = "2.8.4"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -184,6 +184,29 @@ def compare_versions(v1, v2):
         return -1
     return 0
 
+def get_installed_macos_version():
+    if sys.platform != "darwin":
+        return None
+    plist_path = "/Applications/MacToolbox.app/Contents/Info.plist"
+    if not os.path.isfile(plist_path):
+        return None
+    try:
+        import plistlib
+        with open(plist_path, "rb") as f:
+            data = plistlib.load(f)
+            return data.get("CFBundleShortVersionString")
+    except Exception:
+        return None
+
+
+MAC_UPDATE_STATE = {
+    "state": "idle",
+    "message": "",
+    "installed_version": None,
+    "target_version": None
+}
+
+
 OFFICIAL_UPDATE_URL = os.environ.get("POWERUP_UPDATE_URL", "https://powerup.dancingarden.com/downloads/toolbox/version.json")
 
 def check_github_update(repo=None, branch=None):
@@ -246,6 +269,9 @@ def check_github_update(repo=None, branch=None):
         except Exception:
             pass
 
+    installed_ver = get_installed_macos_version()
+    has_installed_update = bool(installed_ver and compare_versions(installed_ver, APP_VERSION) > 0)
+
     if remote_data:
         remote_ver = remote_data.get("version", "0.0.0")
         has_update = compare_versions(remote_ver, APP_VERSION) > 0
@@ -258,6 +284,8 @@ def check_github_update(repo=None, branch=None):
             "current_version": APP_VERSION,
             "latest_version": remote_ver,
             "has_update": has_update,
+            "installed_version": installed_ver,
+            "has_installed_update": has_installed_update,
             "release_date": remote_data.get("release_date", ""),
             "changelog": remote_data.get("changelog", []),
             "dmg_url": remote_data.get("dmg_url", default_dmg),
@@ -279,6 +307,8 @@ def check_github_update(repo=None, branch=None):
                 "current_version": APP_VERSION,
                 "latest_version": remote_ver,
                 "has_update": compare_versions(remote_ver, APP_VERSION) > 0,
+                "installed_version": installed_ver,
+                "has_installed_update": has_installed_update,
                 "release_date": local_data.get("release_date", ""),
                 "changelog": local_data.get("changelog", []),
                 "dmg_url": local_data.get("dmg_url", ""),
@@ -288,14 +318,16 @@ def check_github_update(repo=None, branch=None):
         except Exception:
             pass
     return {
-        "ok": False,
+        "ok": has_installed_update,
         "repo": repo,
         "branch": branch,
         "current_version": APP_VERSION,
-        "latest_version": APP_VERSION,
+        "latest_version": installed_ver or APP_VERSION,
         "has_update": False,
-        "error": "無法連線至官方更新伺服器或 GitHub",
-        "source": "failed"
+        "installed_version": installed_ver,
+        "has_installed_update": has_installed_update,
+        "error": "無法連線至官方更新伺服器或 GitHub" if not has_installed_update else "",
+        "source": "local_installed" if has_installed_update else "failed"
     }
 
 if IS_APP_BUNDLE:
@@ -2453,6 +2485,15 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             self.send_json({"ok": True, **win_support.update_status()})
             return
 
+        if route == "/api/update-status":
+            cur_installed = get_installed_macos_version()
+            if cur_installed and compare_versions(cur_installed, APP_VERSION) > 0:
+                MAC_UPDATE_STATE["state"] = "ready_to_restart"
+                MAC_UPDATE_STATE["installed_version"] = cur_installed
+                MAC_UPDATE_STATE["message"] = f"新版本 v{cur_installed} 已安裝完成！"
+            self.send_json({"ok": True, **MAC_UPDATE_STATE})
+            return
+
         if route == "/api/check-update" and IS_WIN_FROZEN:
             self.send_json(win_support.check_update())
             return
@@ -3335,8 +3376,13 @@ class ToolboxHandler(BaseHTTPRequestHandler):
 
         if route == "/api/perform-update":
             pkg_url = body.get("pkg_url")
+            target_version = body.get("target_version")
             if not pkg_url:
                 pkg_url = "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
+
+            MAC_UPDATE_STATE["state"] = "downloading"
+            MAC_UPDATE_STATE["target_version"] = target_version
+            MAC_UPDATE_STATE["message"] = "正在下載最新安裝包..."
 
             def do_download_and_install():
                 import urllib.request
@@ -3346,12 +3392,46 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     with urllib.request.urlopen(req, timeout=45.0) as resp, open(dest, "wb") as out:
                         shutil.copyfileobj(resp, out)
                     _mac_popen(["/usr/bin/xattr", "-cr", dest])
+
+                    MAC_UPDATE_STATE["state"] = "installing"
+                    MAC_UPDATE_STATE["message"] = "已啟動 macOS 安裝引導，請在系統視窗完成安裝..."
                     _mac_popen(["/usr/bin/open", dest])
+
+                    # Monitor /Applications/MacToolbox.app/Contents/Info.plist for completion
+                    for _ in range(300):
+                        time.sleep(1.0)
+                        cur_installed = get_installed_macos_version()
+                        if cur_installed and compare_versions(cur_installed, APP_VERSION) > 0:
+                            MAC_UPDATE_STATE["state"] = "ready_to_restart"
+                            MAC_UPDATE_STATE["installed_version"] = cur_installed
+                            MAC_UPDATE_STATE["message"] = f"新版本 v{cur_installed} 已安裝完成！是否要立即重新啟動應用程式？"
+                            return
                 except Exception as err:
-                    print(f"Auto-update download error: {err}")
+                    MAC_UPDATE_STATE["state"] = "failed"
+                    MAC_UPDATE_STATE["message"] = f"更新失敗: {err}"
 
             threading.Thread(target=do_download_and_install, daemon=True).start()
             self.send_json({"ok": True, "message": "已開始背景下載最新安裝包，完成後將自動啟動 macOS 安裝引導。"})
+            return
+
+        if route == "/api/restart":
+            def do_restart():
+                time.sleep(0.4)
+                if sys.platform == "darwin":
+                    target_app = "/Applications/MacToolbox.app"
+                    if os.path.isdir(target_app):
+                        _mac_popen(["/usr/bin/open", "-n", target_app])
+                    time.sleep(0.3)
+                    ppid = os.getppid()
+                    try:
+                        os.kill(ppid, signal.SIGTERM)
+                    except Exception:
+                        pass
+                    os._exit(0)
+                elif IS_WINDOWS:
+                    os._exit(0)
+            threading.Thread(target=do_restart, daemon=True).start()
+            self.send_json({"ok": True, "message": "正在重新啟動..."})
             return
 
         if route == "/api/pdf-interact":

@@ -171,6 +171,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             task.standardError = handle
         }
 
+        task.terminationHandler = { _ in
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+        }
+
         try? task.run()
         self.serverProcess = task
     }
@@ -306,6 +312,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMainMenu()
+
+        if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+            let alert = NSAlert()
+            alert.messageText = "提示：正在磁碟映像檔 (DMG) 中執行"
+            alert.informativeText = "您目前直接在掛載的 DMG 磁碟映像檔中執行 PowerUp Toolbox。\n\n建議您將 MacToolbox 拖曳複製至「應用程式」(Applications) 資料夾後開啟，以便在更新時能順暢自動替換並重新啟動。"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "我知道了，繼續執行")
+            alert.runModal()
+        }
 
         let args = CommandLine.arguments
         if args.count > 1 && !args[1].hasPrefix("-psn") && initialTargetFile == nil {

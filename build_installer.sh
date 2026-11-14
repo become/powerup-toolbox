@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="2.8.3"
+VERSION="2.8.4"
 APP_NAME="MacToolbox.app"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
 
 # Keep Info.plist versions synchronized
 plutil -replace CFBundleShortVersionString -string "${VERSION}" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
-plutil -replace CFBundleVersion -string "283" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
+plutil -replace CFBundleVersion -string "284" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 
 echo "🔨 [1/5] 編譯 macOS 原生二進位執行檔 (Vision Helper & App Launcher)..."
 swiftc -O "$ROOT_DIR/mac_vision_helper.swift" -o "$ROOT_DIR/mac_vision_helper"
@@ -179,11 +179,11 @@ cat << EOF > "$DIST_DIR/version.json"
     "size": ${WIN_SIZE}
   },
   "changelog": [
-    "📷 本機真實相簿工坊：100% 讀取電腦真實照片庫（Downloads、Desktop、macOS Photos 圖庫與自訂相簿），支援 Finder 整合與修圖",
-    "☁️ Google 相簿雲端同步：支援個人 OAuth 憑證連線，一鍵備份照片至 Google 雲端",
-    "🍎 macOS 顯示與體驗優化：修復 Safari / Chrome 左上角圖標與 Favicon 多格式支援，消除持續 loading",
-    "🌐 官網獨立發布支援：支援 powerup.dancingarden.com 官方高速更新節點，原始碼完全保密",
-    "⚡ 跨平台一鍵自動更新引擎 (官方高速更新節點)"
+    "🔄 全新升級重啟詢問機制：更新安裝完成後主動彈出對話框，詢問「立即重新啟動」或「稍後手動重啟」，告別舊版進程殘留",
+    "💻 程式碼與文字語言好讀版：原生支援 Java / Groovy / GSP / HTML / JS / CSS / TXT，提供語法高亮、符號大綱 TOC 跳轉、字體縮放與 ⌘E/⌘S 即時編輯儲存",
+    "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證認證",
+    "📷 本機真實相簿工坊：100% 讀取電腦真實相簿與 macOS Photos，支援 Finder 整合與修圖",
+    "☁️ Google 相簿雲端同步：支援個人憑證授權與相簿快速備份"
   ]
 }
 EOF

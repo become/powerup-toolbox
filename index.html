@@ -2108,7 +2108,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.3 · 點擊手動檢查更新">v2.8.3</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.4 · 點擊手動檢查更新">v2.8.4</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2210,7 +2210,7 @@
 
     <!-- Always-Available System Actions (Anchored to Right, Never Cut Off) -->
     <div class="topbar-right">
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.3)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.4)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -9085,7 +9085,9 @@
   let latestUpdateInfo = null;
 
   function handleUpdatePillClick() {
-    if (latestUpdateInfo && latestUpdateInfo.has_update) {
+    if (latestUpdateInfo && latestUpdateInfo.has_installed_update) {
+      showRestartModal(latestUpdateInfo.installed_version);
+    } else if (latestUpdateInfo && latestUpdateInfo.has_update) {
       showUpdateModal(false);
     } else {
       checkAppUpdates(false);
@@ -9101,14 +9103,30 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.3";
+        const curVer = data.current_version || "2.8.4";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
         }
         const pill = document.getElementById("btnAppUpdatePill");
         const lbl = document.getElementById("lblUpdatePill");
-        if (data.has_update) {
+
+        if (data.has_installed_update) {
+          if (badge) badge.classList.add("has-update");
+          if (pill) {
+            pill.classList.add("has-update-pill");
+            pill.style.background = "linear-gradient(135deg, rgba(16,185,129,0.35), rgba(5,150,105,0.35))";
+            pill.style.borderColor = "#10b981";
+            pill.style.color = "#34d399";
+            pill.title = `新版本 v${data.installed_version} 已安裝完成！點擊立即重新啟動`;
+          }
+          if (lbl) {
+            lbl.innerHTML = ` <strong>🔄 重啟套用 v${data.installed_version}</strong>`;
+          }
+          if (!silent) {
+            showRestartModal(data.installed_version);
+          }
+        } else if (data.has_update) {
           if (badge) badge.classList.add("has-update");
           if (pill) {
             pill.classList.add("has-update-pill");
@@ -9155,7 +9173,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.3";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.4";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -9164,16 +9182,29 @@
     const clTitleEl = document.getElementById("modalChangelogTitle");
     const list = document.getElementById("modalChangelogList");
     const btnPerform = document.getElementById("btnModalPerformUpdate");
+    const btnManual = document.getElementById("btnModalManualDownload");
+    const btnRestart = document.getElementById("btnModalRestart");
     const btnCancel = document.getElementById("btnModalCancel");
     const statusBox = document.getElementById("updateDownloadStatus");
-    if (statusBox) statusBox.style.display = "none";
+
+    if (btnRestart) btnRestart.style.display = "none";
+    if (btnManual) btnManual.style.display = "inline-flex";
+    if (statusBox) {
+      statusBox.style.display = "none";
+      statusBox.style.background = "rgba(59,130,246,0.15)";
+      statusBox.style.borderColor = "rgba(59,130,246,0.3)";
+      statusBox.style.color = "#93c5fd";
+    }
 
     if (!hasUpd) {
       if (titleEl) titleEl.innerHTML = "✅ PowerUp Toolbox 目前已是最新版本";
       if (badgeEl) badgeEl.textContent = `目前版本: v${curVer}（最新穩定版）${latestUpdateInfo && latestUpdateInfo.release_date ? ' · 釋出日期: ' + latestUpdateInfo.release_date : ''}`;
       if (clTitleEl) clTitleEl.textContent = `✨ 目前版本功能亮點 (v${curVer})：`;
       if (btnPerform) btnPerform.style.display = "none";
-      if (btnCancel) btnCancel.textContent = "關閉";
+      if (btnCancel) {
+        btnCancel.style.display = "inline-flex";
+        btnCancel.textContent = "關閉";
+      }
     } else {
       if (titleEl) titleEl.innerHTML = "🎉 發現 PowerUp Toolbox 新版本！";
       if (badgeEl) badgeEl.textContent = `目前版本: v${curVer} ➔ 最新版本: v${latestVer}`;
@@ -9183,22 +9214,103 @@
         btnPerform.disabled = false;
         btnPerform.textContent = "⚡ 立即一鍵升級";
       }
-      if (btnCancel) btnCancel.textContent = "稍後再說";
+      if (btnCancel) {
+        btnCancel.style.display = "inline-flex";
+        btnCancel.textContent = "稍後再說";
+      }
     }
 
     if (list) {
       const logs = (latestUpdateInfo && latestUpdateInfo.changelog && latestUpdateInfo.changelog.length > 0)
         ? latestUpdateInfo.changelog
         : [
-            "📷 Google 相簿深度整合：雲端相簿快速瀏覽、一鍵上傳備份與相簿分類整理",
-            "⚡ 支援介面常駐版本號顯示與隨時手動檢查更新功能",
-            "🍎 macOS / Safari 高解析度圖標與 Favicon 載入優化，修復分頁持續 loading 問題",
-            "🚀 跨平台支援 (macOS 及 Windows 10/11) 與免安裝可攜架構",
-            "🔒 密碼保護檔案（Excel、Word、PowerPoint、PDF）免解密即時預覽"
+            "💻 程式碼與文字語言好讀版：支援 Java / Groovy / GSP / HTML / JS / CSS / TXT 語法高亮、符號大綱跳轉與即時編輯",
+            "🍎 官方 Apple Developer ID 簽名與雲端公證",
+            "📷 本機真實相簿工坊與 Google 相簿備份整合",
+            "⚡ 支援一鍵安裝與全新無縫重啟套用機制"
           ];
       list.innerHTML = logs.map(item => `<li>${escapeHtml(item)}</li>`).join("");
     }
     modal.style.display = "flex";
+  }
+
+  function showRestartModal(installedVer) {
+    const modal = document.getElementById("updateModal");
+    if (!modal) return;
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.4";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.4";
+
+    const titleEl = document.getElementById("modalUpdateTitle");
+    const badgeEl = document.getElementById("modalUpdateVersionBadge");
+    const clTitleEl = document.getElementById("modalChangelogTitle");
+    const list = document.getElementById("modalChangelogList");
+    const btnPerform = document.getElementById("btnModalPerformUpdate");
+    const btnManual = document.getElementById("btnModalManualDownload");
+    const btnRestart = document.getElementById("btnModalRestart");
+    const btnCancel = document.getElementById("btnModalCancel");
+    const statusBox = document.getElementById("updateDownloadStatus");
+
+    if (titleEl) titleEl.innerHTML = "🎉 新版本已安裝完成！";
+    if (badgeEl) badgeEl.innerHTML = `<span style="color:#94a3b8;">目前運行: v${curVer}</span> ➔ <span style="color:#34d399; font-weight:700;">已安裝就緒: v${newVer}</span>`;
+    if (clTitleEl) clTitleEl.textContent = "即將套用的升級亮點：";
+
+    if (statusBox) {
+      statusBox.style.display = "block";
+      statusBox.style.background = "rgba(16,185,129,0.15)";
+      statusBox.style.borderColor = "rgba(16,185,129,0.35)";
+      statusBox.style.color = "#6ee7b7";
+      statusBox.innerHTML = `✅ <strong>PowerUp Toolbox v${newVer} 已成功安裝至「應用程式」！</strong><br><span style="color:#cbd5e1; font-size:12px; display:inline-block; margin-top:5px;">是否要立即重新啟動應用程式以套用新版本？</span>`;
+    }
+
+    if (btnPerform) btnPerform.style.display = "none";
+    if (btnManual) btnManual.style.display = "none";
+    if (btnRestart) {
+      btnRestart.style.display = "inline-flex";
+      btnRestart.disabled = false;
+      btnRestart.textContent = "🔄 立即重新啟動";
+    }
+    if (btnCancel) {
+      btnCancel.style.display = "inline-flex";
+      btnCancel.disabled = false;
+      btnCancel.textContent = "稍後手動重啟";
+    }
+
+    if (list) {
+      const logs = (latestUpdateInfo && latestUpdateInfo.changelog && latestUpdateInfo.changelog.length > 0)
+        ? latestUpdateInfo.changelog
+        : [
+            "💻 程式碼與文字語言好讀版：支援 Java / Groovy / GSP / HTML / JS / CSS / TXT 語法高亮、符號大綱跳轉與即時編輯",
+            "🍎 官方 Apple Developer ID 簽名與雲端公證",
+            "📷 本機真實相簿工坊與 Google 相簿備份整合",
+            "⚡ 支援一鍵安裝與全新無縫重啟套用機制"
+          ];
+      list.innerHTML = logs.map(item => `<li>${escapeHtml(item)}</li>`).join("");
+    }
+    modal.style.display = "flex";
+  }
+
+  async function restartAppNow() {
+    const btnRestart = document.getElementById("btnModalRestart");
+    const btnCancel = document.getElementById("btnModalCancel");
+    const statusBox = document.getElementById("updateDownloadStatus");
+    if (btnRestart) btnRestart.disabled = true;
+    if (btnCancel) btnCancel.disabled = true;
+    if (statusBox) {
+      statusBox.style.display = "block";
+      statusBox.style.background = "rgba(59,130,246,0.15)";
+      statusBox.style.borderColor = "rgba(59,130,246,0.35)";
+      statusBox.style.color = "#93c5fd";
+      statusBox.innerHTML = `<span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">🔄</span> 正在啟動新版本並關閉舊進程，請稍候...`;
+    }
+    showToast("🔄 正在重新啟動 PowerUp Toolbox...");
+    try {
+      await fetch('/api/restart', { method: 'POST' });
+    } catch (e) {
+      // server shuts down quickly
+    }
+    setTimeout(() => {
+      try { window.close(); } catch(e){}
+    }, 1200);
   }
 
   function closeUpdateModal() {
@@ -9230,10 +9342,47 @@
     }
   }
 
+  async function pollMacUpdate(statusBox, btn) {
+    for (let i = 0; i < 300; i++) {
+      await new Promise(r => setTimeout(r, 800));
+      let s;
+      try {
+        const res = await fetch('/api/update-status');
+        s = await res.json();
+      } catch (e) {
+        continue;
+      }
+      if (!s || !s.ok) continue;
+
+      if (s.state === "ready_to_restart") {
+        if (latestUpdateInfo) {
+          latestUpdateInfo.has_installed_update = true;
+          latestUpdateInfo.installed_version = s.installed_version;
+        }
+        showRestartModal(s.installed_version);
+        return;
+      }
+      if (s.state === "failed") {
+        if (statusBox) statusBox.innerHTML = `<span style="color:#f87171;">❌ ${escapeHtml(s.message || '更新失敗')}</span>`;
+        if (btn) btn.disabled = false;
+        return;
+      }
+      if (statusBox && s.message) {
+        statusBox.innerHTML = `⏳ ${escapeHtml(s.message)}`;
+      }
+    }
+  }
+
   async function performAutoUpdate() {
     const statusBox = document.getElementById("updateDownloadStatus");
     const btn = document.getElementById("btnModalPerformUpdate");
-    if (statusBox) statusBox.style.display = "block";
+    if (statusBox) {
+      statusBox.style.display = "block";
+      statusBox.style.background = "rgba(59,130,246,0.15)";
+      statusBox.style.borderColor = "rgba(59,130,246,0.3)";
+      statusBox.style.color = "#93c5fd";
+      statusBox.innerHTML = `<span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">⏳</span> 正在下載最新安裝包...`;
+    }
     if (btn) btn.disabled = true;
     try {
       const res = await fetch('/api/perform-update', {
@@ -9242,7 +9391,8 @@
         body: JSON.stringify({
           repo: latestUpdateInfo ? latestUpdateInfo.repo : undefined,
           branch: latestUpdateInfo ? latestUpdateInfo.branch : undefined,
-          pkg_url: latestUpdateInfo ? latestUpdateInfo.pkg_url : undefined
+          pkg_url: latestUpdateInfo ? latestUpdateInfo.pkg_url : undefined,
+          target_version: latestUpdateInfo ? latestUpdateInfo.latest_version : undefined
         })
       });
       const data = await res.json();
@@ -9256,9 +9406,9 @@
         return;
       }
       if (statusBox) {
-        statusBox.innerHTML = `✅ ${escapeHtml(data.message || '安裝包下載完成，已啟動 macOS 安裝精靈！')}`;
+        statusBox.innerHTML = `⏳ 安裝包已就緒，請在 macOS 安裝引導視窗完成安裝...`;
       }
-      setTimeout(closeUpdateModal, 3500);
+      await pollMacUpdate(statusBox, btn);
     } catch (e) {
       if (statusBox) {
         statusBox.innerHTML = `❌ 下載失敗，請點選「前往官網」手動下載安裝。`;
@@ -10338,7 +10488,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.3</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.4</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
@@ -10360,6 +10510,7 @@
         <button class="btn" id="btnModalCancel" onclick="closeUpdateModal()" style="padding:7px 14px; font-size:12px;">稍後再說</button>
         <button class="btn" id="btnModalManualDownload" onclick="openGitHubRelease()" style="padding:7px 14px; font-size:12px; border-color:rgba(255,255,255,0.2);">前往官網</button>
         <button class="btn btn-primary" id="btnModalPerformUpdate" onclick="performAutoUpdate()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #f59e0b, #ec4899); border:none; color:#fff; font-weight:700; cursor:pointer;">⚡ 立即一鍵升級</button>
+        <button class="btn btn-primary emerald" id="btnModalRestart" onclick="restartAppNow()" style="display:none; padding:7px 18px; font-size:12px; background:#10b981; border:none; color:#fff; font-weight:700; cursor:pointer;">🔄 立即重新啟動</button>
       </div>
     </div>
   </div>
