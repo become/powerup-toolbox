@@ -49,7 +49,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.6"
+APP_VERSION = "2.8.7"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -3438,19 +3438,35 @@ class ToolboxHandler(BaseHTTPRequestHandler):
 
         if route == "/api/restart":
             def do_restart():
-                time.sleep(0.4)
+                time.sleep(0.2)
                 if sys.platform == "darwin":
                     target_app = "/Applications/MacToolbox.app"
-                    if os.path.isdir(target_app):
-                        _mac_popen(["/usr/bin/open", "-n", target_app])
-                    time.sleep(0.3)
-                    ppid = os.getppid()
+                    swift_pid = os.getppid()
+                    server_pid = os.getpid()
+                    # Detached background process that polls until the old Swift app and server have completely exited,
+                    # pauses briefly so that the port 18765 socket is fully released, and then launches the new app cleanly.
+                    cmd = (
+                        f"while /bin/kill -0 {swift_pid} 2>/dev/null || /bin/kill -0 {server_pid} 2>/dev/null; do "
+                        f"  /bin/sleep 0.1; "
+                        f"done; "
+                        f"/bin/sleep 0.3; "
+                        f"/usr/bin/open -a '{target_app}'"
+                    )
+                    subprocess.Popen(
+                        ["/bin/sh", "-c", cmd],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True,
+                        close_fds=True
+                    )
                     try:
-                        os.kill(ppid, signal.SIGTERM)
+                        os.kill(swift_pid, signal.SIGTERM)
                     except Exception:
                         pass
+                    time.sleep(0.15)
                     try:
-                        os.kill(ppid, signal.SIGKILL)
+                        os.kill(swift_pid, signal.SIGKILL)
                     except Exception:
                         pass
                     os._exit(0)
