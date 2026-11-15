@@ -2549,7 +2549,7 @@
       <div class="pdf-stage" id="pdfStage">
         <!-- 6A: Native macOS PDFKit / WebKit View -->
         <div id="pdfNativeWrapper" style="flex:1; width:100%; height:100%; overflow:auto; display:flex; align-items:flex-start; justify-content:center; background:#111827; position:relative;">
-          <div id="pdfNativeInner" style="width:100%; height:100%; min-width:100%; min-height:100%; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:width 0.1s ease, height 0.1s ease;">
+          <div id="pdfNativeInner" style="width:100%; height:100%; min-width:100%; min-height:100%; flex-shrink:0; display:block; position:relative;">
             <iframe id="pdfNativeFrame" style="width:100%; height:100%; border:none; background:#111827;" src=""></iframe>
           </div>
         </div>
@@ -3055,7 +3055,13 @@
   </div>
 
 <script>
-  mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });
+  if (typeof mermaid !== "undefined") {
+    try {
+      mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });
+    } catch(e) {
+      console.warn("Mermaid initialize error:", e);
+    }
+  }
 
   if (typeof hljs !== "undefined") {
     try {
@@ -8073,7 +8079,9 @@
       }
     });
 
-    mermaid.run({ querySelector: ".mermaid" }).then(stripMermaidLinks).catch(() => {});
+    if (typeof mermaid !== "undefined" && typeof mermaid.run === "function") {
+      mermaid.run({ querySelector: ".mermaid" }).then(stripMermaidLinks).catch(() => {});
+    }
     buildMarkdownToc();
   }
 
@@ -8584,15 +8592,37 @@
     pdfPageZoom = Math.max(0.3, Math.min(5.0, Math.round(val * 100) / 100));
     if (Math.abs(pdfPageZoom - 1.0) < 0.03) pdfPageZoom = 1.0;
 
-    // 1. Update native PDFKit iframe container dimensions
+    // 1. Update native PDFKit iframe container dimensions and CSS transform
+    const wrap = document.getElementById("pdfNativeWrapper");
     const inner = document.getElementById("pdfNativeInner");
-    if (inner) {
+    const frame = document.getElementById("pdfNativeFrame");
+    if (wrap && inner && frame) {
       if (pdfPageZoom === 1.0) {
+        wrap.style.justifyContent = "center";
+        wrap.style.alignItems = "flex-start";
         inner.style.width = "100%";
+        inner.style.minWidth = "100%";
         inner.style.height = "100%";
+        inner.style.minHeight = "100%";
+        frame.style.width = "100%";
+        frame.style.height = "100%";
+        frame.style.transformOrigin = "top left";
+        frame.style.transform = "none";
       } else {
-        inner.style.width = Math.round(100 * pdfPageZoom) + "%";
-        inner.style.height = Math.round(100 * pdfPageZoom) + "%";
+        const w = wrap.clientWidth;
+        const h = wrap.clientHeight;
+        const targetW = Math.round(w * pdfPageZoom) + "px";
+        const targetH = Math.round(h * pdfPageZoom) + "px";
+        wrap.style.justifyContent = "flex-start";
+        wrap.style.alignItems = "flex-start";
+        inner.style.width = targetW;
+        inner.style.minWidth = targetW;
+        inner.style.height = targetH;
+        inner.style.minHeight = targetH;
+        frame.style.width = w + "px";
+        frame.style.height = h + "px";
+        frame.style.transformOrigin = "top left";
+        frame.style.transform = "scale(" + pdfPageZoom + ")";
       }
     }
 
@@ -8612,6 +8642,12 @@
     const badge = document.getElementById("pdfZoomBadge");
     if (badge) badge.textContent = Math.round(pdfPageZoom * 100) + "%";
   }
+
+  window.addEventListener("resize", function() {
+    if (currentFileType === "pdf" && pdfViewMode === "native" && pdfPageZoom !== 1.0) {
+      setPdfPageZoom(pdfPageZoom);
+    }
+  });
 
   window.handleNativeMagnify = function(delta) {
     if (currentFileType === "pdf") {
