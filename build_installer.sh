@@ -83,8 +83,9 @@ if [ -x "$LSREGISTER" ] && [ -d "$APP_PATH" ]; then
     "$LSREGISTER" -f "$APP_PATH" || true
 fi
 
-CONSOLE_USER="${USER:-$(stat -f%Su /dev/console)}"
+CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || echo become)"
 if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+    chown -R "$CONSOLE_USER":staff "$APP_PATH" 2>/dev/null || true
     su -l "$CONSOLE_USER" -c 'python3 -c "
 import plistlib, os, subprocess
 p = os.path.expanduser(\"~/Library/Preferences/com.apple.dock.plist\")

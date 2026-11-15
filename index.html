@@ -2548,7 +2548,11 @@
       <!-- 6. PDF Document Stage -->
       <div class="pdf-stage" id="pdfStage">
         <!-- 6A: Native macOS PDFKit / WebKit View -->
-        <iframe id="pdfNativeFrame" style="flex:1; width:100%; border:none; background:#111827;" src=""></iframe>
+        <div id="pdfNativeWrapper" style="flex:1; width:100%; height:100%; overflow:auto; display:flex; align-items:flex-start; justify-content:center; background:#111827; position:relative;">
+          <div id="pdfNativeInner" style="width:100%; height:100%; min-width:100%; min-height:100%; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:width 0.1s ease, height 0.1s ease;">
+            <iframe id="pdfNativeFrame" style="width:100%; height:100%; border:none; background:#111827;" src=""></iframe>
+          </div>
+        </div>
 
         <!-- 6B: High-Res Page Render & Image Workshop Bridge -->
         <div id="pdfPageView" style="display:none; flex:1; overflow-y:auto; padding:24px; flex-direction:column; align-items:center; gap:16px;">
@@ -6766,6 +6770,7 @@
     currentPdfPages = data.pages || [];
     currentPdfMarkdown = data.markdown || "";
     currentPdfPageNum = 1;
+    resetPdfZoom();
 
     const sizeKb = (data.size / 1024).toFixed(1);
     document.getElementById("hudMeta").textContent =
@@ -6807,7 +6812,8 @@
     document.getElementById("pdfModePageBtn").classList.toggle("active", mode === "page");
     document.getElementById("pdfModeTextBtn").classList.toggle("active", mode === "text");
 
-    document.getElementById("pdfNativeFrame").style.display = mode === "native" ? "block" : "none";
+    const nativeWrap = document.getElementById("pdfNativeWrapper");
+    if (nativeWrap) nativeWrap.style.display = mode === "native" ? "flex" : "none";
     document.getElementById("pdfPageView").style.display = mode === "page" ? "flex" : "none";
     document.getElementById("pdfTextView").style.display = mode === "text" ? "block" : "none";
 
@@ -7403,6 +7409,36 @@
         }
       }, { passive: false });
     }
+
+    // Native PDF View Trackpad Pinch & Ctrl/Cmd+Wheel
+    const pdfNativeWrap = document.getElementById("pdfNativeWrapper");
+    if (pdfNativeWrap) {
+      pdfNativeWrap.addEventListener("wheel", function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const factor = Math.exp(-e.deltaY * 0.008);
+          setPdfPageZoom(pdfPageZoom * factor);
+        }
+      }, { passive: false });
+    }
+
+    // Allow Cmd/Ctrl + Wheel over iframe by temporarily making iframe pass pointer events through
+    window.addEventListener("keydown", function(e) {
+      if ((e.key === "Meta" || e.key === "Control") && currentFileType === "pdf") {
+        const iframe = document.getElementById("pdfNativeFrame");
+        if (iframe) iframe.style.pointerEvents = "none";
+      }
+    });
+    window.addEventListener("keyup", function(e) {
+      if (e.key === "Meta" || e.key === "Control") {
+        const iframe = document.getElementById("pdfNativeFrame");
+        if (iframe) iframe.style.pointerEvents = "auto";
+      }
+    });
+    window.addEventListener("blur", function() {
+      const iframe = document.getElementById("pdfNativeFrame");
+      if (iframe) iframe.style.pointerEvents = "auto";
+    });
 
     // PDF Page View Trackpad Pinch & Ctrl/Cmd+Wheel
     const pdfPageView = document.getElementById("pdfPageView");
@@ -8491,7 +8527,6 @@
     setCodeFontSize(codeFontSize + delta);
   }
 
-  let mdFontSize = 14;
   let mdGestureStartFontSize = 14;
   function setMdFontSize(val) {
     mdFontSize = Math.max(10, Math.min(36, Math.round(val * 10) / 10));
@@ -8548,6 +8583,20 @@
   function setPdfPageZoom(val) {
     pdfPageZoom = Math.max(0.3, Math.min(5.0, Math.round(val * 100) / 100));
     if (Math.abs(pdfPageZoom - 1.0) < 0.03) pdfPageZoom = 1.0;
+
+    // 1. Update native PDFKit iframe container dimensions
+    const inner = document.getElementById("pdfNativeInner");
+    if (inner) {
+      if (pdfPageZoom === 1.0) {
+        inner.style.width = "100%";
+        inner.style.height = "100%";
+      } else {
+        inner.style.width = Math.round(100 * pdfPageZoom) + "%";
+        inner.style.height = Math.round(100 * pdfPageZoom) + "%";
+      }
+    }
+
+    // 2. Update page render image view
     const img = document.getElementById("pdfPageImage");
     if (img) {
       if (pdfPageZoom !== 1.0) {
@@ -8558,9 +8607,33 @@
         img.style.width = "100%";
       }
     }
+
+    // 3. Update topbar badge
     const badge = document.getElementById("pdfZoomBadge");
     if (badge) badge.textContent = Math.round(pdfPageZoom * 100) + "%";
   }
+
+  window.handleNativeMagnify = function(delta) {
+    if (currentFileType === "pdf") {
+      if (pdfViewMode === "text") {
+        adjustPdfTextFontSize(delta > 0 ? 0.5 : -0.5);
+      } else {
+        const factor = 1 + delta * 1.5;
+        setPdfPageZoom(pdfPageZoom * factor);
+      }
+    } else if (currentFileType === "image" && viewMode === "single") {
+      zoom = Math.max(0.2, Math.min(25, zoom * (1 + delta * 1.5)));
+      applyTransform();
+    } else if (currentFileType === "code") {
+      adjustCodeFontSize(delta > 0 ? 0.5 : -0.5);
+    } else if (currentFileType === "markdown" || currentFileType === "docx") {
+      adjustMdFontSize(delta > 0 ? 0.5 : -0.5);
+    } else if (currentFileType === "json" || currentFileType === "xml") {
+      adjustJsonFontSize(delta > 0 ? 0.5 : -0.5);
+    } else if (currentFileType === "csv" || currentFileType === "xlsx") {
+      adjustCsvFontSize(delta > 0 ? 0.5 : -0.5);
+    }
+  };
 
   function adjustPdfZoom(delta) {
     if (pdfViewMode === "text") {
@@ -9684,6 +9757,8 @@
       try { window.close(); } catch(e){}
     }, 600);
     setTimeout(() => {
+      if (btnCancel) btnCancel.disabled = false;
+      if (btnRestart) btnRestart.disabled = false;
       if (statusBox) {
         statusBox.innerHTML = `✅ 已送出重啟請求！若程式未自動重新開啟，請至「應用程式」點擊 <strong>MacToolbox</strong> 或<button class="btn primary" onclick="location.reload()" style="margin-left:8px; padding:2px 8px; font-size:11px;">重新載入頁面</button>`;
       }

@@ -65,8 +65,29 @@ class WebDelegateHandler: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 }
 
+class NativeToolboxWebView: WKWebView {
+    override func magnify(with event: NSEvent) {
+        let delta = event.magnification
+        let js = "if (typeof handleNativeMagnify === 'function') { handleNativeMagnify(\(delta)); }"
+        self.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if event.modifierFlags.contains(.command) || event.modifierFlags.contains(.control) {
+            let dy = event.scrollingDeltaY
+            if abs(dy) > 0.05 {
+                let factor = dy > 0 ? 0.05 : -0.05
+                let js = "if (typeof handleNativeMagnify === 'function') { handleNativeMagnify(\(factor)); }"
+                self.evaluateJavaScript(js, completionHandler: nil)
+                return
+            }
+        }
+        super.scrollWheel(with: event)
+    }
+}
+
 class MainWindowController: NSWindowController, NSWindowDelegate {
-    var webView: WKWebView!
+    var webView: NativeToolboxWebView!
     var delegateHandler: WebDelegateHandler!
 
     convenience init() {
@@ -89,7 +110,7 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
         config.defaultWebpagePreferences.allowsContentJavaScript = true
 
         self.delegateHandler = WebDelegateHandler()
-        self.webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
+        self.webView = NativeToolboxWebView(frame: window.contentView!.bounds, configuration: config)
         self.webView.autoresizingMask = [.width, .height]
         self.webView.navigationDelegate = self.delegateHandler
         self.webView.uiDelegate = self.delegateHandler

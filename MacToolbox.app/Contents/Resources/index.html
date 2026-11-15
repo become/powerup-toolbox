@@ -2108,7 +2108,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.6 · 點擊手動檢查更新">v2.8.6</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.7 · 點擊手動檢查更新">v2.8.7</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2132,6 +2132,11 @@
           <button class="btn" id="mdSplitEditBtn" onclick="setMdEditMode(true)">✏️ 雙欄編輯 <span class="kbd">⌘E</span></button>
         </div>
         <button class="btn primary" id="mdSaveBtn" style="display:none;" onclick="saveMarkdownFile()">💾 儲存 <span class="kbd">⌘S</span></button>
+        <div class="btn-group">
+          <button class="btn" onclick="adjustMdFontSize(-1)" title="縮小字體 (⌘-)">A-</button>
+          <span id="mdFontSizeBadge" style="font-size:11px; padding:2px 6px; color:var(--muted); display:inline-flex; align-items:center;">14px</span>
+          <button class="btn" onclick="adjustMdFontSize(1)" title="放大字體 (⌘+)">A+</button>
+        </div>
       </div>
 
       <!-- 2.5 Code / Plaintext Top Controls -->
@@ -2145,9 +2150,9 @@
         <button class="btn" id="codeCopyBtn" onclick="copyCodeContent()">📋 複製代碼</button>
         <button class="btn" id="codeWrapBtn" onclick="toggleCodeWrap()" title="切換自動換行">↵ 換行</button>
         <div class="btn-group">
-          <button class="btn" onclick="adjustCodeFontSize(-1)" title="縮小字體">A-</button>
+          <button class="btn" onclick="adjustCodeFontSize(-1)" title="縮小字體 (⌘-)">A-</button>
           <span id="codeFontSizeBadge" style="font-size:11px; padding:2px 6px; color:var(--muted); display:inline-flex; align-items:center;">13.5px</span>
-          <button class="btn" onclick="adjustCodeFontSize(1)" title="放大字體">A+</button>
+          <button class="btn" onclick="adjustCodeFontSize(1)" title="放大字體 (⌘+)">A+</button>
         </div>
       </div>
 
@@ -2169,6 +2174,12 @@
           <button class="btn purple" onclick="repairJsonEditor()" title="自動修復單引號、尾逗號、Python True/False/None 語法">🪄 修復</button>
         </div>
 
+        <div class="btn-group">
+          <button class="btn" onclick="adjustJsonFontSize(-1)" title="縮小字體 (⌘-)">A-</button>
+          <span id="jsonFontSizeBadge" style="font-size:11px; padding:2px 6px; color:var(--muted); display:inline-flex; align-items:center;">13px</span>
+          <button class="btn" onclick="adjustJsonFontSize(1)" title="放大字體 (⌘+)">A+</button>
+        </div>
+
         <button class="btn emerald" onclick="pasteAndFormatJsonFromClipboard()" title="從剪貼簿貼上 JSON/文字，自動修復並格式化整理">📋 貼上整理</button>
         <button class="btn primary" id="jsonSaveBtn" style="display:none;" onclick="saveJsonFile()">💾 儲存 <span class="kbd">⌘S</span></button>
       </div>
@@ -2176,6 +2187,11 @@
       <!-- 4. CSV / Excel (XLSX) Top Controls -->
       <div id="csvTopControls" style="display:none; align-items:center; gap:6px; flex-shrink:0;">
         <input id="csvSearchInput" class="path-input" style="width:160px;" type="text" placeholder="🔎 搜尋表格內容..." oninput="renderCsvTable()" />
+        <div class="btn-group">
+          <button class="btn" onclick="adjustCsvFontSize(-1)" title="縮小表格字體 (⌘-)">A-</button>
+          <span id="csvFontSizeBadge" style="font-size:11px; padding:2px 6px; color:var(--muted); display:inline-flex; align-items:center;">12.5px</span>
+          <button class="btn" onclick="adjustCsvFontSize(1)" title="放大表格字體 (⌘+)">A+</button>
+        </div>
         <button class="btn primary" onclick="saveCsvFile()" title="儲存表格修改回原檔案 (⌘S)">💾 儲存 <span class="kbd">⌘S</span></button>
       </div>
 
@@ -2205,6 +2221,11 @@
           <span id="pdfPageCounter" style="padding:4px 8px; font-size:12px; font-family:'SF Mono',monospace; color:#fda4af; font-weight:700;">1 / 1</span>
           <button class="btn" onclick="stepPdfPage(1)" title="下一頁 (↓ / →)">▶</button>
         </div>
+        <div class="btn-group" id="pdfZoomGroup" style="display:inline-flex; align-items:center;">
+          <button class="btn" onclick="adjustPdfZoom(-0.15)" title="縮小 (觸控板捏合雙指 / ⌘-)">−</button>
+          <button class="btn" id="pdfZoomBadge" onclick="resetPdfZoom()" style="font-size:11px; padding:2px 8px; font-family:'SF Mono',monospace; min-width:54px; text-align:center;" title="點擊重設為 100% (⌘0)">100%</button>
+          <button class="btn" onclick="adjustPdfZoom(0.15)" title="放大 (觸控板張開雙指 / ⌘+)"><span style="font-size:13px; font-weight:700;">+</span></button>
+        </div>
       </div>
     </div>
 
@@ -2213,7 +2234,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.6)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.7)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -2527,7 +2548,11 @@
       <!-- 6. PDF Document Stage -->
       <div class="pdf-stage" id="pdfStage">
         <!-- 6A: Native macOS PDFKit / WebKit View -->
-        <iframe id="pdfNativeFrame" style="flex:1; width:100%; border:none; background:#111827;" src=""></iframe>
+        <div id="pdfNativeWrapper" style="flex:1; width:100%; height:100%; overflow:auto; display:flex; align-items:flex-start; justify-content:center; background:#111827; position:relative;">
+          <div id="pdfNativeInner" style="width:100%; height:100%; min-width:100%; min-height:100%; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:width 0.1s ease, height 0.1s ease;">
+            <iframe id="pdfNativeFrame" style="width:100%; height:100%; border:none; background:#111827;" src=""></iframe>
+          </div>
+        </div>
 
         <!-- 6B: High-Res Page Render & Image Workshop Bridge -->
         <div id="pdfPageView" style="display:none; flex:1; overflow-y:auto; padding:24px; flex-direction:column; align-items:center; gap:16px;">
@@ -6745,6 +6770,7 @@
     currentPdfPages = data.pages || [];
     currentPdfMarkdown = data.markdown || "";
     currentPdfPageNum = 1;
+    resetPdfZoom();
 
     const sizeKb = (data.size / 1024).toFixed(1);
     document.getElementById("hudMeta").textContent =
@@ -6786,7 +6812,8 @@
     document.getElementById("pdfModePageBtn").classList.toggle("active", mode === "page");
     document.getElementById("pdfModeTextBtn").classList.toggle("active", mode === "text");
 
-    document.getElementById("pdfNativeFrame").style.display = mode === "native" ? "block" : "none";
+    const nativeWrap = document.getElementById("pdfNativeWrapper");
+    if (nativeWrap) nativeWrap.style.display = mode === "native" ? "flex" : "none";
     document.getElementById("pdfPageView").style.display = mode === "page" ? "flex" : "none";
     document.getElementById("pdfTextView").style.display = mode === "text" ? "block" : "none";
 
@@ -6835,6 +6862,13 @@
     const imgEl = document.getElementById("pdfPageImage");
     imgEl.src = data.image_url;
     imgEl.dataset.imgPath = data.image_path;
+    if (pdfPageZoom !== 1.0) {
+      imgEl.style.maxWidth = "none";
+      imgEl.style.width = Math.round(960 * pdfPageZoom) + "px";
+    } else {
+      imgEl.style.maxWidth = "960px";
+      imgEl.style.width = "100%";
+    }
 
     const pg = currentPdfPages[pageNum - 1];
     const txtCard = document.getElementById("pdfPageTextCard");
@@ -7329,6 +7363,168 @@
           cmpZoom = 1; cmpPanX = 0; cmpPanY = 0;
         }
         applyCompareTransform();
+      }, { passive: false });
+    }
+
+    // Code & Plaintext Stage Trackpad Pinch & Ctrl/Cmd+Wheel
+    const codeStage = document.getElementById("codeStage");
+    if (codeStage) {
+      codeStage.addEventListener("gesturestart", function(e) {
+        e.preventDefault();
+        codeGestureStartFontSize = codeFontSize;
+      }, { passive: false });
+
+      codeStage.addEventListener("gesturechange", function(e) {
+        e.preventDefault();
+        setCodeFontSize(codeGestureStartFontSize * e.scale);
+      }, { passive: false });
+
+      codeStage.addEventListener("wheel", function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const factor = Math.exp(-e.deltaY * 0.008);
+          setCodeFontSize(codeFontSize * factor);
+        }
+      }, { passive: false });
+    }
+
+    // Markdown Stage Trackpad Pinch & Ctrl/Cmd+Wheel
+    const mdStage = document.getElementById("mdStage");
+    if (mdStage) {
+      mdStage.addEventListener("gesturestart", function(e) {
+        e.preventDefault();
+        mdGestureStartFontSize = mdFontSize;
+      }, { passive: false });
+
+      mdStage.addEventListener("gesturechange", function(e) {
+        e.preventDefault();
+        setMdFontSize(mdGestureStartFontSize * e.scale);
+      }, { passive: false });
+
+      mdStage.addEventListener("wheel", function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const factor = Math.exp(-e.deltaY * 0.008);
+          setMdFontSize(mdFontSize * factor);
+        }
+      }, { passive: false });
+    }
+
+    // Native PDF View Trackpad Pinch & Ctrl/Cmd+Wheel
+    const pdfNativeWrap = document.getElementById("pdfNativeWrapper");
+    if (pdfNativeWrap) {
+      pdfNativeWrap.addEventListener("wheel", function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const factor = Math.exp(-e.deltaY * 0.008);
+          setPdfPageZoom(pdfPageZoom * factor);
+        }
+      }, { passive: false });
+    }
+
+    // Allow Cmd/Ctrl + Wheel over iframe by temporarily making iframe pass pointer events through
+    window.addEventListener("keydown", function(e) {
+      if ((e.key === "Meta" || e.key === "Control") && currentFileType === "pdf") {
+        const iframe = document.getElementById("pdfNativeFrame");
+        if (iframe) iframe.style.pointerEvents = "none";
+      }
+    });
+    window.addEventListener("keyup", function(e) {
+      if (e.key === "Meta" || e.key === "Control") {
+        const iframe = document.getElementById("pdfNativeFrame");
+        if (iframe) iframe.style.pointerEvents = "auto";
+      }
+    });
+    window.addEventListener("blur", function() {
+      const iframe = document.getElementById("pdfNativeFrame");
+      if (iframe) iframe.style.pointerEvents = "auto";
+    });
+
+    // PDF Page View Trackpad Pinch & Ctrl/Cmd+Wheel
+    const pdfPageView = document.getElementById("pdfPageView");
+    if (pdfPageView) {
+      pdfPageView.addEventListener("gesturestart", function(e) {
+        e.preventDefault();
+        pdfGestureStartZoom = pdfPageZoom;
+      }, { passive: false });
+
+      pdfPageView.addEventListener("gesturechange", function(e) {
+        e.preventDefault();
+        setPdfPageZoom(pdfGestureStartZoom * e.scale);
+      }, { passive: false });
+
+      pdfPageView.addEventListener("wheel", function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const factor = Math.exp(-e.deltaY * 0.008);
+          setPdfPageZoom(pdfPageZoom * factor);
+        }
+      }, { passive: false });
+    }
+
+    // PDF Text View Trackpad Pinch & Ctrl/Cmd+Wheel
+    const pdfTextView = document.getElementById("pdfTextView");
+    if (pdfTextView) {
+      let pdfTextGestureStartSize = 14;
+      pdfTextView.addEventListener("gesturestart", function(e) {
+        e.preventDefault();
+        pdfTextGestureStartSize = pdfTextFontSize;
+      }, { passive: false });
+
+      pdfTextView.addEventListener("gesturechange", function(e) {
+        e.preventDefault();
+        adjustPdfTextFontSize(e.scale > 1.05 ? 1 : (e.scale < 0.95 ? -1 : 0));
+      }, { passive: false });
+
+      pdfTextView.addEventListener("wheel", function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          adjustPdfTextFontSize(e.deltaY < 0 ? 1 : -1);
+        }
+      }, { passive: false });
+    }
+
+    // JSON Stage Trackpad Pinch & Ctrl/Cmd+Wheel
+    const jsonStage = document.getElementById("jsonStage");
+    if (jsonStage) {
+      jsonStage.addEventListener("gesturestart", function(e) {
+        e.preventDefault();
+        jsonGestureStartFontSize = jsonFontSize;
+      }, { passive: false });
+
+      jsonStage.addEventListener("gesturechange", function(e) {
+        e.preventDefault();
+        setJsonFontSize(jsonGestureStartFontSize * e.scale);
+      }, { passive: false });
+
+      jsonStage.addEventListener("wheel", function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const factor = Math.exp(-e.deltaY * 0.008);
+          setJsonFontSize(jsonFontSize * factor);
+        }
+      }, { passive: false });
+    }
+
+    // CSV Stage Trackpad Pinch & Ctrl/Cmd+Wheel
+    const csvStage = document.getElementById("csvStage");
+    if (csvStage) {
+      csvStage.addEventListener("gesturestart", function(e) {
+        e.preventDefault();
+        csvGestureStartFontSize = csvFontSize;
+      }, { passive: false });
+
+      csvStage.addEventListener("gesturechange", function(e) {
+        e.preventDefault();
+        setCsvFontSize(csvGestureStartFontSize * e.scale);
+      }, { passive: false });
+
+      csvStage.addEventListener("wheel", function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const factor = Math.exp(-e.deltaY * 0.008);
+          setCsvFontSize(csvFontSize * factor);
+        }
       }, { passive: false });
     }
   }
@@ -8314,8 +8510,9 @@
     }
   }
 
-  function adjustCodeFontSize(delta) {
-    codeFontSize = Math.max(11, Math.min(24, codeFontSize + delta));
+  let codeGestureStartFontSize = 13.5;
+  function setCodeFontSize(val) {
+    codeFontSize = Math.max(10, Math.min(36, Math.round(val * 10) / 10));
     const badge = document.getElementById("codeFontSizeBadge");
     if (badge) badge.textContent = codeFontSize + "px";
 
@@ -8324,6 +8521,136 @@
 
     const textarea = document.getElementById("codeTextarea");
     if (textarea) textarea.style.fontSize = codeFontSize + "px";
+  }
+
+  function adjustCodeFontSize(delta) {
+    setCodeFontSize(codeFontSize + delta);
+  }
+
+  let mdGestureStartFontSize = 14;
+  function setMdFontSize(val) {
+    mdFontSize = Math.max(10, Math.min(36, Math.round(val * 10) / 10));
+    const badge = document.getElementById("mdFontSizeBadge");
+    if (badge) badge.textContent = mdFontSize + "px";
+
+    const rendered = document.getElementById("mdRendered");
+    if (rendered) rendered.style.fontSize = mdFontSize + "px";
+
+    const textarea = document.getElementById("mdTextarea");
+    if (textarea) textarea.style.fontSize = mdFontSize + "px";
+  }
+
+  function adjustMdFontSize(delta) {
+    setMdFontSize(mdFontSize + delta);
+  }
+
+  let jsonFontSize = 13;
+  let jsonGestureStartFontSize = 13;
+  function setJsonFontSize(val) {
+    jsonFontSize = Math.max(10, Math.min(32, Math.round(val * 10) / 10));
+    const badge = document.getElementById("jsonFontSizeBadge");
+    if (badge) badge.textContent = jsonFontSize + "px";
+
+    ["jsonTreeContainer", "jsonGridContainer", "jsonTableContainer", "jsonCodeContainer", "jsonTextarea"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.fontSize = jsonFontSize + "px";
+    });
+  }
+
+  function adjustJsonFontSize(delta) {
+    setJsonFontSize(jsonFontSize + delta);
+  }
+
+  let csvFontSize = 12.5;
+  let csvGestureStartFontSize = 12.5;
+  function setCsvFontSize(val) {
+    csvFontSize = Math.max(10, Math.min(30, Math.round(val * 10) / 10));
+    const badge = document.getElementById("csvFontSizeBadge");
+    if (badge) badge.textContent = csvFontSize + "px";
+
+    const tbl = document.getElementById("csvTableContainer");
+    if (tbl) tbl.style.fontSize = csvFontSize + "px";
+  }
+
+  function adjustCsvFontSize(delta) {
+    setCsvFontSize(csvFontSize + delta);
+  }
+
+  let pdfPageZoom = 1.0;
+  let pdfGestureStartZoom = 1.0;
+  let pdfTextFontSize = 14;
+
+  function setPdfPageZoom(val) {
+    pdfPageZoom = Math.max(0.3, Math.min(5.0, Math.round(val * 100) / 100));
+    if (Math.abs(pdfPageZoom - 1.0) < 0.03) pdfPageZoom = 1.0;
+
+    // 1. Update native PDFKit iframe container dimensions
+    const inner = document.getElementById("pdfNativeInner");
+    if (inner) {
+      if (pdfPageZoom === 1.0) {
+        inner.style.width = "100%";
+        inner.style.height = "100%";
+      } else {
+        inner.style.width = Math.round(100 * pdfPageZoom) + "%";
+        inner.style.height = Math.round(100 * pdfPageZoom) + "%";
+      }
+    }
+
+    // 2. Update page render image view
+    const img = document.getElementById("pdfPageImage");
+    if (img) {
+      if (pdfPageZoom !== 1.0) {
+        img.style.maxWidth = "none";
+        img.style.width = Math.round(960 * pdfPageZoom) + "px";
+      } else {
+        img.style.maxWidth = "960px";
+        img.style.width = "100%";
+      }
+    }
+
+    // 3. Update topbar badge
+    const badge = document.getElementById("pdfZoomBadge");
+    if (badge) badge.textContent = Math.round(pdfPageZoom * 100) + "%";
+  }
+
+  window.handleNativeMagnify = function(delta) {
+    if (currentFileType === "pdf") {
+      if (pdfViewMode === "text") {
+        adjustPdfTextFontSize(delta > 0 ? 0.5 : -0.5);
+      } else {
+        const factor = 1 + delta * 1.5;
+        setPdfPageZoom(pdfPageZoom * factor);
+      }
+    } else if (currentFileType === "image" && viewMode === "single") {
+      zoom = Math.max(0.2, Math.min(25, zoom * (1 + delta * 1.5)));
+      applyTransform();
+    } else if (currentFileType === "code") {
+      adjustCodeFontSize(delta > 0 ? 0.5 : -0.5);
+    } else if (currentFileType === "markdown" || currentFileType === "docx") {
+      adjustMdFontSize(delta > 0 ? 0.5 : -0.5);
+    } else if (currentFileType === "json" || currentFileType === "xml") {
+      adjustJsonFontSize(delta > 0 ? 0.5 : -0.5);
+    } else if (currentFileType === "csv" || currentFileType === "xlsx") {
+      adjustCsvFontSize(delta > 0 ? 0.5 : -0.5);
+    }
+  };
+
+  function adjustPdfZoom(delta) {
+    if (pdfViewMode === "text") {
+      adjustPdfTextFontSize(delta > 0 ? 1 : -1);
+      return;
+    }
+    setPdfPageZoom(pdfPageZoom + delta);
+  }
+
+  function resetPdfZoom() {
+    setPdfPageZoom(1.0);
+  }
+
+  function adjustPdfTextFontSize(delta) {
+    pdfTextFontSize = Math.max(10, Math.min(36, pdfTextFontSize + delta));
+    const rendered = document.getElementById("pdfTextRendered");
+    if (rendered) rendered.style.fontSize = pdfTextFontSize + "px";
   }
 
   function toggleCodeWrap() {
@@ -8448,6 +8775,32 @@
       const item = getCurrentActiveItem();
       if (item) trashFileItem(null, item.path, item.name.split("/").pop(), false);
       return;
+    }
+
+    // Global Cmd/Ctrl +/-/0 Zoom for Image, PDF, Code, Markdown, JSON, CSV
+    if (e.metaKey || e.ctrlKey) {
+      if (e.key === "=" || e.key === "+") {
+        if (currentFileType === "code") { e.preventDefault(); adjustCodeFontSize(1); return; }
+        if (currentFileType === "markdown" || currentFileType === "docx") { e.preventDefault(); adjustMdFontSize(1); return; }
+        if (currentFileType === "pdf") { e.preventDefault(); adjustPdfZoom(0.15); return; }
+        if (currentFileType === "json" || currentFileType === "xml") { e.preventDefault(); adjustJsonFontSize(1); return; }
+        if (currentFileType === "csv" || currentFileType === "xlsx") { e.preventDefault(); adjustCsvFontSize(1); return; }
+        if (currentFileType === "image" && viewMode === "single") { e.preventDefault(); zoom = Math.min(25, zoom * 1.25); applyTransform(); return; }
+      } else if (e.key === "-") {
+        if (currentFileType === "code") { e.preventDefault(); adjustCodeFontSize(-1); return; }
+        if (currentFileType === "markdown" || currentFileType === "docx") { e.preventDefault(); adjustMdFontSize(-1); return; }
+        if (currentFileType === "pdf") { e.preventDefault(); adjustPdfZoom(-0.15); return; }
+        if (currentFileType === "json" || currentFileType === "xml") { e.preventDefault(); adjustJsonFontSize(-1); return; }
+        if (currentFileType === "csv" || currentFileType === "xlsx") { e.preventDefault(); adjustCsvFontSize(-1); return; }
+        if (currentFileType === "image" && viewMode === "single") { e.preventDefault(); zoom = Math.max(0.2, zoom * 0.8); applyTransform(); return; }
+      } else if (e.key === "0") {
+        if (currentFileType === "code") { e.preventDefault(); setCodeFontSize(13.5); return; }
+        if (currentFileType === "markdown" || currentFileType === "docx") { e.preventDefault(); setMdFontSize(14); return; }
+        if (currentFileType === "pdf") { e.preventDefault(); resetPdfZoom(); return; }
+        if (currentFileType === "json" || currentFileType === "xml") { e.preventDefault(); setJsonFontSize(13); return; }
+        if (currentFileType === "csv" || currentFileType === "xlsx") { e.preventDefault(); setCsvFontSize(12.5); return; }
+        if (currentFileType === "image" && viewMode === "single") { e.preventDefault(); zoom = 1; panX = 0; panY = 0; applyTransform(); return; }
+      }
     }
 
     // Global Escape Handler: Close Scratchpad or Return to Thumbnail Wall / Grid View
@@ -9191,7 +9544,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.6";
+        const curVer = data.current_version || "2.8.7";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -9261,7 +9614,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.6";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.7";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -9325,8 +9678,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.6";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.6";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.7";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.7";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -9392,13 +9745,24 @@
     }
     showToast("🔄 正在重新啟動 PowerUp Toolbox...");
     try {
-      await fetch('/api/restart', { method: 'POST' });
+      await fetch('/api/restart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
     } catch (e) {
       // server shuts down quickly
     }
     setTimeout(() => {
       try { window.close(); } catch(e){}
-    }, 1200);
+    }, 600);
+    setTimeout(() => {
+      if (btnCancel) btnCancel.disabled = false;
+      if (btnRestart) btnRestart.disabled = false;
+      if (statusBox) {
+        statusBox.innerHTML = `✅ 已送出重啟請求！若程式未自動重新開啟，請至「應用程式」點擊 <strong>MacToolbox</strong> 或<button class="btn primary" onclick="location.reload()" style="margin-left:8px; padding:2px 8px; font-size:11px;">重新載入頁面</button>`;
+      }
+    }, 3000);
   }
 
   function closeUpdateModal() {
@@ -10732,7 +11096,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.6</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.7</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
