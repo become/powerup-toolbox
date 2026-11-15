@@ -7423,7 +7423,7 @@
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           const factor = Math.exp(-e.deltaY * 0.008);
-          setPdfPageZoom(pdfPageZoom * factor);
+          setPdfPageZoom(pdfPageZoom * factor, e.clientX, e.clientY);
         }
       }, { passive: false });
     }
@@ -8588,9 +8588,20 @@
   let pdfGestureStartZoom = 1.0;
   let pdfTextFontSize = 14;
 
-  function setPdfPageZoom(val) {
-    pdfPageZoom = Math.max(0.3, Math.min(5.0, Math.round(val * 100) / 100));
-    if (Math.abs(pdfPageZoom - 1.0) < 0.03) pdfPageZoom = 1.0;
+  let lastMouseClientX = window.innerWidth / 2;
+  let lastMouseClientY = window.innerHeight / 2;
+  window.addEventListener("mousemove", function(e) {
+    lastMouseClientX = e.clientX;
+    lastMouseClientY = e.clientY;
+  }, { passive: true });
+
+  function setPdfPageZoom(val, clientX, clientY) {
+    const oldZoom = pdfPageZoom;
+    let newZoom = Math.max(0.3, Math.min(5.0, Math.round(val * 100) / 100));
+    if (Math.abs(newZoom - 1.0) < 0.03) newZoom = 1.0;
+    if (Math.abs(newZoom - oldZoom) < 0.001) return;
+
+    pdfPageZoom = newZoom;
 
     // 1. Update native PDFKit iframe container dimensions and CSS transform
     const wrap = document.getElementById("pdfNativeWrapper");
@@ -8608,21 +8619,50 @@
         frame.style.height = "100%";
         frame.style.transformOrigin = "top left";
         frame.style.transform = "none";
+        wrap.scrollLeft = 0;
+        wrap.scrollTop = 0;
       } else {
+        const wrapRect = wrap.getBoundingClientRect();
+        let mouseX = wrapRect.width / 2;
+        let mouseY = wrapRect.height / 2;
+        const targetClientX = (clientX !== undefined && clientX !== null) ? clientX : lastMouseClientX;
+        const targetClientY = (clientY !== undefined && clientY !== null) ? clientY : lastMouseClientY;
+        if (targetClientX >= wrapRect.left && targetClientX <= wrapRect.right &&
+            targetClientY >= wrapRect.top && targetClientY <= wrapRect.bottom) {
+          mouseX = targetClientX - wrapRect.left;
+          mouseY = targetClientY - wrapRect.top;
+        }
+
+        const prevScrollLeft = wrap.scrollLeft;
+        const prevScrollTop = wrap.scrollTop;
+
+        // Content point under cursor before zoom
+        const contentX = prevScrollLeft + mouseX;
+        const contentY = prevScrollTop + mouseY;
+        const ratio = newZoom / oldZoom;
+
         const w = wrap.clientWidth;
         const h = wrap.clientHeight;
-        const targetW = Math.round(w * pdfPageZoom) + "px";
-        const targetH = Math.round(h * pdfPageZoom) + "px";
+        const targetW = Math.round(w * pdfPageZoom);
+        const targetH = Math.round(h * pdfPageZoom);
+
         wrap.style.justifyContent = "flex-start";
         wrap.style.alignItems = "flex-start";
-        inner.style.width = targetW;
-        inner.style.minWidth = targetW;
-        inner.style.height = targetH;
-        inner.style.minHeight = targetH;
+        inner.style.width = targetW + "px";
+        inner.style.minWidth = targetW + "px";
+        inner.style.height = targetH + "px";
+        inner.style.minHeight = targetH + "px";
         frame.style.width = w + "px";
         frame.style.height = h + "px";
         frame.style.transformOrigin = "top left";
         frame.style.transform = "scale(" + pdfPageZoom + ")";
+
+        // Target new scroll positions so content point stays under mouse
+        const nextScrollLeft = Math.max(0, Math.min(targetW - w, Math.round(contentX * ratio - mouseX)));
+        const nextScrollTop = Math.max(0, Math.min(targetH - h, Math.round(contentY * ratio - mouseY)));
+
+        wrap.scrollLeft = nextScrollLeft;
+        wrap.scrollTop = nextScrollTop;
       }
     }
 
@@ -8649,13 +8689,13 @@
     }
   });
 
-  window.handleNativeMagnify = function(delta) {
+  window.handleNativeMagnify = function(delta, clientX, clientY) {
     if (currentFileType === "pdf") {
       if (pdfViewMode === "text") {
         adjustPdfTextFontSize(delta > 0 ? 0.5 : -0.5);
       } else {
         const factor = 1 + delta * 1.5;
-        setPdfPageZoom(pdfPageZoom * factor);
+        setPdfPageZoom(pdfPageZoom * factor, clientX, clientY);
       }
     } else if (currentFileType === "image" && viewMode === "single") {
       zoom = Math.max(0.2, Math.min(25, zoom * (1 + delta * 1.5)));
@@ -8671,12 +8711,12 @@
     }
   };
 
-  function adjustPdfZoom(delta) {
+  function adjustPdfZoom(delta, clientX, clientY) {
     if (pdfViewMode === "text") {
       adjustPdfTextFontSize(delta > 0 ? 1 : -1);
       return;
     }
-    setPdfPageZoom(pdfPageZoom + delta);
+    setPdfPageZoom(pdfPageZoom + delta, clientX, clientY);
   }
 
   function resetPdfZoom() {

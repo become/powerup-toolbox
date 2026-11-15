@@ -68,7 +68,10 @@ class WebDelegateHandler: NSObject, WKNavigationDelegate, WKUIDelegate {
 class NativeToolboxWebView: WKWebView {
     override func magnify(with event: NSEvent) {
         let delta = event.magnification
-        let js = "if (typeof handleNativeMagnify === 'function') { handleNativeMagnify(\(delta)); }"
+        let loc = self.convert(event.locationInWindow, from: nil)
+        let cx = loc.x
+        let cy = self.bounds.height - loc.y
+        let js = "if (typeof handleNativeMagnify === 'function') { handleNativeMagnify(\(delta), \(cx), \(cy)); }"
         self.evaluateJavaScript(js, completionHandler: nil)
     }
 
@@ -77,7 +80,10 @@ class NativeToolboxWebView: WKWebView {
             let dy = event.scrollingDeltaY
             if abs(dy) > 0.05 {
                 let factor = dy > 0 ? 0.05 : -0.05
-                let js = "if (typeof handleNativeMagnify === 'function') { handleNativeMagnify(\(factor)); }"
+                let loc = self.convert(event.locationInWindow, from: nil)
+                let cx = loc.x
+                let cy = self.bounds.height - loc.y
+                let js = "if (typeof handleNativeMagnify === 'function') { handleNativeMagnify(\(factor), \(cx), \(cy)); }"
                 self.evaluateJavaScript(js, completionHandler: nil)
                 return
             }
