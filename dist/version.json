@@ -1,5 +1,5 @@
 {
-  "version": "2.8.7",
+  "version": "2.8.8",
   "name": "PowerUp Toolbox",
   "release_date": "2026-11-15",
   "min_macos": "12.0",
@@ -11,7 +11,7 @@
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
-    "version": "2.8.7",
+    "version": "2.8.8",
     "min_macos": "12.0",
     "latest_dmg": "MacToolbox-latest.dmg",
     "latest_pkg": "MacToolbox-latest.pkg",
