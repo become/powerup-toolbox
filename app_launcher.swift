@@ -65,7 +65,94 @@ class WebDelegateHandler: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 }
 
+class NativeAppBridge: NSObject, WKScriptMessageHandler {
+    weak var window: NSWindow?
+    weak var webView: WKWebView?
+
+    init(window: NSWindow?, webView: WKWebView?) {
+        self.window = window
+        self.webView = webView
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any],
+              let action = body["action"] as? String else { return }
+
+        if action == "pickFolder" || action == "pickFile" {
+            let isFolder = (action == "pickFolder")
+            let panel = NSOpenPanel()
+            panel.title = isFolder ? "選擇要瀏覽的資料夾" : "選擇要開啟的檔案"
+            panel.prompt = "選擇"
+            panel.canChooseFiles = !isFolder
+            panel.canChooseDirectories = isFolder
+            panel.allowsMultipleSelection = false
+            panel.resolvesAliases = true
+
+            if let currentDir = body["currentDir"] as? String, !currentDir.isEmpty, FileManager.default.fileExists(atPath: currentDir) {
+                panel.directoryURL = URL(fileURLWithPath: currentDir)
+            } else {
+                panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+            }
+
+            let completion: (NSApplication.ModalResponse) -> Void = { [weak self] resp in
+                guard resp == .OK, let selectedUrl = panel.url else { return }
+                let path = selectedUrl.path
+                let escaped = path.replacingOccurrences(of: "\\", with: "\\\\")
+                                  .replacingOccurrences(of: "'", with: "\\'")
+                let js = isFolder
+                    ? "if (typeof loadDirectory === 'function') { loadDirectory('\(escaped)', null, true); }"
+                    : "if (typeof loadDirectory === 'function') { loadDirectory('\(escaped)', '\(escaped)', true); }"
+                DispatchQueue.main.async {
+                    self?.webView?.evaluateJavaScript(js, completionHandler: nil)
+                }
+            }
+
+            if let win = self.window {
+                panel.beginSheetModal(for: win, completionHandler: completion)
+            } else {
+                panel.begin(completionHandler: completion)
+            }
+        }
+    }
+}
+
 class NativeToolboxWebView: WKWebView {
+    override init(frame: CGRect, configuration: WKWebViewConfiguration) {
+        super.init(frame: frame, configuration: configuration)
+        self.registerForDraggedTypes([.fileURL])
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        self.registerForDraggedTypes([.fileURL])
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let pboard = sender.draggingPasteboard
+        if pboard.canReadItem(withDataConformingToTypes: [NSPasteboard.PasteboardType.fileURL.rawValue]) {
+            return .copy
+        }
+        return super.draggingEntered(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let pboard = sender.draggingPasteboard
+        if let urls = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], let firstUrl = urls.first {
+            let path = firstUrl.path
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
+                let escaped = path.replacingOccurrences(of: "\\", with: "\\\\")
+                                  .replacingOccurrences(of: "'", with: "\\'")
+                let js = isDir.boolValue
+                    ? "if (typeof loadDirectory === 'function') { loadDirectory('\(escaped)', null, true); }"
+                    : "if (typeof loadDirectory === 'function') { loadDirectory('\(escaped)', '\(escaped)', true); }"
+                self.evaluateJavaScript(js, completionHandler: nil)
+                return true
+            }
+        }
+        return super.performDragOperation(sender)
+    }
+
     override func magnify(with event: NSEvent) {
         let delta = event.magnification
         let loc = self.convert(event.locationInWindow, from: nil)
@@ -95,6 +182,7 @@ class NativeToolboxWebView: WKWebView {
 class MainWindowController: NSWindowController, NSWindowDelegate {
     var webView: NativeToolboxWebView!
     var delegateHandler: WebDelegateHandler!
+    var nativeBridge: NativeAppBridge!
 
     convenience init() {
         let window = NSWindow(
@@ -115,8 +203,16 @@ class MainWindowController: NSWindowController, NSWindowDelegate {
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
         config.defaultWebpagePreferences.allowsContentJavaScript = true
 
+        let bridge = NativeAppBridge(window: window, webView: nil)
+        let userContent = WKUserContentController()
+        userContent.add(bridge, name: "nativeApp")
+        config.userContentController = userContent
+
         self.delegateHandler = WebDelegateHandler()
         self.webView = NativeToolboxWebView(frame: window.contentView!.bounds, configuration: config)
+        bridge.webView = self.webView
+        self.nativeBridge = bridge
+
         self.webView.autoresizingMask = [.width, .height]
         self.webView.navigationDelegate = self.delegateHandler
         self.webView.uiDelegate = self.delegateHandler

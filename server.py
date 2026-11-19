@@ -49,7 +49,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.8"
+APP_VERSION = "2.8.9"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -2588,10 +2588,12 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             return
 
         if route == "/api/bookmarks":
+            user_home = os.path.expanduser("~")
             bookmarks = [
                 {"name": "📷 本機相簿", "full_name": "📷 本機相簿工坊 (真實照片庫、智慧分類與雲端同步)", "path": "albums://", "icon": "📷", "special": "albums"},
                 {"name": "📸 截圖匣", "full_name": "📸 截圖與剪貼簿匣", "path": os.path.abspath(CAPTURES_DIR), "icon": "📸"},
                 {"name": "📝 暫存匣", "full_name": "📝 暫存草稿工作匣 (Scratchpad)", "path": os.path.abspath(SCRATCH_DIR), "icon": "📝"},
+                {"name": "🏠 家目錄", "full_name": f"🏠 使用者家目錄 ({user_home})", "path": user_home, "icon": "🏠"},
                 {"name": "🧰 Toolbox", "full_name": "🧰 Toolbox 專案目錄", "path": os.path.abspath(TOOLBOX_DIR), "icon": "🧰"},
                 {"name": "🖥️ 桌面", "full_name": "🖥️ 桌面 (Desktop)", "path": safe_or_none("~/Desktop"), "icon": "🖥️"},
                 {"name": "📂 下載", "full_name": "📂 下載項目 (Downloads)", "path": safe_or_none("~/Downloads"), "icon": "📂"},
@@ -2611,42 +2613,63 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                             "icon": "💾"
                         })
             else:
-                bookmarks.append({"name": "💻 專案區", "full_name": "💻 Claude 專案目錄", "path": safe_or_none("~/Claude/Projects"), "icon": "💻"})
+                try:
+                    claude_proj = safe_or_none("~/Claude/Projects")
+                    if claude_proj and os.path.isdir(claude_proj):
+                        bookmarks.append({"name": "💻 專案區", "full_name": "💻 Claude 專案目錄", "path": claude_proj, "icon": "💻"})
+                except Exception:
+                    pass
                 # Auto-detect macOS Cloud Storage (Google Drive, iCloud Drive, OneDrive, Dropbox)
-                icloud_dir = os.path.expanduser("~/Library/Mobile Documents/com~apple~CloudDocs")
-                if os.path.isdir(icloud_dir):
-                    bookmarks.append({"name": "☁️ iCloud 雲端", "full_name": "☁️ iCloud 雲端硬碟 (自動同步)", "path": icloud_dir, "icon": "☁️"})
-                cloud_storage = os.path.expanduser("~/Library/CloudStorage")
-                if os.path.isdir(cloud_storage):
-                    for entry in sorted(os.listdir(cloud_storage)):
-                        full_entry = os.path.join(cloud_storage, entry)
-                        if os.path.isdir(full_entry):
-                            if "GoogleDrive" in entry:
-                                if " (" in entry and os.path.isdir(os.path.join(cloud_storage, entry.split(" (")[0])):
-                                    continue
-                                gdrive_my = os.path.join(full_entry, "我的雲端硬碟")
-                                gpath = gdrive_my if os.path.isdir(gdrive_my) else full_entry
-                                bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟 (我的雲端硬碟)", "path": gpath, "icon": "☁️"})
-                            elif "OneDrive" in entry:
-                                bookmarks.append({"name": "☁️ OneDrive", "full_name": "☁️ OneDrive 雲端硬碟", "path": full_entry, "icon": "☁️"})
-                            elif "Dropbox" in entry:
-                                bookmarks.append({"name": "☁️ Dropbox", "full_name": "☁️ Dropbox 雲端硬碟", "path": full_entry, "icon": "☁️"})
+                try:
+                    icloud_dir = os.path.expanduser("~/Library/Mobile Documents/com~apple~CloudDocs")
+                    if os.path.isdir(icloud_dir):
+                        bookmarks.append({"name": "☁️ iCloud 雲端", "full_name": "☁️ iCloud 雲端硬碟 (自動同步)", "path": icloud_dir, "icon": "☁️"})
+                except Exception:
+                    pass
+                try:
+                    cloud_storage = os.path.expanduser("~/Library/CloudStorage")
+                    if os.path.isdir(cloud_storage):
+                        for entry in sorted(os.listdir(cloud_storage)):
+                            full_entry = os.path.join(cloud_storage, entry)
+                            if os.path.isdir(full_entry):
+                                if "GoogleDrive" in entry:
+                                    if " (" in entry and os.path.isdir(os.path.join(cloud_storage, entry.split(" (")[0])):
+                                        continue
+                                    gdrive_my = os.path.join(full_entry, "我的雲端硬碟")
+                                    gpath = gdrive_my if os.path.isdir(gdrive_my) else full_entry
+                                    bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟 (我的雲端硬碟)", "path": gpath, "icon": "☁️"})
+                                elif "OneDrive" in entry:
+                                    bookmarks.append({"name": "☁️ OneDrive", "full_name": "☁️ OneDrive 雲端硬碟", "path": full_entry, "icon": "☁️"})
+                                elif "Dropbox" in entry:
+                                    bookmarks.append({"name": "☁️ Dropbox", "full_name": "☁️ Dropbox 雲端硬碟", "path": full_entry, "icon": "☁️"})
+                except Exception:
+                    pass
             if IS_WINDOWS:
-                user_home = os.path.expanduser("~")
-                onedrive_dir = os.environ.get("OneDrive") or os.path.join(user_home, "OneDrive")
-                if os.path.isdir(onedrive_dir):
-                    bookmarks.append({"name": "☁️ OneDrive", "full_name": "☁️ OneDrive 雲端硬碟", "path": onedrive_dir, "icon": "☁️"})
-                gdrive_win = os.path.join(user_home, "Google Drive")
-                if os.path.isdir(gdrive_win):
-                    bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟", "path": gdrive_win, "icon": "☁️"})
+                try:
+                    onedrive_dir = os.environ.get("OneDrive") or os.path.join(user_home, "OneDrive")
+                    if os.path.isdir(onedrive_dir):
+                        bookmarks.append({"name": "☁️ OneDrive", "full_name": "☁️ OneDrive 雲端硬碟", "path": onedrive_dir, "icon": "☁️"})
+                    gdrive_win = os.path.join(user_home, "Google Drive")
+                    if os.path.isdir(gdrive_win):
+                        bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟", "path": gdrive_win, "icon": "☁️"})
+                except Exception:
+                    pass
 
-            valid = [b for b in bookmarks if b["path"] and (
-                b.get("special") in ("albums", "gphotos")
-                or (not path_is_unsafe(b["path"]) and (
-                    (IS_WINDOWS and len(b["path"]) == 3 and b["path"][1:] == ":\\" and winpath.drive_type(b["path"][0]) == 4)
-                    or os.path.exists(b["path"])
-                ))
-            )]
+            valid = []
+            for b in bookmarks:
+                bp = b.get("path")
+                if not bp:
+                    continue
+                if b.get("special") in ("albums", "gphotos"):
+                    valid.append(b)
+                    continue
+                if path_is_unsafe(bp):
+                    continue
+                try:
+                    if (IS_WINDOWS and len(bp) == 3 and bp[1:] == ":\\" and winpath.drive_type(bp[0]) == 4) or os.path.exists(bp):
+                        valid.append(b)
+                except Exception:
+                    pass
             self.send_json({"ok": True, "bookmarks": valid, "home": safe_or_none("~") or ""})
             return
 
@@ -2959,18 +2982,24 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     os.path.expanduser("~/Desktop"),
                     os.path.expanduser("~/Pictures"),
                     os.path.expanduser("~/Downloads"),
+                    os.path.expanduser("~/Documents"),
+                    os.path.expanduser("~"),
+                    os.path.abspath(TOOLBOX_DIR),
                 ]
+                first_readable = None
                 for cand in candidates:
                     if not path_is_unsafe(cand) and os.path.isdir(cand):
                         try:
-                            if any(not e.startswith(".") and detect_file_type(e) is not None for e in os.listdir(cand)):
+                            entries = os.listdir(cand)
+                            if first_readable is None:
+                                first_readable = cand
+                            if any(not e.startswith(".") and detect_file_type(e) is not None for e in entries):
                                 raw_path = cand
                                 break
-                        except Exception:
+                        except (PermissionError, OSError):
                             pass
                 if not raw_path:
-                    desktop = os.path.expanduser("~/Desktop")
-                    raw_path = desktop if os.path.isdir(desktop) else os.path.expanduser("~")
+                    raw_path = first_readable or os.path.expanduser("~")
 
             target = safe_fs_path(raw_path)
             focus_file = None
@@ -3074,6 +3103,26 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                                     csvs.append(obj)
                             except Exception:
                                 pass
+            except PermissionError as e:
+                self.send_json({
+                    "ok": True,
+                    "permission_denied": True,
+                    "error": f"macOS 隱私限制：無法讀取「{os.path.basename(target) or target}」(Operation not permitted)",
+                    "path": target,
+                    "home": safe_or_none("~") or "",
+                    "parent": os.path.dirname(target) if target != "/" else "/",
+                    "recursive": recursive,
+                    "focus_file": focus_file,
+                    "focus_type": focus_type,
+                    "dirs": [],
+                    "items": [],
+                    "images": [],
+                    "markdowns": [],
+                    "codes": [],
+                    "jsons": [],
+                    "csvs": [],
+                })
+                return
             except Exception as e:
                 self.send_json({"ok": False, "error": str(e)}, 500)
                 return

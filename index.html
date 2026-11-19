@@ -2111,7 +2111,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.8 · 點擊手動檢查更新">v2.8.8</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.9 · 點擊手動檢查更新">v2.8.9</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2244,7 +2244,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.8)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.9)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -3106,6 +3106,8 @@
   let recentFiles = [];
   let currentIndex = -1;
   let activeFileObj = null;      // Currently displayed file on center stage: { path, name, type, size, mtime }
+  let lastDirPermissionDenied = false;
+  let lastDirPermissionError = "";
 
   // Thumbnail privacy: image previews are hidden by default and NOT remembered across launches.
   let showThumbs = false;
@@ -3429,6 +3431,7 @@
 
     setInterval(checkPendingOpen, 1200);
     setInterval(pollMarkdownLiveReload, 2000);
+    setupDragAndDrop();
 
     // Onboarding tour is available on demand via topbar (?) button
     // try {
@@ -3721,6 +3724,13 @@
   }
 
   async function pickNativePath(mode = "folder") {
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeApp) {
+      window.webkit.messageHandlers.nativeApp.postMessage({
+        action: mode === "file" ? "pickFile" : "pickFolder",
+        currentDir: currentDir || ""
+      });
+      return;
+    }
     showToast(T(mode === "file" ? "📂 請在 Mac 視窗選擇要開啟的檔案..." : "📂 請在 Mac 視窗選擇要瀏覽的資料夾..."));
     try {
       const res = await fetch("/api/pick-path", {
@@ -3826,6 +3836,8 @@
       return;
     }
 
+    lastDirPermissionDenied = Boolean(data.permission_denied);
+    lastDirPermissionError = data.error || "";
     if (data.home) homeDir = data.home;
     const prevDirForGrid = currentDir;
     currentDir = data.path;
@@ -3930,6 +3942,7 @@
         document.getElementById("hudBrowseBadge").style.display = "inline-block";
       }
       renderLeftNavigation();
+      updateCenterEmptyState();
       return;
     }
 
@@ -3957,6 +3970,7 @@
       }
       highlightActiveThumb();
       renderLeftNavigation();
+      updateCenterEmptyState();
     }
   }
 
@@ -4000,6 +4014,7 @@
 
     highlightActiveThumb();
     renderLeftNavigation();
+    updateCenterEmptyState();
 
     if (item.type === "pdf") {
       adaptUiForFileType("pdf");
@@ -4162,12 +4177,125 @@
             <button class="btn" style="width:100%; justify-content:center;" onclick="setTypeFilter('all'); clearSearchInput();">🔄 顯示全部 (${allItems.length})</button>
           </div>
         `;
+      } else if (lastDirPermissionDenied) {
+        html += `
+          <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:10px; padding:14px 12px; margin:8px 4px; text-align:center; font-size:12px; line-height:1.5;">
+            <div style="font-size:22px; margin-bottom:6px;">🛡️</div>
+            <div style="font-weight:700; color:#fca5a5; margin-bottom:6px;">macOS 系統隱私權限提示</div>
+            <div style="color:#cbd5e1; font-size:11px; margin-bottom:12px;">此資料夾受系統保護 (Operation not permitted)。請點擊下方手動挑選即可自動取得授權，或前往家目錄：</div>
+            <button class="btn primary" style="width:100%; justify-content:center; margin-bottom:6px;" onclick="pickNativePath('folder')">📂 選取此資料夾 (自動授權)</button>
+            <button class="btn" style="width:100%; justify-content:center;" onclick="loadDirectory(homeDir || '~')">🏠 前往家目錄 (~)</button>
+          </div>
+        `;
       } else {
-        html += `<div style="color:var(--muted); font-size:11.5px; padding:12px 8px; text-align:center;">（此資料夾內無支援的檔案）</div>`;
+        html += `
+          <div style="background:var(--bg-0); border:1px dashed var(--border); border-radius:10px; padding:16px 12px; margin:8px 4px; text-align:center; font-size:12px; line-height:1.5;">
+            <div style="font-size:20px; margin-bottom:6px;">📂</div>
+            <div style="color:var(--muted); margin-bottom:12px;">此資料夾內尚無支援的檔案<br/><span style="font-size:10.5px; opacity:0.8;">(支援圖片、Markdown、程式碼、JSON、CSV、PDF)</span></div>
+            <button class="btn primary" style="width:100%; justify-content:center; margin-bottom:6px;" onclick="pickNativePath('folder')">📂 選取其他資料夾…</button>
+            <button class="btn" style="width:100%; justify-content:center;" onclick="loadDirectory(homeDir || '~')">🏠 前往家目錄 (~)</button>
+          </div>
+        `;
       }
     }
 
     el.innerHTML = html;
+  }
+
+  function updateCenterEmptyState() {
+    let emptyEl = document.getElementById("centerEmptyState");
+    if (!emptyEl) {
+      emptyEl = document.createElement("div");
+      emptyEl.id = "centerEmptyState";
+      emptyEl.style.cssText = "display:none; position:absolute; inset:40px 20px 20px 20px; flex-direction:column; align-items:center; justify-content:center; text-align:center; z-index:30; pointer-events:auto;";
+      const stageEl = document.getElementById("singleView");
+      if (stageEl && stageEl.parentNode) {
+        stageEl.parentNode.style.position = "relative";
+        stageEl.parentNode.appendChild(emptyEl);
+      }
+    }
+
+    if (activeFileObj || filteredItems.length > 0 || isGPhotosActive || (subDirs.length > 0 && !lastDirPermissionDenied)) {
+      emptyEl.style.display = "none";
+      return;
+    }
+
+    emptyEl.style.display = "flex";
+    if (lastDirPermissionDenied) {
+      emptyEl.innerHTML = `
+        <div style="background:rgba(15,23,42,0.94); border:1px solid rgba(239,68,68,0.4); box-shadow:0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(239,68,68,0.15); border-radius:18px; padding:32px 28px; max-width:540px; width:90%;">
+          <div style="font-size:42px; margin-bottom:12px;">🛡️</div>
+          <h2 style="margin:0 0 10px 0; font-size:19px; color:#fff; font-weight:800;">macOS 系統隱私限制 (Operation not permitted)</h2>
+          <p style="margin:0 0 18px 0; color:#94a3b8; font-size:13px; line-height:1.6;">
+            此目錄受 macOS TCC 隱私安全機制保護。<br/>
+            只要透過系統視窗手動選取該資料夾一次，系統將立即自動賦予存取授權！
+          </p>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+            <button class="btn primary" style="padding:10px 16px; font-size:13px; font-weight:700; justify-content:center;" onclick="pickNativePath('folder')">📂 選取資料夾… (立即自動授權)</button>
+            <button class="btn" style="padding:8px 14px; font-size:12.5px; justify-content:center;" onclick="loadDirectory(homeDir || '~')">🏠 前往使用者家目錄 (~)</button>
+          </div>
+          <div style="font-size:11.5px; color:#64748b; line-height:1.5;">
+            💡 提示：您也可以直接從 Mac Finder 將任何檔案或資料夾<b>拖曳</b>進本視窗直接開啟瀏覽。
+          </div>
+        </div>
+      `;
+    } else {
+      emptyEl.innerHTML = `
+        <div style="background:rgba(15,23,42,0.92); border:1px solid rgba(255,255,255,0.1); box-shadow:0 20px 50px rgba(0,0,0,0.8); border-radius:18px; padding:32px 28px; max-width:520px; width:90%;">
+          <div style="font-size:42px; margin-bottom:12px;">📂</div>
+          <h2 style="margin:0 0 10px 0; font-size:18px; color:#fff; font-weight:800;">此資料夾內尚無支援的檔案</h2>
+          <p style="margin:0 0 18px 0; color:#94a3b8; font-size:13px; line-height:1.6;">
+            支援圖片 (PNG/JPG/WEBP/HEIC/SVG)、Markdown (.md)、程式碼、JSON、CSV 表格、文書與 PDF 等多種格式。
+          </p>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+            <button class="btn primary" style="padding:10px 16px; font-size:13px; font-weight:700; justify-content:center;" onclick="pickNativePath('folder')">📂 選取其他資料夾…</button>
+            <button class="btn" style="padding:8px 14px; font-size:12.5px; justify-content:center;" onclick="loadDirectory(homeDir || '~')">🏠 前往使用者家目錄 (~)</button>
+          </div>
+          <div style="font-size:11.5px; color:#64748b; line-height:1.5;">
+            📥 支援<b>拖曳</b>：隨時從 Finder 拖入檔案或資料夾立即檢視
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  function setupDragAndDrop() {
+    let dragCounter = 0;
+    const dropOverlay = document.createElement("div");
+    dropOverlay.id = "appDropOverlay";
+    dropOverlay.style.cssText = "display:none; position:fixed; inset:0; background:rgba(37,99,235,0.25); border:3px dashed #3b82f6; backdrop-filter:blur(4px); z-index:999999; pointer-events:none; align-items:center; justify-content:center; flex-direction:column; gap:12px; color:#fff;";
+    dropOverlay.innerHTML = `
+      <div style="font-size:56px; filter:drop-shadow(0 4px 12px rgba(0,0,0,0.5));">📥</div>
+      <div style="font-size:20px; font-weight:800; text-shadow:0 2px 8px rgba(0,0,0,0.8);">放開滑鼠以開啟檔案或瀏覽資料夾</div>
+      <div style="font-size:13px; color:#bfdbfe; text-shadow:0 1px 4px rgba(0,0,0,0.8);">支援圖片、Markdown、程式碼、JSON、CSV、PDF 或整個資料夾</div>
+    `;
+    document.body.appendChild(dropOverlay);
+
+    window.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      dragCounter++;
+      dropOverlay.style.display = "flex";
+    });
+
+    window.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        dropOverlay.style.display = "none";
+      }
+    });
+
+    window.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    });
+
+    window.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dropOverlay.style.display = "none";
+    });
   }
 
   /* =========================================================
@@ -9734,7 +9862,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.8";
+        const curVer = data.current_version || "2.8.9";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -9804,7 +9932,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.8";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.9";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -9868,8 +9996,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.8";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.8";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.9";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.9";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -11286,7 +11414,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.8</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.9</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
