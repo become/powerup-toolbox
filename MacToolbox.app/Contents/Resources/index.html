@@ -1005,10 +1005,13 @@
   }
   .code-line-num {
     min-width: 54px; width: 54px; padding: 0 12px 0 6px;
-    text-align: right; user-select: none; color: #484f58;
+    text-align: right; user-select: none; -webkit-user-select: none; color: #484f58;
     font-size: 12px; cursor: pointer; flex-shrink: 0;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     margin-right: 16px;
+  }
+  .code-line-num::before {
+    content: attr(data-line);
   }
   .code-line-num:hover {
     color: #8b949e;
@@ -8425,7 +8428,7 @@
     const htmlRows = lines.map((l, i) => {
       const lineNum = i + 1;
       return `<div class="code-line" id="code-line-${lineNum}">` +
-        `<span class="code-line-num" data-line="${lineNum}" onclick="highlightCodeLine(${lineNum})">${lineNum}</span>` +
+        `<span class="code-line-num" data-line="${lineNum}" onclick="highlightCodeLine(${lineNum})"></span>` +
         `<span class="code-line-content">${l || "&nbsp;"}</span>` +
       `</div>`;
     }).join("");
