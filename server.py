@@ -49,7 +49,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.7"
+APP_VERSION = "2.8.8"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -3469,6 +3469,9 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                         os.kill(swift_pid, signal.SIGKILL)
                     except Exception:
                         pass
+                    os._exit(0)
+                elif IS_WIN_FROZEN:
+                    win_support.relaunch_after_exit()    # starts the same exe once this process is gone, then exits
                     os._exit(0)
                 elif IS_WINDOWS:
                     os._exit(0)

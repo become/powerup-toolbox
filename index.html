@@ -2108,7 +2108,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.7 · 點擊手動檢查更新">v2.8.7</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.8 · 點擊手動檢查更新">v2.8.8</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2234,7 +2234,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.7)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.8)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -3162,7 +3162,7 @@
   let currentMdMtimeNs = 0;
   let currentMdDir = "";
   let mdEditMode = false;
-  let mdFontSize = 15.5;
+  let mdFontSize = 14;   // single declaration; setMdFontSize() / adjustMdFontSize() further down use it
 
   // JSON View State
   let currentJsonPath = "";
@@ -8491,7 +8491,6 @@
     setCodeFontSize(codeFontSize + delta);
   }
 
-  let mdFontSize = 14;
   let mdGestureStartFontSize = 14;
   function setMdFontSize(val) {
     mdFontSize = Math.max(10, Math.min(36, Math.round(val * 10) / 10));
@@ -9471,7 +9470,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.7";
+        const curVer = data.current_version || "2.8.8";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -9541,7 +9540,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.7";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.8";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -9605,8 +9604,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.7";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.7";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.8";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.8";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -10965,9 +10964,14 @@
   initStageGestureListeners();
 
   // First launch default file association prompt (only prompt once permanently across all versions):
+  // macOS only - Windows registers its "Open with PowerUp Toolbox" entries itself (win_support.register()).
   try {
+    if (IS_WIN) {
+      const fab = document.getElementById("btnFileAssociations");
+      if (fab) fab.style.setProperty("display", "none", "important");
+    }
     const hasConfiguredAssoc = localStorage.getItem("powerup_file_assoc_prompted_done") || localStorage.getItem("powerup_file_assoc_configured_v1");
-    if (!hasConfiguredAssoc) {
+    if (!IS_WIN && !hasConfiguredAssoc) {
       setTimeout(() => {
         openFileAssociationModal(true);
       }, 1200);
@@ -11021,7 +11025,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.7</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.8</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>

@@ -1,13 +1,13 @@
 {
-    "version":  "2.8.7",
+    "version":  "2.8.8",
     "name":  "PowerUp Toolbox for Windows",
-    "release_date":  "2026-11-15",
+    "release_date":  "2026-11-19",
     "asset":  "PowerUpToolbox-portable.zip",
-    "sha256":  "2d06a7b16c22dd9c2aa68075f3f34903172615c8a7aab4f4337c619d5ecbeabc",
-    "size":  39912657,
+    "sha256":  "27c86a012bcd85f3111a4aa72cd4fc71dbb8ae4e5627a8900b4a44e99937a32b",
+    "size":  39913944,
     "changelog":  [
-                      "Windows v2.8.7：同步最新工具箱介面與後端。",
-                      "新增 Java、Groovy、GSP、HTML、JS、CSS、TXT 程式碼與文字檢視。",
-                      "官網下載與自動更新套件同步，提供 SHA-256 完整性驗證。"
+                      "修正 2.8.7 前端程式錯誤導致無法開啟檔案的問題",
+                      "修正 Windows 版重新啟動後未自動開啟的問題",
+                      "Windows 版不再顯示僅適用 macOS 的「預設開啟程式」設定精靈"
                   ]
 }

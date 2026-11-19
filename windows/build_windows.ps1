@@ -27,6 +27,29 @@ if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 & $Python -m py_compile (Join-Path $Root "server.py") (Join-Path $Root "windows\launcher.py") (Join-Path $Root "windows\win_support.py") (Join-Path $Root "gphotos.py") (Join-Path $Root "local_albums.py")
 if ($LASTEXITCODE -ne 0) { throw "syntax check failed" }
 
+# Same for the front end: one SyntaxError in index.html's inline <script> (e.g. a duplicate `let`) kills the whole UI
+# (v2.8.7 shipped like that and could not open any file). Requires node; skipped with a warning when node is absent.
+$node = Get-Command node -ErrorAction SilentlyContinue
+if ($node) {
+  $html = [System.IO.File]::ReadAllText((Join-Path $Root "index.html"), (New-Object System.Text.UTF8Encoding($false)))
+  # every inline <script> (with or without attributes), skipping <script src=...> and non-JS types such as JSON
+  $blocks = [regex]::Matches($html, '(?is)<script(?![^>]*\bsrc\s*=)(?![^>]*\btype\s*=\s*"?application/(?:ld\+)?json)[^>]*>(.*?)</script>')
+  if ($blocks.Count -eq 0) { throw "index.html: no inline <script> found" }
+  $tmpJs = Join-Path ([System.IO.Path]::GetTempPath()) ("powerup_inline_{0}.js" -f $PID)
+  try {
+    $i = 0
+    foreach ($m in $blocks) {
+      $i++
+      [System.IO.File]::WriteAllText($tmpJs, $m.Groups[1].Value, (New-Object System.Text.UTF8Encoding($false)))
+      & $node.Source --check $tmpJs
+      if ($LASTEXITCODE -ne 0) { throw "index.html inline <script> #$i has a syntax error (see above)" }
+    }
+  } finally { Remove-Item -LiteralPath $tmpJs -ErrorAction SilentlyContinue }
+  Write-Host "index.html inline scripts: $($blocks.Count) checked OK"
+} else {
+  Write-Warning "node not found: skipped the index.html script syntax check"
+}
+
 $Work = Join-Path $Root "build_win"
 $Rel  = Join-Path $Root "release_win"
 # Never overwrite a release folder whose exe is currently running (it would crash the user's session).

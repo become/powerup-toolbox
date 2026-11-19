@@ -583,6 +583,42 @@ def _do_update(url, sha256=None):
             pass
 
 
+_RELAUNCH_PS1 = r'''param([int]$ProcId,[string]$Exe,[string]$LogFile)
+function Log($m){ try { Add-Content -LiteralPath $LogFile -Value ("{0} {1}" -f (Get-Date -Format s),$m) } catch {} }
+try { Wait-Process -Id $ProcId -Timeout 60 -ErrorAction SilentlyContinue } catch {}
+Start-Sleep -Milliseconds 300
+if (Test-Path -LiteralPath $Exe) { Start-Process -FilePath $Exe; Log "relaunched $Exe" } else { Log "relaunch skipped, exe missing: $Exe" }
+'''
+
+
+def relaunch_after_exit():
+    """Used by /api/restart: start a detached PowerShell that waits for this process to exit and then starts
+    the same exe again (the single-instance lock is released by then). Never raises."""
+    try:
+        exe = exe_path()
+        if not exe:
+            return False
+        work = os.path.join(data_dir(), "updates")
+        os.makedirs(work, exist_ok=True)
+        ps1 = os.path.join(work, "relaunch.ps1")
+        with open(ps1, "w", encoding="utf-8-sig") as f:
+            f.write(_RELAUNCH_PS1)
+        cmd = [_system_exe(r"System32\WindowsPowerShell\v1.0\powershell.exe"), "-NoProfile", "-ExecutionPolicy", "Bypass",
+               "-WindowStyle", "Hidden", "-File", ps1, "-ProcId", str(os.getpid()), "-Exe", exe,
+               "-LogFile", os.path.join(log_dir(), "updater.log")]
+        base = 0x08000000 | 0x00000200          # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
+        for extra in (0x01000000, 0):           # try CREATE_BREAKAWAY_FROM_JOB first
+            try:
+                subprocess.Popen(cmd, creationflags=base | extra, close_fds=True,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except OSError:
+                continue
+    except Exception as e:
+        print("relaunch failed: %r" % (e,), flush=True)
+    return False
+
+
 def perform_update():
     d = install_dir()
     if not d:
