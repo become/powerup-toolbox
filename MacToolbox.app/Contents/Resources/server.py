@@ -3519,6 +3519,9 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     except Exception:
                         pass
                     os._exit(0)
+                elif IS_WIN_FROZEN:
+                    win_support.relaunch_after_exit()    # starts the same exe once this process is gone, then exits
+                    os._exit(0)
                 elif IS_WINDOWS:
                     os._exit(0)
             threading.Thread(target=do_restart, daemon=True).start()
