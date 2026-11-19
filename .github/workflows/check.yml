@@ -1,0 +1,31 @@
+name: Syntax check
+
+# Runs on every push / PR to main (from the Mac or Windows side alike), so a broken front-end script
+# or Python module is flagged within minutes instead of reaching users (see v2.8.7).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Front-end script + Python syntax
+        run: python tools/check_syntax.py --require-node

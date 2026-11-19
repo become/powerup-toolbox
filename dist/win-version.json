@@ -1,15 +1,13 @@
 {
-  "version": "2.8.1",
-  "name": "PowerUp Toolbox for Windows",
-  "release_date": "2026-11-12",
-  "asset": "PowerUpToolbox-portable.zip",
-  "sha256": "6c5834b258a9cd9ab6e4e9fa3cc3812e1cee13e4fda1db956fb9f728b4b77b7c",
-  "size": 39897952,
-  "download_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
-  "changelog": [
-    "📷 本機相簿工坊：瀏覽下載、桌面、圖片資料夾中的照片，建立自訂相簿",
-    "🔒 相簿畫面遵守「縮圖預設隱藏」隱私設定，新增縮圖開關",
-    "🌐 更新來源改為官方網站，並加入下載檔案完整性驗證 (SHA-256)",
-    "⚡ 修正相簿書籤無法開啟與多項穩定性問題"
-  ]
+    "version":  "2.8.8",
+    "name":  "PowerUp Toolbox for Windows",
+    "release_date":  "2026-11-19",
+    "asset":  "PowerUpToolbox-portable.zip",
+    "sha256":  "27c86a012bcd85f3111a4aa72cd4fc71dbb8ae4e5627a8900b4a44e99937a32b",
+    "size":  39913944,
+    "changelog":  [
+                      "修正 2.8.7 前端程式錯誤導致無法開啟檔案的問題",
+                      "修正 Windows 版重新啟動後未自動開啟的問題",
+                      "Windows 版不再顯示僅適用 macOS 的「預設開啟程式」設定精靈"
+                  ]
 }

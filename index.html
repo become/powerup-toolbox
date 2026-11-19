@@ -3185,7 +3185,7 @@
   let currentMdMtimeNs = 0;
   let currentMdDir = "";
   let mdEditMode = false;
-  let mdFontSize = 15.5;
+  let mdFontSize = 14;   // single declaration; setMdFontSize() / adjustMdFontSize() further down use it
 
   // JSON View State
   let currentJsonPath = "";
@@ -11358,9 +11358,14 @@
   initStageGestureListeners();
 
   // First launch default file association prompt (only prompt once permanently across all versions):
+  // macOS only - Windows registers its "Open with PowerUp Toolbox" entries itself (win_support.register()).
   try {
+    if (IS_WIN) {
+      const fab = document.getElementById("btnFileAssociations");
+      if (fab) fab.style.setProperty("display", "none", "important");
+    }
     const hasConfiguredAssoc = localStorage.getItem("powerup_file_assoc_prompted_done") || localStorage.getItem("powerup_file_assoc_configured_v1");
-    if (!hasConfiguredAssoc) {
+    if (!IS_WIN && !hasConfiguredAssoc) {
       setTimeout(() => {
         openFileAssociationModal(true);
       }, 1200);

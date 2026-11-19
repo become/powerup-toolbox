@@ -7,7 +7,7 @@
   "latest_pkg": "MacToolbox-latest.pkg",
   "dmg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.dmg",
   "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg",
-  "windows_version": "2.8.1",
+  "windows_version": "2.8.8",
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
@@ -19,11 +19,11 @@
     "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
   },
   "windows": {
-    "version": "2.8.1",
+    "version": "2.8.8",
     "latest_zip": "PowerUpToolbox-portable.zip",
     "zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
-    "sha256": "6c5834b258a9cd9ab6e4e9fa3cc3812e1cee13e4fda1db956fb9f728b4b77b7c",
-    "size": 39897952
+    "sha256": "27c86a012bcd85f3111a4aa72cd4fc71dbb8ae4e5627a8900b4a44e99937a32b",
+    "size": 39913944
   },
   "changelog": [
     "🔍 跨視圖雙指縮放支援：全面支援 PDF 頁面、程式碼 (Java/JS/HTML/CSS/TXT)、Markdown、JSON 與 CSV 表格的觸控板捏合 (Pinch-to-zoom)、Ctrl/⌘+滾輪與 ⌘+/⌘-/⌘0 快速縮放",
