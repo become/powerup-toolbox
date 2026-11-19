@@ -13,6 +13,14 @@ BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
 plutil -replace CFBundleShortVersionString -string "${VERSION}" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 plutil -replace CFBundleVersion -string "288" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 
+echo "🧪 [0/5] 語法檢查 (index.html 前端程式＋Python)..."
+# One SyntaxError in index.html's inline script disables the whole front end (v2.8.7 could not open files).
+# Install node (e.g. `brew install node`) so the front-end part runs; without it only a warning is printed.
+if ! python3 "$ROOT_DIR/tools/check_syntax.py"; then
+  echo "❌ 語法檢查失敗，已中止打包。請修正上方錯誤後再建置。" >&2
+  exit 1
+fi
+
 echo "🔨 [1/5] 編譯 macOS 原生二進位執行檔 (Vision Helper & App Launcher)..."
 swiftc -O "$ROOT_DIR/mac_vision_helper.swift" -o "$ROOT_DIR/mac_vision_helper"
 rm -rf "$ROOT_DIR/$APP_NAME/Contents/MacOS"
