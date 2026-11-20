@@ -18,6 +18,8 @@ import secrets
 import urllib.parse
 import subprocess
 import threading
+import zipfile
+import xml.etree.ElementTree as ET
 try:
     import local_albums
 except ImportError:
@@ -49,7 +51,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.9"
+APP_VERSION = "2.8.10"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -842,10 +844,151 @@ def check_office_encrypted(target):
         raise EncryptedOfficeError()
 
 
+def _parse_pptx_pure(target, data=None, st=None):
+    """Pure-Python standard-library PPTX parser (zero external dependencies).
+    Extracts slide texts, titles, tables, and embedded images using zipfile + xml.etree."""
+    mem = data is not None
+    if st is None and not mem:
+        st = os.stat(target)
+    f_obj = io.BytesIO(data) if mem else target
+    filename = os.path.basename(target) if isinstance(target, str) else "presentation.pptx"
+
+    try:
+        zf = zipfile.ZipFile(f_obj)
+    except Exception as e:
+        raise ValueError(f"無法解壓縮 PPTX 簡報: {e}")
+
+    with zf:
+        sw, sh = 12192000.0, 6858000.0
+        if "ppt/presentation.xml" in zf.namelist():
+            try:
+                p_tree = ET.fromstring(zf.read("ppt/presentation.xml"))
+                sldSz = p_tree.find("{http://schemas.openxmlformats.org/presentationml/2006/main}sldSz")
+                if sldSz is not None:
+                    sw = float(sldSz.attrib.get("cx", sw))
+                    sh = float(sldSz.attrib.get("cy", sh))
+            except Exception:
+                pass
+        aspect = round(sw / max(1.0, sh), 4)
+
+        slide_names = sorted(
+            [n for n in zf.namelist() if n.startswith("ppt/slides/slide") and n.endswith(".xml")],
+            key=lambda x: int(re.search(r"\d+", os.path.basename(x)).group()) if re.search(r"\d+", os.path.basename(x)) else 0
+        )
+
+        slides_out = []
+        all_images = []
+        md_lines = [f"# 📽️ {filename}", ""]
+
+        for s_idx, s_name in enumerate(slide_names, start=1):
+            try:
+                s_tree = ET.fromstring(zf.read(s_name))
+            except Exception:
+                continue
+
+            s_rel_name = f"ppt/slides/_rels/{os.path.basename(s_name)}.rels"
+            s_rels = {}
+            if s_rel_name in zf.namelist():
+                try:
+                    r_tree = ET.fromstring(zf.read(s_rel_name))
+                    for r in r_tree:
+                        r_id = r.attrib.get("Id")
+                        tgt = r.attrib.get("Target", "")
+                        if r_id and tgt:
+                            s_rels[r_id] = tgt
+                except Exception:
+                    pass
+
+            blocks = []
+            tables = []
+            images = []
+            canvas_items = []
+            title_text = ""
+
+            for sp in s_tree.iter("{http://schemas.openxmlformats.org/presentationml/2006/main}sp"):
+                sp_texts = []
+                for p in sp.iter("{http://schemas.openxmlformats.org/drawingml/2006/main}p"):
+                    p_txt = "".join(p.itertext()).strip()
+                    if p_txt:
+                        sp_texts.append(p_txt)
+                full_sp_text = "\n".join(sp_texts).strip()
+                if full_sp_text:
+                    if not title_text:
+                        title_text = sp_texts[0]
+                    blocks.append({"text": full_sp_text, "level": 0, "is_title": (full_sp_text == title_text)})
+
+            for tbl in s_tree.iter("{http://schemas.openxmlformats.org/drawingml/2006/main}tbl"):
+                t_rows = []
+                for tr in tbl.iter("{http://schemas.openxmlformats.org/drawingml/2006/main}tr"):
+                    c_texts = ["".join(tc.itertext()).strip().replace("\n", " ") for tc in tr.iter("{http://schemas.openxmlformats.org/drawingml/2006/main}tc")]
+                    if c_texts:
+                        t_rows.append(c_texts)
+                if t_rows:
+                    tables.append({"headers": t_rows[0], "rows": t_rows[1:]})
+
+            for blip in s_tree.iter("{http://schemas.openxmlformats.org/drawingml/2006/main}blip"):
+                r_id = blip.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
+                if r_id and r_id in s_rels:
+                    tgt = s_rels[r_id]
+                    img_path_in_zip = "ppt/" + tgt.replace("../", "").lstrip("/")
+                    if img_path_in_zip in zf.namelist():
+                        blob = zf.read(img_path_in_zip)
+                        i_ext = os.path.splitext(tgt)[1].lower().lstrip(".") or "png"
+                        if mem:
+                            mime = {"jpg": "image/jpeg", "svg": "image/svg+xml", "tif": "image/tiff"}.get(i_ext, "image/" + i_ext)
+                            img_info = {
+                                "path": "",
+                                "url": f"data:{mime};base64,{base64.b64encode(blob).decode('ascii')}",
+                                "name": os.path.basename(tgt),
+                                "slide": s_idx,
+                                "box": {"x": 10, "y": 10, "w": 80, "h": 80}
+                            }
+                        else:
+                            h_md5 = hashlib.md5(blob).hexdigest()[:16]
+                            out_path = os.path.join(CACHE_DIR, f"pptx_{h_md5}.{i_ext}")
+                            if not os.path.exists(out_path):
+                                with open(out_path, "wb") as f:
+                                    f.write(blob)
+                            img_info = {
+                                "path": out_path,
+                                "url": f"/api/image?path={urllib.parse.quote(out_path)}",
+                                "name": os.path.basename(tgt),
+                                "slide": s_idx,
+                                "box": {"x": 10, "y": 10, "w": 80, "h": 80}
+                            }
+                        images.append(img_info)
+                        all_images.append(img_info)
+
+            if not title_text:
+                title_text = f"投影片 {s_idx}"
+            slides_out.append({
+                "index": s_idx,
+                "title": title_text,
+                "blocks": blocks,
+                "tables": tables,
+                "charts": [],
+                "images": images,
+                "canvas_items": canvas_items,
+                "notes": ""
+            })
+
+        return {
+            "ok": True,
+            "path": target if isinstance(target, str) else "",
+            "name": filename,
+            "dir": os.path.dirname(target) if isinstance(target, str) else "",
+            "size": (st.st_size if st else (len(data) if data else 0)),
+            "mtime": int(st.st_mtime) if st else int(time.time()),
+            "aspect": aspect,
+            "slides": slides_out,
+            "all_images": all_images,
+            "markdown": "\n\n".join(md_lines),
+        }
+
+
 def parse_pptx_file(target, data=None):
     """Extract slides, 2D canvas items, text blocks, tables, speaker notes, and all embedded/SVG images from a .pptx file.
     `data` = decrypted bytes (memory-only mode: nothing derived from them is written to disk)."""
-    import pptx
     mem = data is not None
     if not mem:
         check_office_encrypted(target)
@@ -873,7 +1016,11 @@ def parse_pptx_file(target, data=None):
             "markdown": f"# {os.path.basename(target)}\n\n（舊版 .ppt 格式，支援系統 QuickLook 預覽）"
         }
 
-    prs = pptx.Presentation(io.BytesIO(data) if mem else target)
+    try:
+        import pptx
+        prs = pptx.Presentation(io.BytesIO(data) if mem else target)
+    except Exception:
+        return _parse_pptx_pure(target, data=data, st=st)
     sw = float(prs.slide_width or 12192000)
     sh = float(prs.slide_height or 6858000)
     aspect = round(sw / max(1.0, sh), 4)
@@ -1335,6 +1482,166 @@ def parse_pptx_file(target, data=None):
     }
 
 
+def _parse_docx_pure(target, data=None, st=None):
+    """Pure-Python standard-library DOCX parser (zero external dependencies).
+    Extracts paragraphs, headings, bullet lists, tables, and embedded images using zipfile + xml.etree."""
+    mem = data is not None
+    if st is None and not mem:
+        st = os.stat(target)
+    f_obj = io.BytesIO(data) if mem else target
+    filename = os.path.basename(target) if isinstance(target, str) else "document.docx"
+
+    try:
+        zf = zipfile.ZipFile(f_obj)
+    except Exception as e:
+        raise ValueError(f"無法解壓縮 Word 文件: {e}")
+
+    with zf:
+        if "word/document.xml" not in zf.namelist():
+            raise ValueError("無效的 Word 文件格式 (缺少 word/document.xml)")
+
+        # 1. Relationships for images
+        rel_images = {}
+        if "word/_rels/document.xml.rels" in zf.namelist():
+            try:
+                rel_tree = ET.fromstring(zf.read("word/_rels/document.xml.rels"))
+                for r in rel_tree:
+                    target_ref = r.attrib.get("Target", "")
+                    r_id = r.attrib.get("Id", "")
+                    r_type = r.attrib.get("Type", "")
+                    if "image" in r_type or target_ref.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".tiff", ".bmp")):
+                        if not target_ref.startswith("word/"):
+                            full_img_path = "word/" + target_ref.lstrip("/")
+                        else:
+                            full_img_path = target_ref
+                        if full_img_path in zf.namelist():
+                            blob = zf.read(full_img_path)
+                            i_ext = os.path.splitext(target_ref)[1].lower().lstrip(".") or "png"
+                            if mem:
+                                mime = {"jpg": "image/jpeg", "svg": "image/svg+xml", "tif": "image/tiff"}.get(i_ext, "image/" + i_ext)
+                                rel_images[r_id] = f"data:{mime};base64,{base64.b64encode(blob).decode('ascii')}"
+                            else:
+                                h_md5 = hashlib.md5(blob).hexdigest()[:16]
+                                img_path = os.path.join(CACHE_DIR, f"docx_{h_md5}.{i_ext}")
+                                if not os.path.exists(img_path):
+                                    with open(img_path, "wb") as img_f:
+                                        img_f.write(blob)
+                                rel_images[r_id] = img_path
+            except Exception:
+                pass
+
+        # 2. Document body
+        doc_tree = ET.fromstring(zf.read("word/document.xml"))
+        ns = {
+            "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "a": "http://schemas.openxmlformats.org/drawingml/2006/main"
+        }
+        body = doc_tree.find("w:body", ns)
+        if body is None:
+            for child in doc_tree:
+                if child.tag.endswith("body"):
+                    body = child
+                    break
+        if body is None:
+            raise ValueError("Word 文件內容為空或無法辨識")
+
+        md_out = []
+        para_count = 0
+        table_count = 0
+        img_count = 0
+        total_chars = 0
+
+        for child in list(body):
+            tag = child.tag.split("}")[-1]
+            if tag == "p":
+                style_val = ""
+                pPr = child.find("w:pPr", ns)
+                if pPr is not None:
+                    pStyle = pPr.find("w:pStyle", ns)
+                    if pStyle is not None:
+                        style_val = (pStyle.attrib.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val") or pStyle.attrib.get("val") or "").lower()
+
+                runs_text = []
+                for node in child.iter():
+                    ntag = node.tag.split("}")[-1]
+                    if ntag == "t" and node.text:
+                        runs_text.append(node.text)
+                    elif ntag == "tab":
+                        runs_text.append("    ")
+                    elif ntag in ("br", "cr"):
+                        runs_text.append("\n")
+                txt = "".join(runs_text).strip()
+                total_chars += len(txt)
+
+                # Check inline images
+                for blip in child.iter():
+                    for attr_k, attr_v in blip.attrib.items():
+                        if "embed" in attr_k or "id" in attr_k:
+                            if attr_v in rel_images:
+                                img_count += 1
+                                img_ref = rel_images[attr_v]
+                                if not img_ref.startswith("data:"):
+                                    img_ref = "/api/image?path=" + urllib.parse.quote(img_ref, safe="")
+                                md_out.append(f"\n![Embedded Image]({img_ref})\n")
+
+                if not txt:
+                    continue
+                para_count += 1
+
+                if "title" in style_val and "subtitle" not in style_val:
+                    md_out.append(f"# {txt}\n")
+                elif "heading1" in style_val or "heading 1" in style_val:
+                    md_out.append(f"# {txt}\n")
+                elif "heading2" in style_val or "heading 2" in style_val:
+                    md_out.append(f"## {txt}\n")
+                elif "heading3" in style_val or "heading 3" in style_val:
+                    md_out.append(f"### {txt}\n")
+                elif "heading4" in style_val or "subtitle" in style_val:
+                    md_out.append(f"#### {txt}\n")
+                elif "list" in style_val or "bullet" in style_val:
+                    md_out.append(f"- {txt}")
+                else:
+                    md_out.append(f"{txt}\n")
+
+            elif tag == "tbl":
+                rows_data = []
+                for tr in child.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr"):
+                    row_cells = []
+                    for tc in tr.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc"):
+                        c_text = "".join(tc.itertext()).strip().replace("\n", " ")
+                        row_cells.append(c_text)
+                    if row_cells:
+                        rows_data.append(row_cells)
+                        total_chars += sum(len(x) for x in row_cells)
+                if rows_data:
+                    table_count += 1
+                    md_out.append("")
+                    md_out.append("| " + " | ".join(rows_data[0]) + " |")
+                    md_out.append("| " + " | ".join("---" for _ in rows_data[0]) + " |")
+                    for r in rows_data[1:]:
+                        md_out.append("| " + " | ".join(r) + " |")
+                    md_out.append("")
+
+        markdown_str = "\n".join(md_out).strip()
+        if not markdown_str:
+            markdown_str = f"# 📘 {filename}\n\n*（空白 Word 文件）*"
+
+        return {
+            "ok": True,
+            "path": target if isinstance(target, str) else "",
+            "name": filename,
+            "dir": os.path.dirname(target) if isinstance(target, str) else "",
+            "size": (st.st_size if st else (len(data) if data else 0)),
+            "mtime": int(st.st_mtime) if st else int(time.time()),
+            "paragraphs_count": para_count,
+            "tables_count": table_count,
+            "images_count": img_count,
+            "chars": total_chars,
+            "markdown": markdown_str,
+        }
+
+
 def parse_docx_file(target, data=None):
     """Convert .docx / .doc / .rtf into structured Markdown & HTML with embedded images and tables.
     `data` = decrypted bytes (memory-only mode)."""
@@ -1361,112 +1668,115 @@ def parse_docx_file(target, data=None):
             "markdown": f"# 📘 {os.path.basename(target)}\n\n" + txt,
         }
 
-    import docx
-    from docx.oxml.text.paragraph import CT_P
-    from docx.oxml.table import CT_Tbl
-    from docx.text.paragraph import Paragraph
-    from docx.table import Table
-
-    doc = docx.Document(io.BytesIO(data) if mem else target)
-    md_out = []
-    para_count = 0
-    table_count = 0
-    img_count = 0
-    total_chars = 0
-
-    # Map relationship IDs for embedded images
-    rel_images = {}
     try:
-        for r_id, rel in doc.part.rels.items():
-            if "image" in rel.target_ref:
-                if getattr(rel, "is_external", False):
-                    continue                      # linked (not embedded) image: skip it, keep going
-                try:
-                    blob = rel.target_part.blob
-                except Exception:
+        import docx
+        from docx.oxml.text.paragraph import CT_P
+        from docx.oxml.table import CT_Tbl
+        from docx.text.paragraph import Paragraph
+        from docx.table import Table
+
+        doc = docx.Document(io.BytesIO(data) if mem else target)
+        md_out = []
+        para_count = 0
+        table_count = 0
+        img_count = 0
+        total_chars = 0
+
+        # Map relationship IDs for embedded images
+        rel_images = {}
+        try:
+            for r_id, rel in doc.part.rels.items():
+                if "image" in rel.target_ref:
+                    if getattr(rel, "is_external", False):
+                        continue                      # linked (not embedded) image: skip it, keep going
+                    try:
+                        blob = rel.target_part.blob
+                    except Exception:
+                        continue
+                    i_ext = os.path.splitext(rel.target_ref)[1].lower().lstrip(".") or "png"
+                    if mem:   # decrypted content: data URI only, nothing written to disk
+                        mime = {"jpg": "image/jpeg", "svg": "image/svg+xml", "tif": "image/tiff"}.get(i_ext, "image/" + i_ext)
+                        rel_images[r_id] = "data:%s;base64,%s" % (mime, base64.b64encode(blob).decode("ascii"))
+                        continue
+                    h_md5 = hashlib.md5(blob).hexdigest()[:16]
+                    img_path = os.path.join(CACHE_DIR, f"docx_{h_md5}.{i_ext}")
+                    if not os.path.exists(img_path):
+                        with open(img_path, "wb") as f:
+                            f.write(blob)
+                    rel_images[r_id] = img_path
+        except Exception:
+            pass
+
+        for child in doc.element.body.iterchildren():
+            if isinstance(child, CT_P):
+                p = Paragraph(child, doc)
+                txt = p.text.strip()
+                total_chars += len(txt)
+
+                # Check for inline images in this paragraph
+                embedded_rids = re.findall(r'r:embed="([^"]+)"', child.xml)
+                for rid in embedded_rids:
+                    if rid in rel_images:
+                        img_count += 1
+                        _img_ref = rel_images[rid]
+                        if not _img_ref.startswith("data:"):
+                            _img_ref = "/api/image?path=" + urllib.parse.quote(_img_ref, safe="")
+                        md_out.append(f"\n![Embedded Image]({_img_ref})\n")
+
+                if not txt:
                     continue
-                i_ext = os.path.splitext(rel.target_ref)[1].lower().lstrip(".") or "png"
-                if mem:   # decrypted content: data URI only, nothing written to disk
-                    mime = {"jpg": "image/jpeg", "svg": "image/svg+xml", "tif": "image/tiff"}.get(i_ext, "image/" + i_ext)
-                    rel_images[r_id] = "data:%s;base64,%s" % (mime, base64.b64encode(blob).decode("ascii"))
-                    continue
-                h_md5 = hashlib.md5(blob).hexdigest()[:16]
-                img_path = os.path.join(CACHE_DIR, f"docx_{h_md5}.{i_ext}")
-                if not os.path.exists(img_path):
-                    with open(img_path, "wb") as f:
-                        f.write(blob)
-                rel_images[r_id] = img_path
+                para_count += 1
+                style_name = (p.style.name if p.style else "").lower()
+                if "title" in style_name and "subtitle" not in style_name:
+                    md_out.append(f"# {txt}\n")
+                elif "heading 1" in style_name:
+                    md_out.append(f"# {txt}\n")
+                elif "heading 2" in style_name:
+                    md_out.append(f"## {txt}\n")
+                elif "heading 3" in style_name:
+                    md_out.append(f"### {txt}\n")
+                elif "heading 4" in style_name or "subtitle" in style_name:
+                    md_out.append(f"#### {txt}\n")
+                elif "list" in style_name or "bullet" in style_name:
+                    md_out.append(f"- {txt}")
+                else:
+                    md_out.append(f"{txt}\n")
+
+            elif isinstance(child, CT_Tbl):
+                tbl = Table(child, doc)
+                rows_data = []
+                for r in tbl.rows:
+                    row_cells = [c.text.strip().replace("\n", " ") for c in r.cells]
+                    rows_data.append(row_cells)
+                    total_chars += sum(len(x) for x in row_cells)
+                if rows_data:
+                    table_count += 1
+                    md_out.append("")
+                    md_out.append("| " + " | ".join(rows_data[0]) + " |")
+                    md_out.append("| " + " | ".join("---" for _ in rows_data[0]) + " |")
+                    for r in rows_data[1:]:
+                        md_out.append("| " + " | ".join(r) + " |")
+                    md_out.append("")
+
+        markdown_str = "\n".join(md_out).strip()
+        if not markdown_str:
+            markdown_str = f"# 📘 {os.path.basename(target)}\n\n*（空白 Word 文件）*"
+
+        return {
+            "ok": True,
+            "path": target,
+            "name": os.path.basename(target),
+            "dir": os.path.dirname(target),
+            "size": st.st_size,
+            "mtime": int(st.st_mtime),
+            "paragraphs_count": para_count,
+            "tables_count": table_count,
+            "images_count": img_count,
+            "chars": total_chars,
+            "markdown": markdown_str,
+        }
     except Exception:
-        pass
-
-    for child in doc.element.body.iterchildren():
-        if isinstance(child, CT_P):
-            p = Paragraph(child, doc)
-            txt = p.text.strip()
-            total_chars += len(txt)
-
-            # Check for inline images in this paragraph
-            embedded_rids = re.findall(r'r:embed="([^"]+)"', child.xml)
-            for rid in embedded_rids:
-                if rid in rel_images:
-                    img_count += 1
-                    _img_ref = rel_images[rid]
-                    if not _img_ref.startswith("data:"):
-                        _img_ref = "/api/image?path=" + urllib.parse.quote(_img_ref, safe="")
-                    md_out.append(f"\n![Embedded Image]({_img_ref})\n")
-
-            if not txt:
-                continue
-            para_count += 1
-            style_name = (p.style.name if p.style else "").lower()
-            if "title" in style_name and "subtitle" not in style_name:
-                md_out.append(f"# {txt}\n")
-            elif "heading 1" in style_name:
-                md_out.append(f"# {txt}\n")
-            elif "heading 2" in style_name:
-                md_out.append(f"## {txt}\n")
-            elif "heading 3" in style_name:
-                md_out.append(f"### {txt}\n")
-            elif "heading 4" in style_name or "subtitle" in style_name:
-                md_out.append(f"#### {txt}\n")
-            elif "list" in style_name or "bullet" in style_name:
-                md_out.append(f"- {txt}")
-            else:
-                md_out.append(f"{txt}\n")
-
-        elif isinstance(child, CT_Tbl):
-            tbl = Table(child, doc)
-            rows_data = []
-            for r in tbl.rows:
-                row_cells = [c.text.strip().replace("\n", " ") for c in r.cells]
-                rows_data.append(row_cells)
-                total_chars += sum(len(x) for x in row_cells)
-            if rows_data:
-                table_count += 1
-                md_out.append("")
-                md_out.append("| " + " | ".join(rows_data[0]) + " |")
-                md_out.append("| " + " | ".join("---" for _ in rows_data[0]) + " |")
-                for r in rows_data[1:]:
-                    md_out.append("| " + " | ".join(r) + " |")
-                md_out.append("")
-
-    markdown_str = "\n".join(md_out).strip()
-    if not markdown_str:
-        markdown_str = f"# 📘 {os.path.basename(target)}\n\n*（空白 Word 文件）*"
-
-    return {
-        "ok": True,
-        "path": target,
-        "name": os.path.basename(target),
-        "dir": os.path.dirname(target),
-        "size": st.st_size,
-        "mtime": int(st.st_mtime),
-        "paragraphs_count": para_count,
-        "tables_count": table_count,
-        "images_count": img_count,
-        "chars": total_chars,
-        "markdown": markdown_str,
-    }
+        return _parse_docx_pure(target, data=data, st=st)
 
 
 def _build_sheet_dict(sheet_name, raw_rows):
@@ -1528,6 +1838,148 @@ def _build_sheet_dict(sheet_name, raw_rows):
         "headers": headers,
         "rows": norm_rows,
         "total_rows": len(data_rows),
+    }
+
+
+def _parse_xlsx_pure(target, data=None, st=None):
+    """Pure-Python standard-library XLSX parser (zero external dependencies).
+    Reads sheets, shared strings, numbers, dates and cell grids using zipfile + xml.etree."""
+    mem = data is not None
+    if st is None and not mem:
+        st = os.stat(target)
+    f_obj = io.BytesIO(data) if mem else target
+    filename = os.path.basename(target) if isinstance(target, str) else "spreadsheet.xlsx"
+
+    try:
+        zf = zipfile.ZipFile(f_obj)
+    except Exception as e:
+        raise ValueError(f"無法解壓縮 Excel 試算表: {e}")
+
+    sheets_out = []
+    with zf:
+        # 1. Shared strings table
+        shared_strings = []
+        if "xl/sharedStrings.xml" in zf.namelist():
+            try:
+                ss_tree = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+                for si in ss_tree.iter("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}si"):
+                    shared_strings.append("".join(si.itertext()))
+            except Exception:
+                pass
+
+        # 2. Workbook sheet names and rels
+        rels = {}
+        if "xl/_rels/workbook.xml.rels" in zf.namelist():
+            try:
+                rel_tree = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+                for r in rel_tree:
+                    r_id = r.attrib.get("Id")
+                    tgt = r.attrib.get("Target", "")
+                    if r_id and tgt:
+                        rels[r_id] = tgt
+            except Exception:
+                pass
+
+        sheet_items = []
+        if "xl/workbook.xml" in zf.namelist():
+            try:
+                wb_tree = ET.fromstring(zf.read("xl/workbook.xml"))
+                for s in wb_tree.iter("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet"):
+                    name = s.attrib.get("name", "Sheet")
+                    r_id = s.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id") or s.attrib.get("id")
+                    target_path = rels.get(r_id, "")
+                    if target_path:
+                        if not target_path.startswith("xl/"):
+                            target_path = "xl/" + target_path.lstrip("/")
+                    sheet_items.append((name, target_path))
+            except Exception:
+                pass
+
+        if not sheet_items:
+            for n in sorted(zf.namelist()):
+                if n.startswith("xl/worksheets/sheet") and n.endswith(".xml"):
+                    s_name = os.path.splitext(os.path.basename(n))[0]
+                    sheet_items.append((s_name, n))
+
+        def _col_to_idx(col_str):
+            idx = 0
+            for ch in col_str:
+                if 'A' <= ch <= 'Z':
+                    idx = idx * 26 + (ord(ch) - ord('A') + 1)
+                elif 'a' <= ch <= 'z':
+                    idx = idx * 26 + (ord(ch.upper()) - ord('A') + 1)
+            return max(0, idx - 1)
+
+        for sheet_name, sheet_path in sheet_items:
+            if not sheet_path or sheet_path not in zf.namelist():
+                candidates = [n for n in zf.namelist() if n.endswith(os.path.basename(sheet_path))]
+                if candidates:
+                    sheet_path = candidates[0]
+                else:
+                    continue
+            try:
+                ws_tree = ET.fromstring(zf.read(sheet_path))
+            except Exception:
+                continue
+
+            raw_rows = []
+            for row in ws_tree.iter("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}row"):
+                cell_dict = {}
+                max_c_idx = -1
+                for c in row.iter("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}c"):
+                    r_ref = c.attrib.get("r", "")
+                    m = re.match(r"([A-Za-z]+)(\d+)", r_ref)
+                    c_idx = _col_to_idx(m.group(1)) if m else (max_c_idx + 1)
+                    t = c.attrib.get("t", "")
+                    val = ""
+                    if t == "s":
+                        v_el = c.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}v")
+                        if v_el is not None and v_el.text:
+                            try:
+                                s_idx = int(v_el.text.strip())
+                                val = shared_strings[s_idx] if 0 <= s_idx < len(shared_strings) else v_el.text.strip()
+                            except Exception:
+                                val = v_el.text.strip()
+                    elif t == "inlineStr":
+                        is_el = c.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}is")
+                        if is_el is not None:
+                            val = "".join(is_el.itertext()).strip()
+                        else:
+                            val = "".join(c.itertext()).strip()
+                    elif t == "b":
+                        v_el = c.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}v")
+                        val = "TRUE" if v_el is not None and v_el.text == "1" else "FALSE"
+                    else:
+                        v_el = c.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}v")
+                        if v_el is not None and v_el.text is not None:
+                            val = v_el.text.strip()
+                            try:
+                                fv = float(val)
+                                if fv.is_integer():
+                                    val = str(int(fv))
+                            except ValueError:
+                                pass
+                    cell_dict[c_idx] = val
+                    if c_idx > max_c_idx:
+                        max_c_idx = c_idx
+
+                if max_c_idx >= 0:
+                    str_row = [cell_dict.get(i, "") for i in range(max_c_idx + 1)]
+                    if any(cell != "" for cell in str_row):
+                        raw_rows.append(str_row)
+                if len(raw_rows) >= 10015:
+                    break
+            sheets_out.append(_build_sheet_dict(sheet_name, raw_rows))
+
+    return {
+        "ok": True,
+        "path": target if isinstance(target, str) else "",
+        "name": filename,
+        "dir": os.path.dirname(target) if isinstance(target, str) else "",
+        "size": (st.st_size if st else (len(data) if data else 0)),
+        "mtime": int(st.st_mtime) if st else int(time.time()),
+        "format": "XLSX",
+        "sheets": sheets_out,
     }
 
 
@@ -1635,36 +2087,39 @@ def parse_xlsx_file(target, data=None):
             raise xls_err
 
     # 2. Standard OOXML .xlsx / .xlsm
-    import openpyxl
-    wb = openpyxl.load_workbook(io.BytesIO(data) if mem else target, data_only=True)
-    for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-        raw_rows = []
-        for row in ws.iter_rows(values_only=True):
-            str_row = []
-            for v in row:
-                if v is None:
-                    str_row.append("")
-                elif isinstance(v, float) and v.is_integer():
-                    str_row.append(str(int(v)))
-                else:
-                    str_row.append(str(v).strip())
-            if any(c != "" for c in str_row):
-                raw_rows.append(str_row)
-            if len(raw_rows) >= 10015:
-                break
-        sheets_out.append(_build_sheet_dict(sheet_name, raw_rows))
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(data) if mem else target, data_only=True)
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            raw_rows = []
+            for row in ws.iter_rows(values_only=True):
+                str_row = []
+                for v in row:
+                    if v is None:
+                        str_row.append("")
+                    elif isinstance(v, float) and v.is_integer():
+                        str_row.append(str(int(v)))
+                    else:
+                        str_row.append(str(v).strip())
+                if any(c != "" for c in str_row):
+                    raw_rows.append(str_row)
+                if len(raw_rows) >= 10015:
+                    break
+            sheets_out.append(_build_sheet_dict(sheet_name, raw_rows))
 
-    return {
-        "ok": True,
-        "path": target,
-        "name": os.path.basename(target),
-        "dir": os.path.dirname(target),
-        "size": st.st_size,
-        "mtime": int(st.st_mtime),
-        "format": "XLSX",
-        "sheets": sheets_out,
-    }
+        return {
+            "ok": True,
+            "path": target,
+            "name": os.path.basename(target),
+            "dir": os.path.dirname(target),
+            "size": st.st_size,
+            "mtime": int(st.st_mtime),
+            "format": "XLSX",
+            "sheets": sheets_out,
+        }
+    except Exception:
+        return _parse_xlsx_pure(target, data=data, st=st)
 
 
 def parse_xml_file(target):

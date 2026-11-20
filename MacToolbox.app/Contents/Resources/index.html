@@ -2100,6 +2100,53 @@
     justify-content: space-between;
     gap: 12px;
   }
+
+  /* In-Document Floating Search Bar & Highlights (Cmd+F / Ctrl+F) */
+  #inDocSearchBar {
+    position: absolute;
+    top: 44px;
+    right: 20px;
+    z-index: 9999;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    border-radius: 12px;
+    padding: 6px 12px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(59, 130, 246, 0.25);
+    display: none;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    animation: fadeInDown 0.15s ease-out;
+  }
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  mark.find-highlight {
+    background: rgba(250, 204, 21, 0.45) !important;
+    color: inherit !important;
+    border-radius: 2px;
+    padding: 1px 2px;
+    box-shadow: 0 0 2px rgba(250, 204, 21, 0.6);
+  }
+  mark.find-highlight-active {
+    background: #f59e0b !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+    border-radius: 3px;
+    padding: 1px 3px;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.9), 0 0 0 1px #fff;
+  }
+  .csv-cell-match {
+    background: rgba(245, 158, 11, 0.25) !important;
+    outline: 1px solid #f59e0b !important;
+  }
+  .csv-cell-match-active {
+    background: rgba(245, 158, 11, 0.55) !important;
+    outline: 2px solid #3b82f6 !important;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+  }
 </style>
 </head>
 <body>
@@ -2111,7 +2158,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.9 · 點擊手動檢查更新">v2.8.9</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.10 · 點擊手動檢查更新">v2.8.10</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2244,7 +2291,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.9)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.10)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -2386,6 +2433,7 @@
           <div id="hudFileActions" style="display:none; align-items:center; gap:3px; margin-left:4px; flex-shrink:0;">
             <button class="icon-btn" onclick="copyActiveFilePath()" title="複製目前檔案完整路徑">📍 路徑</button>
             <button class="icon-btn" onclick="renameActiveFile()" title="重新命名目前檔案">✏️ 改名</button>
+            <button class="icon-btn" id="hudSearchBtn" onclick="openInDocSearch()" title="在目前文件內搜尋字串 (快捷鍵 ⌘F / Ctrl+F)">🔎 尋找 <span class="kbd">⌘F</span></button>
             <button class="icon-btn danger" onclick="trashActiveFile()" title="將目前檔案移至 Mac 垃圾桶（快捷鍵 ⌘⌫；直接刪除不詢問：⌘⇧⌫）">🗑️ 刪除</button>
             <div id="hudScratchActions" style="display:none; align-items:center; gap:3px; margin-left:4px;">
               <button class="btn purple" style="font-size:11px; padding:2px 7px;" onclick="openScratchpadForEdit()" title="重新開啟暫存工作台修改內容">✏️ 修改草稿</button>
@@ -2397,6 +2445,16 @@
           <span id="hudScratchBadge" style="display:none; margin-left:4px; flex-shrink:0;"></span>
         </div>
         <div id="hudShortcuts" style="display:flex; gap:10px; align-items:center; flex-shrink:0;"></div>
+      </div>
+
+      <!-- In-Document Floating Search Bar (Cmd+F / Ctrl+F) -->
+      <div id="inDocSearchBar" onkeydown="if(event.key==='Escape'){event.preventDefault();closeInDocSearch();}">
+        <span style="font-size:13px; color:#60a5fa;">🔎</span>
+        <input id="inDocSearchInput" type="text" placeholder="尋找文字 (Enter / ⇧Enter)..." oninput="onInDocSearchInput()" autocomplete="off" spellcheck="false" style="background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.18); border-radius:6px; color:#fff; font-size:12px; padding:4px 8px; width:180px; outline:none; transition:border-color 0.15s;" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='rgba(255,255,255,0.18)'" />
+        <span id="inDocSearchCounter" style="font-size:11px; color:#94a3b8; min-width:48px; text-align:center; font-family:'SF Mono',Menlo,monospace; user-select:none;">0 / 0</span>
+        <button class="btn" onclick="navigateInDocSearch(-1)" title="上一個 (⇧Enter)" style="padding:3px 7px; font-size:11px;">▲</button>
+        <button class="btn" onclick="navigateInDocSearch(1)" title="下一個 (Enter)" style="padding:3px 7px; font-size:11px;">▼</button>
+        <button class="btn" onclick="closeInDocSearch()" title="關閉搜尋 (Esc)" style="padding:3px 7px; font-size:11px; background:none; border:none; color:#64748b; cursor:pointer;">✕</button>
       </div>
 
       <!-- 1A. Image Single Stage -->
@@ -3541,44 +3599,56 @@
     document.getElementById("pptxRightFunctions").style.display = isPptx ? "block" : "none";
     document.getElementById("pdfRightFunctions").style.display = isPdf ? "block" : "none";
 
+    // Close any previous in-document search when switching views
+    closeInDocSearch();
+    const searchBtn = document.getElementById("hudSearchBtn");
+    if (searchBtn) {
+      searchBtn.style.display = (isCsv || isXlsx || isDocx || isMd || isPdf || isCode || isJson || isXml) ? "inline-flex" : "none";
+    }
+
     // HUD shortcuts
     if (isPdf) {
       document.getElementById("hudShortcuts").innerHTML =
-        `<span>縮圖牆: <span class="kbd">Esc</span></span>
+        `<span>尋找: <span class="kbd">⌘F</span></span>
+         <span>縮圖牆: <span class="kbd">Esc</span></span>
          <span>翻頁: <span class="kbd">↑</span> <span class="kbd">↓</span></span>
          <span>切換檔案: <span class="kbd">←</span> <span class="kbd">→</span></span>
-         <span>刪除: <span class="kbd">⌘⌫</span> / 直接刪: <span class="kbd">⌘⇧⌫</span></span>`;
+         <span>刪除: <span class="kbd">⌘⌫</span></span>`;
     } else if (isPptx) {
       document.getElementById("hudShortcuts").innerHTML =
         `<span>縮圖牆: <span class="kbd">Esc</span></span>
          <span>翻頁投影片: <span class="kbd">↑</span> <span class="kbd">↓</span></span>
          <span>切換檔案: <span class="kbd">←</span> <span class="kbd">→</span></span>
-         <span>刪除: <span class="kbd">⌘⌫</span> / 直接刪: <span class="kbd">⌘⇧⌫</span></span>`;
+         <span>刪除: <span class="kbd">⌘⌫</span></span>`;
     } else if (isCsv || isXlsx) {
       document.getElementById("hudShortcuts").innerHTML =
-        `<span>縮圖牆: <span class="kbd">Esc</span></span>
+        `<span>尋找: <span class="kbd">⌘F</span></span>
+         <span>縮圖牆: <span class="kbd">Esc</span></span>
          <span>切換檔案: <span class="kbd">←</span> <span class="kbd">→</span></span>
          <span>雙擊儲存格改字 + <span class="kbd">⌘S</span></span>
-         <span>刪除: <span class="kbd">⌘⌫</span> / 直接刪: <span class="kbd">⌘⇧⌫</span></span>`;
+         <span>刪除: <span class="kbd">⌘⌫</span></span>`;
     } else if (isJson || isXml) {
       document.getElementById("hudShortcuts").innerHTML =
-        `<span>縮圖牆: <span class="kbd">Esc</span></span>
+        `<span>尋找: <span class="kbd">⌘F</span></span>
+         <span>縮圖牆: <span class="kbd">Esc</span></span>
          <span>切換檔案: <span class="kbd">←</span> <span class="kbd">→</span></span>
          <span>儲存: <span class="kbd">⌘S</span></span>
-         <span>刪除: <span class="kbd">⌘⌫</span> / 直接刪: <span class="kbd">⌘⇧⌫</span></span>`;
+         <span>刪除: <span class="kbd">⌘⌫</span></span>`;
     } else if (isCode) {
       document.getElementById("hudShortcuts").innerHTML =
-        `<span>縮圖牆: <span class="kbd">Esc</span></span>
+        `<span>尋找: <span class="kbd">⌘F</span></span>
+         <span>縮圖牆: <span class="kbd">Esc</span></span>
          <span>切換檔案: <span class="kbd">←</span> <span class="kbd">→</span></span>
          <span>切換編輯: <span class="kbd">⌘E</span></span>
          <span>儲存: <span class="kbd">⌘S</span></span>
-         <span>刪除: <span class="kbd">⌘⌫</span> / 直接刪: <span class="kbd">⌘⇧⌫</span></span>`;
+         <span>刪除: <span class="kbd">⌘⌫</span></span>`;
     } else if (isMd || isDocx) {
       document.getElementById("hudShortcuts").innerHTML =
-        `<span>縮圖牆: <span class="kbd">Esc</span></span>
+        `<span>尋找: <span class="kbd">⌘F</span></span>
+         <span>縮圖牆: <span class="kbd">Esc</span></span>
          <span>切換檔案: <span class="kbd">←</span> <span class="kbd">→</span></span>
          ${isMd ? '<span>雙欄編輯: <span class="kbd">⌘E</span></span>' : '<span>右側大綱 (TOC)</span>'}
-         <span>刪除: <span class="kbd">⌘⌫</span> / 直接刪: <span class="kbd">⌘⇧⌫</span></span>`;
+         <span>刪除: <span class="kbd">⌘⌫</span></span>`;
     } else {
       document.getElementById("hudShortcuts").innerHTML =
         `<span>縮圖牆: <span class="kbd">Esc</span></span>
@@ -6112,9 +6182,14 @@
         const val = row[cIdx] ?? "";
         const numCls = isNumericCell(val) && String(val).length < 15 && !/^0\d+/.test(String(val)) ? "csv-cell-num" : "";
         const editAttr = csvEditMode ? 'contenteditable="true"' : 'contenteditable="false"';
+        let cellHtml = escapeHtml(val);
+        if (!csvEditMode && kw) {
+          const reg = new RegExp(`(${escapeRegex(kw)})`, "gi");
+          cellHtml = cellHtml.replace(reg, '<mark class="find-highlight">$1</mark>');
+        }
         html += `<td class="${numCls}" ${editAttr} spellcheck="false"
                      onblur="onCsvCellBlur(${origRowIdx}, ${cIdx}, this.textContent)"
-                     onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}">${escapeHtml(val)}</td>`;
+                     onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}">${cellHtml}</td>`;
       });
       html += `</tr>`;
     });
@@ -9035,8 +9110,29 @@
       return;
     }
 
+    // Cmd+F / Ctrl+F: In-Document String Search (Excel, CSV, Word, PDF, Code, Markdown, JSON)
+    if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "F")) {
+      if (["csv", "xlsx", "markdown", "docx", "pdf", "code", "json", "xml"].includes(currentFileType)) {
+        e.preventDefault();
+        openInDocSearch();
+        return;
+      }
+    }
+
     const tag = (e.target && e.target.tagName) || "";
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.target?.isContentEditable) {
+      if (e.target && e.target.id === "inDocSearchInput") {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          navigateInDocSearch(e.shiftKey ? -1 : 1);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeInDocSearch();
+          return;
+        }
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         const activeIt = getCurrentActiveItem();
@@ -9116,8 +9212,13 @@
       }
     }
 
-    // Global Escape Handler: Close Scratchpad or Return to Thumbnail Wall / Grid View
+    // Global Escape Handler: Close In-Doc Search, Scratchpad or Return to Thumbnail Wall / Grid View
     if (e.key === "Escape") {
+      if (inDocSearchActive) {
+        e.preventDefault();
+        closeInDocSearch();
+        return;
+      }
       const spModal = document.getElementById("scratchpadModal");
       if (spModal && spModal.style.display === "flex") {
         e.preventDefault();
@@ -9708,6 +9809,272 @@
     openScratchpad(content || lastScratchContent, item ? item.type : "auto");
   }
 
+  /* =========================================================
+     In-Document String Search Controller (Cmd+F / Ctrl+F)
+     Supports: Excel, CSV, Word, PDF, Markdown, Code, JSON
+     ========================================================= */
+  let inDocSearchActive = false;
+  let inDocSearchMatches = [];
+  let inDocSearchActiveIdx = -1;
+  let inDocSearchDebounce = null;
+
+  function escapeRegex(str) {
+    return String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function openInDocSearch() {
+    const bar = document.getElementById("inDocSearchBar");
+    const inp = document.getElementById("inDocSearchInput");
+    if (!bar || !inp) return;
+
+    bar.style.display = "flex";
+    inDocSearchActive = true;
+    inp.focus();
+    inp.select();
+
+    if (inp.value.trim()) {
+      executeInDocSearch();
+    }
+  }
+
+  function closeInDocSearch() {
+    const bar = document.getElementById("inDocSearchBar");
+    if (bar) bar.style.display = "none";
+    inDocSearchActive = false;
+    clearInDocSearchHighlights();
+    inDocSearchMatches = [];
+    inDocSearchActiveIdx = -1;
+    const counter = document.getElementById("inDocSearchCounter");
+    if (counter) counter.textContent = "0 / 0";
+  }
+
+  function onInDocSearchInput() {
+    clearTimeout(inDocSearchDebounce);
+    inDocSearchDebounce = setTimeout(executeInDocSearch, 60);
+  }
+
+  function clearInDocSearchHighlights() {
+    // 1. Clear text highlights in markdown / word / code / pdf
+    const mdViewer = document.getElementById("mdViewer");
+    if (mdViewer) clearHighlightsInElement(mdViewer);
+    const pdfTextEl = document.getElementById("pdfTextRendered");
+    if (pdfTextEl) clearHighlightsInElement(pdfTextEl);
+    const codeViewer = document.getElementById("codeViewer");
+    if (codeViewer) clearHighlightsInElement(codeViewer);
+
+    // 2. Clear CSV / XLSX table highlights
+    document.querySelectorAll(".csv-cell-match, .csv-cell-match-active").forEach(td => {
+      td.classList.remove("csv-cell-match", "csv-cell-match-active");
+    });
+  }
+
+  function executeInDocSearch() {
+    const inp = document.getElementById("inDocSearchInput");
+    const counter = document.getElementById("inDocSearchCounter");
+    if (!inp || !counter) return;
+
+    const query = inp.value.trim();
+    clearInDocSearchHighlights();
+    inDocSearchMatches = [];
+    inDocSearchActiveIdx = -1;
+
+    if (!query) {
+      counter.textContent = "0 / 0";
+      if (currentFileType === "csv" || currentFileType === "xlsx") {
+        const cInp = document.getElementById("csvSearchInput");
+        if (cInp && cInp.value) { cInp.value = ""; renderCsvTable(); }
+      }
+      return;
+    }
+
+    const kwLower = query.toLowerCase();
+
+    // 1. Word / Markdown View
+    if (currentFileType === "docx" || currentFileType === "markdown") {
+      const container = document.getElementById("mdViewer");
+      if (container) {
+        inDocSearchMatches = highlightMatchesInElement(container, query);
+      }
+    }
+    // 2. Excel & CSV View
+    else if (currentFileType === "csv" || currentFileType === "xlsx") {
+      const cInp = document.getElementById("csvSearchInput");
+      if (cInp && cInp.value !== query) {
+        cInp.value = query;
+        renderCsvTable();
+      }
+      const matches = [];
+      for (let r = 0; r < currentCsvRows.length; r++) {
+        const row = currentCsvRows[r];
+        for (let c = 0; c < row.length; c++) {
+          const val = String(row[c] ?? "");
+          if (val.toLowerCase().includes(kwLower)) {
+            matches.push({ type: "csv", r, c, val });
+          }
+        }
+      }
+      inDocSearchMatches = matches;
+    }
+    // 3. PDF View
+    else if (currentFileType === "pdf") {
+      const matches = [];
+      for (let i = 0; i < currentPdfPages.length; i++) {
+        const p = currentPdfPages[i];
+        const text = p.text || "";
+        const regex = new RegExp(escapeRegex(query), "gi");
+        let m;
+        while ((m = regex.exec(text)) !== null) {
+          matches.push({ type: "pdf", page: p.index, snippet: text.slice(Math.max(0, m.index - 20), m.index + query.length + 20) });
+        }
+      }
+      inDocSearchMatches = matches;
+      if (pdfViewMode === "text") {
+        const pdfTextEl = document.getElementById("pdfTextRendered");
+        if (pdfTextEl) highlightMatchesInElement(pdfTextEl, query);
+      }
+    }
+    // 4. Code View
+    else if (currentFileType === "code") {
+      const container = document.getElementById("codeViewer");
+      if (container) {
+        inDocSearchMatches = highlightMatchesInElement(container, query);
+      }
+    }
+    // 5. JSON / XML View
+    else if (currentFileType === "json" || currentFileType === "xml") {
+      const jInp = document.getElementById("jsonSearchInput");
+      if (jInp) {
+        jInp.value = query;
+        onJsonSearchInput();
+      }
+      const matches = Array.from(document.querySelectorAll("#jsonTreeContainer .j-node:not([style*='display: none'])"));
+      inDocSearchMatches = matches;
+    }
+
+    const total = inDocSearchMatches.length;
+    if (total > 0) {
+      inDocSearchActiveIdx = 0;
+      updateInDocSearchDisplay();
+      focusInDocMatch(0);
+    } else {
+      counter.textContent = "0 / 0";
+    }
+  }
+
+  function navigateInDocSearch(direction) {
+    if (inDocSearchMatches.length === 0) return;
+    inDocSearchActiveIdx = (inDocSearchActiveIdx + direction + inDocSearchMatches.length) % inDocSearchMatches.length;
+    updateInDocSearchDisplay();
+    focusInDocMatch(inDocSearchActiveIdx);
+  }
+
+  function updateInDocSearchDisplay() {
+    const counter = document.getElementById("inDocSearchCounter");
+    if (!counter) return;
+    const total = inDocSearchMatches.length;
+    if (total === 0) {
+      counter.textContent = "0 / 0";
+      return;
+    }
+    const cur = inDocSearchActiveIdx + 1;
+    const match = inDocSearchMatches[inDocSearchActiveIdx];
+    if (match && match.type === "pdf") {
+      counter.textContent = `${cur} / ${total} (P.${match.page})`;
+    } else if (match && match.type === "csv") {
+      counter.textContent = `${cur} / ${total} (R.${match.r + 1})`;
+    } else {
+      counter.textContent = `${cur} / ${total}`;
+    }
+  }
+
+  function focusInDocMatch(idx) {
+    if (idx < 0 || idx >= inDocSearchMatches.length) return;
+    const match = inDocSearchMatches[idx];
+
+    // Word / Markdown / Code: match is a <mark> element
+    if (match instanceof HTMLElement) {
+      document.querySelectorAll("mark.find-highlight-active").forEach(m => m.classList.remove("find-highlight-active"));
+      match.classList.add("find-highlight-active");
+      match.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    // Excel / CSV: match is { type: 'csv', r, c }
+    else if (match && match.type === "csv") {
+      selectCsvRow(match.r);
+      const rowEl = document.getElementById(`csv-row-${match.r}`);
+      if (rowEl) {
+        rowEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        const cellEl = rowEl.children[match.c + 1];
+        if (cellEl) {
+          document.querySelectorAll(".csv-cell-match-active").forEach(el => el.classList.remove("csv-cell-match-active"));
+          cellEl.classList.add("csv-cell-match-active");
+        }
+      }
+    }
+    // PDF: match is { type: 'pdf', page, snippet }
+    else if (match && match.type === "pdf") {
+      selectPdfPage(match.page, true);
+      if (pdfViewMode === "text") {
+        const textMarks = document.querySelectorAll("#pdfTextRendered mark.find-highlight");
+        if (textMarks[idx]) {
+          textMarks.forEach(m => m.classList.remove("find-highlight-active"));
+          textMarks[idx].classList.add("find-highlight-active");
+          textMarks[idx].scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }
+  }
+
+  function highlightMatchesInElement(container, kw) {
+    clearHighlightsInElement(container);
+    if (!kw) return [];
+    const matches = [];
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+    const regex = new RegExp(escapeRegex(kw), "gi");
+    for (const node of textNodes) {
+      if (!node.nodeValue || !regex.test(node.nodeValue)) continue;
+      const parent = node.parentNode;
+      if (!parent || parent.tagName === "MARK" || parent.tagName === "SCRIPT" || parent.tagName === "STYLE") continue;
+
+      const frag = document.createDocumentFragment();
+      let lastIdx = 0;
+      const text = node.nodeValue;
+      regex.lastIndex = 0;
+      let m;
+      while ((m = regex.exec(text)) !== null) {
+        if (m.index > lastIdx) {
+          frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+        }
+        const mark = document.createElement("mark");
+        mark.className = "find-highlight";
+        mark.textContent = m[0];
+        frag.appendChild(mark);
+        matches.push(mark);
+        lastIdx = regex.lastIndex;
+      }
+      if (lastIdx < text.length) {
+        frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+      }
+      parent.replaceChild(frag, node);
+    }
+    return matches;
+  }
+
+  function clearHighlightsInElement(container) {
+    if (!container) return;
+    const marks = container.querySelectorAll("mark.find-highlight");
+    marks.forEach(m => {
+      const parent = m.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(m.textContent), m);
+        parent.normalize();
+      }
+    });
+  }
+
   // ==========================================
   // Bilingual i18n Engine (繁體中文 ⇋ English)
   // ==========================================
@@ -9862,7 +10229,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.9";
+        const curVer = data.current_version || "2.8.10";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -9932,7 +10299,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.9";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.10";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -9996,8 +10363,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.9";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.9";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.10";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.10";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -10191,6 +10558,7 @@
      File Associations & Default Handler Management
      ========================================================= */
   let fileAssocItems = [];
+  let fileAssocCurrentFilter = "all"; // "all" | "set" | "unset"
 
   async function openFileAssociationModal(isFirstLaunch = false) {
     const modal = document.getElementById("fileAssocModal");
@@ -10201,12 +10569,10 @@
     if (!modal || !container) return;
 
     if (titleEl) {
-      titleEl.textContent = isFirstLaunch ? "👋 歡迎使用！請自訂預設開啟程式" : "📂 自訂預設開啟程式（檔案關聯）";
+      titleEl.textContent = "📂 自訂預設開啟程式（系統檔案關聯）";
     }
     if (subEl) {
-      subEl.textContent = isFirstLaunch
-        ? "初次安裝指引：勾選您希望直接點兩下由本工具開啟的檔案（隨時可於右上角「預設開啟」進行調整）"
-        : "您可以自由勾選由 PowerUp Toolbox 預設開啟的副檔名";
+      subEl.textContent = "檢視目前各格式預設開啟程式，可隨時候補勾選由本工具預設開啟";
     }
     if (statusMsg) statusMsg.textContent = "";
 
@@ -10221,18 +10587,65 @@
         return;
       }
       fileAssocItems = data.items;
-      renderFileAssocList(isFirstLaunch);
+      updateFileAssocSummary();
+      renderFileAssocList();
     } catch (e) {
       container.innerHTML = `<div style="text-align:center; padding:20px; color:#f87171; font-size:12px;">❌ 查詢失敗，請重試</div>`;
     }
   }
 
-  function renderFileAssocList(isFirstLaunch = false) {
+  function setFileAssocFilter(filter) {
+    fileAssocCurrentFilter = filter;
+    document.querySelectorAll(".file-assoc-filter-btn").forEach(btn => {
+      if (btn.getAttribute("data-filter") === filter) {
+        btn.style.background = "rgba(59,130,246,0.3)";
+        btn.style.borderColor = "#3b82f6";
+        btn.style.color = "#93c5fd";
+      } else {
+        btn.style.background = "rgba(255,255,255,0.05)";
+        btn.style.borderColor = "rgba(255,255,255,0.12)";
+        btn.style.color = "#94a3b8";
+      }
+    });
+    renderFileAssocList();
+  }
+
+  function updateFileAssocSummary() {
+    const total = fileAssocItems.length;
+    const currentCount = fileAssocItems.filter(it => it.is_default).length;
+    const otherCount = total - currentCount;
+
+    const elTotal = document.getElementById("assocStatTotal");
+    const elCurrent = document.getElementById("assocStatCurrent");
+    const elOther = document.getElementById("assocStatOther");
+    if (elTotal) elTotal.textContent = total;
+    if (elCurrent) elCurrent.textContent = currentCount;
+    if (elOther) elOther.textContent = otherCount;
+
+    const badge = document.getElementById("assocOverviewBadge");
+    if (badge) {
+      badge.innerHTML = `系統共 <strong>${total}</strong> 項格式：<span style="color:#34d399; font-weight:700;">${currentCount} 項由本工具預設開啟</span>，<span style="color:#94a3b8;">${otherCount} 項保留其他程式開啟</span>。您可以勾選或取消，隨時自訂候補。`;
+    }
+  }
+
+  function renderFileAssocList() {
     const container = document.getElementById("fileAssocListContainer");
     if (!container) return;
 
+    let itemsToRender = fileAssocItems;
+    if (fileAssocCurrentFilter === "set") {
+      itemsToRender = fileAssocItems.filter(it => it.is_default);
+    } else if (fileAssocCurrentFilter === "unset") {
+      itemsToRender = fileAssocItems.filter(it => !it.is_default);
+    }
+
+    if (itemsToRender.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding:35px 20px; color:#64748b; font-size:12px;">此分類目前無任何項目</div>`;
+      return;
+    }
+
     const groups = {};
-    for (const item of fileAssocItems) {
+    for (const item of itemsToRender) {
       const cat = item.category_name || "其他檔案";
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(item);
@@ -10241,18 +10654,19 @@
     let html = "";
     for (const [catName, list] of Object.entries(groups)) {
       html += `<div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:12px;">
-        <div style="font-size:12px; font-weight:800; color:#cbd5e1; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+        <div style="font-size:12px; font-weight:800; color:#cbd5e1; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
           <span>${escapeHtml(catName)}</span>
+          <span style="font-size:10px; color:#64748b;">${list.length} 項</span>
         </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:8px;">`;
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:8px;">`;
 
       for (const item of list) {
-        const checked = isFirstLaunch ? Boolean(item.recommended) : Boolean(item.is_default);
+        const checked = Boolean(item.is_default);
         const isCurrentToolbox = item.is_default;
         const isHtml = (item.key === "html");
 
         html += `
-          <label style="display:flex; align-items:flex-start; gap:9px; background:rgba(0,0,0,0.3); border:1px solid ${isHtml ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)'}; border-radius:8px; padding:8px 10px; cursor:pointer; user-select:none; transition:all 0.15s ease;">
+          <label style="display:flex; align-items:flex-start; gap:9px; background:${isCurrentToolbox ? 'rgba(16,185,129,0.06)' : 'rgba(0,0,0,0.3)'}; border:1px solid ${isCurrentToolbox ? 'rgba(16,185,129,0.3)' : (isHtml ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)')}; border-radius:8px; padding:9px 10px; cursor:pointer; user-select:none; transition:all 0.15s ease;">
             <input type="checkbox" class="file-assoc-chk" data-key="${item.key}" ${checked ? 'checked' : ''} style="margin-top:2px; cursor:pointer; accent-color:#3b82f6;">
             <div style="flex:1; min-width:0;">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:2px;">
@@ -10261,11 +10675,12 @@
                 ${isHtml ? '<span style="background:rgba(245,158,11,0.2); color:#fcd34d; font-size:9px; padding:1px 5px; border-radius:4px;">保留瀏覽器</span>' : ''}
               </div>
               <div style="font-size:11px; color:#94a3b8; font-family:'SF Mono',Menlo,monospace; margin-bottom:4px;">${escapeHtml(item.exts.join(" "))}</div>
-              <div style="font-size:10px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; font-size:10px;">
                 ${isCurrentToolbox
                   ? '<span style="background:rgba(16,185,129,0.18); color:#34d399; padding:2px 6px; border-radius:4px; font-weight:600;">✓ 目前：PowerUp Toolbox</span>'
                   : `<span style="background:rgba(255,255,255,0.06); color:#94a3b8; padding:2px 6px; border-radius:4px;">目前：${escapeHtml(item.current_app || '系統預設')}</span>`
                 }
+                <span style="font-size:9px; color:${isCurrentToolbox ? '#64748b' : '#60a5fa'};">${isCurrentToolbox ? '已設定' : '候補設定'}</span>
               </div>
             </div>
           </label>
@@ -10317,7 +10732,17 @@
       localStorage.setItem("powerup_file_assoc_configured_v1", "1");
       localStorage.setItem("powerup_file_assoc_prompted_done", "1");
       showToast("✅ 預設開啟程式設定已成功套用！");
-      closeFileAssociationModal();
+
+      // Refresh in-place so user immediately sees which items are now set
+      const resRefresh = await fetch('/api/file-handlers');
+      const dataRefresh = await resRefresh.json();
+      if (dataRefresh.ok && dataRefresh.items) {
+        fileAssocItems = dataRefresh.items;
+        updateFileAssocSummary();
+        renderFileAssocList();
+      }
+      if (statusMsg) statusMsg.innerHTML = `<span style="color:#34d399; font-weight:700;">✅ 設定已成功套用！</span>`;
+      setTimeout(closeFileAssociationModal, 800);
     } catch (e) {
       if (statusMsg) statusMsg.innerHTML = `<span style="color:#f87171;">❌ 套用失敗，請稍後重試</span>`;
       if (btn) btn.disabled = false;
@@ -11357,19 +11782,15 @@
   applyAppLanguage(appCurrentLang);
   initStageGestureListeners();
 
-  // First launch default file association prompt (only prompt once permanently across all versions):
+  // Default file association management: accessible on demand via topbar "📂 預設開啟"
   // macOS only - Windows registers its "Open with PowerUp Toolbox" entries itself (win_support.register()).
+  // Do NOT automatically prompt on startup so users are never interrupted or prompted for permissions.
   try {
     if (IS_WIN) {
       const fab = document.getElementById("btnFileAssociations");
       if (fab) fab.style.setProperty("display", "none", "important");
     }
-    const hasConfiguredAssoc = localStorage.getItem("powerup_file_assoc_prompted_done") || localStorage.getItem("powerup_file_assoc_configured_v1");
-    if (!IS_WIN && !hasConfiguredAssoc) {
-      setTimeout(() => {
-        openFileAssociationModal(true);
-      }, 1200);
-    }
+    localStorage.setItem("powerup_file_assoc_prompted_done", "1");
   } catch(e){}
   if (window.location.search.includes("check_update=1")) {
     setTimeout(() => checkAppUpdates(false), 500);
@@ -11419,7 +11840,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.9</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.10</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
@@ -11448,27 +11869,35 @@
 
   <!-- File Association Modal -->
   <div id="fileAssocModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.82); backdrop-filter:blur(10px); z-index:99999; align-items:center; justify-content:center;">
-    <div class="modal-card" style="background:#0b0f19; border:1px solid rgba(59,130,246,0.4); border-radius:18px; width:580px; max-width:94vw; max-height:88vh; display:flex; flex-direction:column; padding:22px; box-shadow:0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(59,130,246,0.15);">
+    <div class="modal-card" style="background:#0b0f19; border:1px solid rgba(59,130,246,0.4); border-radius:18px; width:640px; max-width:95vw; max-height:90vh; display:flex; flex-direction:column; padding:22px; box-shadow:0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(59,130,246,0.15);">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
         <div style="display:flex; align-items:center; gap:10px;">
           <span style="font-size:26px;">📂</span>
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalFileAssocTitle">自訂預設開啟程式（檔案關聯）</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalFileAssocSub">您可以自由選擇由 PowerUp Toolbox 預設開啟的副檔名</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalFileAssocSub">檢視目前各格式預設開啟程式，可隨時候補勾選由本工具預設開啟</span>
           </div>
         </div>
         <button onclick="closeFileAssociationModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
       </div>
 
-      <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.22); border-radius:10px; padding:10px 14px; margin-bottom:12px; font-size:12px; color:#93c5fd; line-height:1.5;">
-        💡 <strong>貼心建議</strong>：您可以隨時在此勾選或取消。例如 <strong>HTML</strong> 建議保留由瀏覽器（Google Chrome）開啟；取消勾選的類型會自動恢復為系統預設或原應用程式。
+      <!-- Overview Status Banner -->
+      <div id="assocOverviewBadge" style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.22); border-radius:10px; padding:10px 14px; margin-bottom:10px; font-size:12px; color:#93c5fd; line-height:1.5;">
+        載入中...
       </div>
 
-      <!-- Quick Action Buttons -->
-      <div style="display:flex; gap:8px; margin-bottom:12px; font-size:11px;">
-        <button class="btn" onclick="quickSelectAssoc('recommended')" style="padding:4px 10px; border-color:#3b82f6; color:#60a5fa; font-weight:700;">🌟 推薦設定 (MD/CSV/JSON/簡報)</button>
-        <button class="btn" onclick="quickSelectAssoc('all')" style="padding:4px 8px;">全部選取</button>
-        <button class="btn" onclick="quickSelectAssoc('none')" style="padding:4px 8px;">全部取消</button>
+      <!-- Filter Tabs & Quick Action Buttons -->
+      <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:11px;">
+        <div style="display:flex; gap:6px;">
+          <button class="btn file-assoc-filter-btn" data-filter="all" onclick="setFileAssocFilter('all')" style="padding:4px 9px; background:rgba(59,130,246,0.3); border-color:#3b82f6; color:#93c5fd; font-weight:700;">全部格式 (<span id="assocStatTotal">0</span>)</button>
+          <button class="btn file-assoc-filter-btn" data-filter="set" onclick="setFileAssocFilter('set')" style="padding:4px 9px; background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.12); color:#94a3b8;">✓ 已設為本工具 (<span id="assocStatCurrent">0</span>)</button>
+          <button class="btn file-assoc-filter-btn" data-filter="unset" onclick="setFileAssocFilter('unset')" style="padding:4px 9px; background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.12); color:#94a3b8;">⚪ 其他程式開啟 (<span id="assocStatOther">0</span>)</button>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn" onclick="quickSelectAssoc('recommended')" style="padding:4px 8px; border-color:#3b82f6; color:#60a5fa; font-weight:700;" title="勾選推薦格式">🌟 推薦設定</button>
+          <button class="btn" onclick="quickSelectAssoc('all')" style="padding:4px 7px;">全部選取</button>
+          <button class="btn" onclick="quickSelectAssoc('none')" style="padding:4px 7px;">全部取消</button>
+        </div>
       </div>
 
       <!-- Scrollable list of formats -->
@@ -11480,7 +11909,7 @@
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08);">
         <span id="fileAssocStatusMsg" style="font-size:12px; color:#94a3b8;"></span>
         <div style="display:flex; gap:10px;">
-          <button class="btn" onclick="closeFileAssociationModal()" style="padding:7px 14px; font-size:12px;">稍後再說</button>
+          <button class="btn" onclick="closeFileAssociationModal()" style="padding:7px 14px; font-size:12px;">關閉</button>
           <button class="btn btn-primary" id="btnSaveFileAssoc" onclick="saveFileAssociations()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #2563eb, #1d4ed8); border:none; color:#fff; font-weight:700; cursor:pointer;">💾 儲存並套用設定</button>
         </div>
       </div>

@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="2.8.9"
+VERSION="2.8.10"
 APP_NAME="MacToolbox.app"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
 
 # Keep Info.plist versions synchronized
 plutil -replace CFBundleShortVersionString -string "${VERSION}" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
-plutil -replace CFBundleVersion -string "289" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
+plutil -replace CFBundleVersion -string "2810" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 
 echo "🧪 [0/5] 語法檢查 (index.html 前端程式＋Python)..."
 # One SyntaxError in index.html's inline script disables the whole front end (v2.8.7 could not open files).
@@ -212,11 +212,11 @@ cat << EOF > "$DIST_DIR/version.json"
     "size": ${WIN_SIZE}
   },
   "changelog": [
+    "🔎 文件內關鍵字即時搜尋：全面支援 Excel、CSV、Word、PDF、Markdown 與程式碼按 ⌘F / Ctrl+F 即時搜尋字串，高亮標註、跳轉符合項目與即時結果計數",
+    "📊 零相依 Office 檔案極速解析：內建純 Python 標準庫解析引擎，無須安裝 openpyxl 或 python-docx 即可在任何乾淨系統完美開啟 .xlsx / .docx / .pptx 試算表與文件",
+    "📂 預設開啟與檔案關聯管理頁：移除啟動時干擾的自動彈窗，新增分類切換與統計（全部 / 已設為本工具 / 其他程式開啟），可隨時候補自由配置預設關聯",
     "🔍 跨視圖雙指縮放支援：全面支援 PDF 頁面、程式碼 (Java/JS/HTML/CSS/TXT)、Markdown、JSON 與 CSV 表格的觸控板捏合 (Pinch-to-zoom)、Ctrl/⌘+滾輪與 ⌘+/⌘-/⌘0 快速縮放",
     "🔄 強化可靠升級自動重啟：升級安裝後一鍵「立即重新啟動」，保證舊進程徹底關閉、釋放通訊埠並流暢喚起新版本",
-    "🖼️ 完整圖片預設開啟支援：新增常用圖片關聯（PNG / JPG / JPEG / WEBP / HEIC / GIF / SVG），點兩下直接在圖片工坊開啟，告別預覽程式切換",
-    "📂 自訂預設開啟程式管理：初次安裝主動彈窗引導挑選，支援隨時於右上角「預設開啟」微調，精準保留 HTML 為 Google Chrome、自訂其他副檔名關聯",
-    "💻 程式碼與文字語言好讀版：原生支援 Java / Groovy / GSP / HTML / JS / CSS / TXT，提供語法高亮、符號大綱 TOC 跳轉、字體縮放與 ⌘E/⌘S 即時編輯儲存",
     "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證認證"
   ]
 }
