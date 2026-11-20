@@ -7,7 +7,7 @@
   "latest_pkg": "MacToolbox-latest.pkg",
   "dmg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.dmg",
   "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg",
-  "windows_version": "2.8.8",
+  "windows_version": "2.8.10",
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
@@ -19,11 +19,11 @@
     "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
   },
   "windows": {
-    "version": "2.8.8",
+    "version": "2.8.10",
     "latest_zip": "PowerUpToolbox-portable.zip",
     "zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
-    "sha256": "27c86a012bcd85f3111a4aa72cd4fc71dbb8ae4e5627a8900b4a44e99937a32b",
-    "size": 39913944
+    "sha256": "745ea0248afb52b1d01dcae250b7e74ac31473660cc013ac6fc4c29562357091",
+    "size": 40917919
   },
   "changelog": [
     "🔎 文件內關鍵字即時搜尋：全面支援 Excel、CSV、Word、PDF、Markdown 與程式碼按 ⌘F / Ctrl+F 即時搜尋字串，高亮標註、跳轉符合項目與即時結果計數",
