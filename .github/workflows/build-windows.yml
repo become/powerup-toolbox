@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release Tag (e.g. win-v2.8.8)'
+        description: 'Release Tag (e.g. win-v2.8.10)'
         required: true
-        default: 'win-v2.8.8'
+        default: 'win-v2.8.10'
       notes:
         description: 'Release Notes'
         required: false
-        default: 'PowerUp Toolbox for Windows v2.8.8'
+        default: 'PowerUp Toolbox for Windows v2.8.10'
 
 permissions:
   contents: write
@@ -57,7 +57,7 @@ jobs:
           $notes = if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ github.event.inputs.notes }}") {
             "${{ github.event.inputs.notes }}"
           } else {
-            "- Google 相簿深度整合：雲端相簿快速瀏覽、一鍵上傳備份與相簿分類整理`n- 介面版本號顯示與常駐手動檢查更新功能`n- 品牌圖標與高解析度 Retina Favicon 全平台完美相容`n- 跨平台檔案快速預覽、加密文件免解密即時檢視"
+            "- 文件內關鍵字即時搜尋：全面支援 Excel、CSV、Word、PDF、Markdown 按 Ctrl+F 即時搜尋字串、高亮標註、跳轉符合項目與計數`n- 零相依 Office 檔案極速解析：內建純 Python 標準庫解析引擎，無須額外套件即可完美開啟 .xlsx / .docx / .pptx`n- 修正前端重複宣告變數問題，確保啟動與開啟檔案順暢無阻`n- 支援文件與程式碼視圖雙指/滾輪縮放"
           }
           
           $exists = gh release view $tag --repo ${{ github.repository }} 2>$null
