@@ -663,9 +663,9 @@
   /* Crop Box */
   .crop-box {
     position: absolute;
-    border: 2px dashed #60a5fa;
+    border: 1.5px dashed #60a5fa;
     background: rgba(59, 130, 246, 0.12);
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
     z-index: 15;
     display: none;
     cursor: move;
@@ -673,25 +673,46 @@
   .crop-box.visible { display: block; }
   .crop-toolbar {
     position: absolute;
-    bottom: -36px; left: 50%;
+    bottom: -38px; left: 50%;
     transform: translateX(-50%);
-    background: var(--bg-1);
-    border: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 8px;
-    padding: 4px 6px;
+    padding: 3px 5px;
     display: flex; gap: 4px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.7);
     white-space: nowrap; z-index: 25;
+    pointer-events: auto;
+  }
+  .crop-toolbar.toolbar-above {
+    bottom: auto;
+    top: -38px;
+  }
+  .crop-toolbar .btn {
+    padding: 3px 7px;
+    font-size: 11px;
+    height: 25px;
+    line-height: 1;
+    border-radius: 5px;
   }
   .crop-size-badge {
     position: absolute;
-    top: -22px; left: 0;
-    background: rgba(15, 23, 42, 0.9);
+    top: -20px; left: 0;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     color: #93c5fd;
-    font-size: 10px; padding: 2px 6px;
-    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
     font-family: "SF Mono", monospace;
     line-height: 1.2;
+    pointer-events: none;
+  }
+  .crop-size-badge.badge-inside {
+    top: 4px; left: 4px;
   }
 
   /* Loupe Magnifier */
@@ -2158,7 +2179,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.11 · 點擊手動檢查更新">v2.8.11</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.12 · 點擊手動檢查更新">v2.8.12</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2291,7 +2312,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.11)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.12)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -7272,9 +7293,9 @@
     const effH = isRotated90 ? nw : nh;
 
     if (fitMode === "window") {
-      baseFitScale = Math.min(sw / effW, sh / effH);
+      baseFitScale = Math.min(1.0, sw / effW, sh / effH);
     } else if (fitMode === "width") {
-      baseFitScale = sw / effW;
+      baseFitScale = Math.min(1.0, sw / effW);
     } else {
       baseFitScale = 1.0;
     }
@@ -7297,6 +7318,7 @@
       const modeLabel = fitMode === "window" ? "適應視窗" : (fitMode === "width" ? "適應寬度" : "1:1 原寸");
       document.getElementById("hudExtraBadge").textContent = `${totalPct}% (${modeLabel})`;
     }
+    if (cropRect) renderCropBox();
   }
 
   function resetViewTransform() {
@@ -7895,7 +7917,38 @@
     const img = document.getElementById("mainImage");
     const pw = Math.round((img.naturalWidth || 0) * cropRect.w);
     const ph = Math.round((img.naturalHeight || 0) * cropRect.h);
-    document.getElementById("cropBadge").textContent = `${pw} × ${ph} px`;
+    const badge = document.getElementById("cropBadge");
+    if (badge) {
+      badge.textContent = `${pw} × ${ph} px`;
+    }
+
+    const tb = document.querySelector(".crop-toolbar");
+    const currentZoom = (typeof zoom === "number" && zoom > 0) ? zoom : 1;
+    const invScale = 1 / currentZoom;
+
+    if (tb) {
+      // If crop box is near the bottom of the image, flip toolbar above
+      const isNearBottom = (cropRect.y + cropRect.h > 0.85);
+      if (isNearBottom) {
+        tb.classList.add("toolbar-above");
+      } else {
+        tb.classList.remove("toolbar-above");
+      }
+      // Counter-scale so UI buttons always stay crisp 1:1 on screen regardless of image zoom
+      tb.style.transform = `translateX(-50%) scale(${invScale.toFixed(4)})`;
+      tb.style.transformOrigin = isNearBottom ? "bottom center" : "top center";
+    }
+
+    if (badge) {
+      const isNearTop = (cropRect.y < 0.05) || (tb && tb.classList.contains("toolbar-above"));
+      if (isNearTop) {
+        badge.classList.add("badge-inside");
+      } else {
+        badge.classList.remove("badge-inside");
+      }
+      badge.style.transform = `scale(${invScale.toFixed(4)})`;
+      badge.style.transformOrigin = isNearTop ? "top left" : "bottom left";
+    }
   }
 
   function clearCrop() {
@@ -10229,7 +10282,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.11";
+        const curVer = data.current_version || "2.8.12";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -10299,7 +10352,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.11";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.12";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -10363,8 +10416,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.11";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.11";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.12";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.12";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -11891,7 +11944,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.11</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.12</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>

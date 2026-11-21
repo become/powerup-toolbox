@@ -1,5 +1,5 @@
 {
-  "version": "2.8.11",
+  "version": "2.8.12",
   "name": "PowerUp Toolbox",
   "release_date": "2026-11-21",
   "min_macos": "12.0",
@@ -11,7 +11,7 @@
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
-    "version": "2.8.11",
+    "version": "2.8.12",
     "min_macos": "12.0",
     "latest_dmg": "MacToolbox-latest.dmg",
     "latest_pkg": "MacToolbox-latest.pkg",
@@ -26,6 +26,7 @@
     "size": 40917919
   },
   "changelog": [
+    "🖼️ 圖片清晰度與裁切體驗優化：適應視窗模式增加 100% 原寸上限保護，小圖不強制放大失真；精簡裁切工具列尺寸並支援智慧上下避讓與縮放自適應",
     "📂 修正預設開啟檔案關聯管理器：修復套用後按鈕保持鎖定導致二次調整無法儲存的問題，增強跨分類選取記憶與替代程式容錯委派",
     "🔎 文件內關鍵字即時搜尋：全面支援 Excel、CSV、Word、PDF、Markdown 與程式碼按 ⌘F / Ctrl+F 即時搜尋字串，高亮標註、跳轉符合項目與即時結果計數",
     "📊 零相依 Office 檔案極速解析：內建純 Python 標準庫解析引擎，無須安裝 openpyxl 或 python-docx 即可在任何乾淨系統完美開啟 .xlsx / .docx / .pptx 試算表與文件",
