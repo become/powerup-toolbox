@@ -2179,7 +2179,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.13 · 點擊手動檢查更新">v2.8.13</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.14 · 點擊手動檢查更新">v2.8.14</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2312,7 +2312,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.13)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.14)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -2782,36 +2782,6 @@
             <button class="btn emerald" onclick="runOcr()">🔤 OCR 辨識文字</button>
           </div>
           <div id="ocrResultBox" class="output-box"></div>
-        </div>
-
-        <div class="tool-card" data-mac-only="1">
-          <div class="tool-header">
-            <span>✨ 本地 AI 修復強化</span>
-            <span class="badge" style="font-size:9.5px; background:rgba(245,158,11,0.2); color:#fbbf24; padding:1px 5px; border-radius:4px;">進階 · 需配置環境</span>
-          </div>
-          <div style="font-size:10.5px; color:var(--muted); line-height:1.4;">
-            進階實驗性功能（GFPGAN 修臉、4x 超解析等），需本機配置 PyTorch 與模型權重檔。常用修圖請使用上方原生一鍵去背與 OCR。
-          </div>
-          <label style="font-size:11px; display:flex; align-items:center; gap:6px; color:#cbd5e1;">
-            <input type="checkbox" id="pasteBackCheck" checked /> 框選時自動融合回完整原圖
-          </label>
-          <div class="grid-2">
-            <button class="btn primary" onclick="runAiEnhance('gfpgan')">✨ GFPGAN 修臉</button>
-            <button class="btn primary" onclick="runAiEnhance('codeformer')">💎 CodeFormer</button>
-            <button class="btn" onclick="runAiEnhance('descreen')">🧹 FFT 去網點</button>
-            <button class="btn" onclick="runAiEnhance('realesrgan')">🔍 4x 超解析</button>
-          </div>
-          <button class="btn purple" style="width:100%" onclick="runAiEnhance('ddcolor')">🎨 DDColor AI 自動上色</button>
-        </div>
-
-        <div class="tool-card" data-mac-only="1">
-          <div class="tool-header">
-            <span>🤖 呼叫本地 Codex CLI</span>
-            <span class="kbd">codex exec</span>
-          </div>
-          <textarea id="codexPrompt" class="prompt-box" placeholder="輸入自然語言指令讓 Codex CLI 處理或生成圖片..."></textarea>
-          <button class="btn primary" id="codexRunBtn" onclick="runCodexCli()">🚀 交給 Codex CLI 執行</button>
-          <div id="codexOutputBox" class="output-box"></div>
         </div>
 
         <div class="tool-card">
@@ -4512,8 +4482,8 @@
         <div>MacToolbox 會根據您點選的檔案類型，<strong>自動變形切換專業檢視引擎</strong>，無須等待 Keynote / Pages / Numbers 開啟：</div>
         <div class="tour-feature-grid">
           <div class="tour-feature-box">
-            <strong style="color:#93c5fd;">🖼️ 極速看圖 ＋ AI 修復</strong>
-            Fit 視窗、拖曳裁切 <span class="kbd">⌘C</span> 直貼剪貼簿、A/B 比對、Vision 去背/OCR 與人臉修圖
+            <strong style="color:#93c5fd;">🖼️ 極速看圖 ＋ 原生 Vision</strong>
+            Fit 視窗、拖曳裁切 <span class="kbd">⌘C</span> 直貼剪貼簿、A/B 比對、原生 Vision 一鍵去背/OCR 與人臉偵測
           </div>
           <div class="tour-feature-box">
             <strong style="color:#fdba74;">📽️ PPTX / Word / Excel 檢視</strong>
@@ -4609,7 +4579,7 @@
       html: `
         <div>右側面板會根據當前模式提供深度進階工具：</div>
         <ul>
-          <li><strong>🖼️ 圖片模式</strong>：內建 <strong>macOS 原生 Vision 一鍵去背、繁中/英文 OCR 辨識、AI 人臉偵測 (<span class="kbd">F</span>)</strong>，以及本地 MPS GPU 加速的臉部修復與超解析。</li>
+          <li><strong>🖼️ 圖片模式</strong>：內建 <strong>macOS 原生 Vision 一鍵去背、繁中/英文 OCR 辨識、AI 人臉偵測 (<span class="kbd">F</span>)</strong>，支援無失真縮放、A/B 比對與剪貼簿快速貼圖。</li>
           <li><strong>📝 Markdown 模式</strong>：自動生成 <strong>📑 章節大綱 (TOC)</strong>，點擊平滑定位。</li>
           <li><strong>🧩 JSON / 📊 CSV 模式</strong>：提供節點 Inspector、欄位統計分析 (Sum/Avg/Unique) 與值分佈排行，點擊排行即可一鍵篩選表格！</li>
         </ul>
@@ -10289,7 +10259,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.13";
+        const curVer = data.current_version || "2.8.14";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -10359,7 +10329,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.13";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.14";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -10423,8 +10393,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.13";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.13";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.14";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.14";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -11951,7 +11921,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.13</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.14</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
