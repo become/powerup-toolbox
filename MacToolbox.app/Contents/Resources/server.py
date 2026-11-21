@@ -51,7 +51,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.12"
+APP_VERSION = "2.8.13"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -4597,10 +4597,17 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             return
 
         if route == "/api/ai-enhance":
-            import cv2
-            import numpy as np
-            import torch
-            from facexlib.utils.face_restoration_helper import FaceRestoreHelper
+            try:
+                import cv2
+                import numpy as np
+                import torch
+                from facexlib.utils.face_restoration_helper import FaceRestoreHelper
+            except ImportError as e:
+                self.send_json({
+                    "ok": False,
+                    "error": f"此進階功能需要本機環境安裝 PyTorch 與模型依賴庫（缺少：{getattr(e, 'name', 'torch')}）。一般修圖請使用原生一鍵去背、OCR 與裁切功能。"
+                }, 200)
+                return
 
             path = body.get("path", "")
             mode = body.get("mode", "gfpgan")
@@ -4628,6 +4635,9 @@ class ToolboxHandler(BaseHTTPRequestHandler):
 
                 elif mode in ("gfpgan", "codeformer"):
                     ckpt = "GFPGANv1.4.pth" if mode == "gfpgan" else "codeformer.pth"
+                    if not os.path.isfile(os.path.join(MODELS_DIR, ckpt)):
+                        self.send_json({"ok": False, "error": f"找不到 AI 模型檔 ({ckpt})。此進階功能需將模型權重放置於 models 資料夾。"}, 200)
+                        return
                     model_wrapper, dev = get_ai_model(ckpt)
                     net = model_wrapper.model
                     helper = FaceRestoreHelper(
@@ -4655,7 +4665,11 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                     res_img = helper.paste_faces_to_input_image(upsample_img=work_img)
 
                 elif mode == "realesrgan":
-                    esr, dev = get_ai_model("RealESRGAN_x4plus.pth")
+                    ckpt = "RealESRGAN_x4plus.pth"
+                    if not os.path.isfile(os.path.join(MODELS_DIR, ckpt)):
+                        self.send_json({"ok": False, "error": f"找不到 AI 模型檔 ({ckpt})。需將模型權重放置於 models 資料夾。"}, 200)
+                        return
+                    esr, dev = get_ai_model(ckpt)
                     mh, mw = work_img.shape[:2]
                     if max(mh, mw) > 800:
                         scale = 800.0 / max(mh, mw)
