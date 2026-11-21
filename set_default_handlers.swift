@@ -76,12 +76,25 @@ func getCurrentHandler(for uti: String) -> String {
     return ""
 }
 
+func isAppInstalled(_ bundleId: String) -> Bool {
+    return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) != nil
+}
+
 func findAlternativeHandler(for uti: String, fallback: String?) -> String? {
     if let list = LSCopyAllRoleHandlersForContentType(uti as CFString, .all)?.takeRetainedValue() as? [String] {
         for app in list {
-            if app != BUNDLE_ID && !app.contains("mactoolbox") {
+            if app != BUNDLE_ID && !app.contains("mactoolbox") && isAppInstalled(app) {
                 return app
             }
+        }
+    }
+    if let fallback = fallback, isAppInstalled(fallback) {
+        return fallback
+    }
+    let systemFallbacks = ["com.apple.Preview", "com.apple.TextEdit", "com.apple.Safari"]
+    for sysApp in systemFallbacks {
+        if isAppInstalled(sysApp) {
+            return sysApp
         }
     }
     return fallback

@@ -2158,7 +2158,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.10 · 點擊手動檢查更新">v2.8.10</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.11 · 點擊手動檢查更新">v2.8.11</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2291,7 +2291,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.10)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.11)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -10229,7 +10229,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.10";
+        const curVer = data.current_version || "2.8.11";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -10299,7 +10299,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.10";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.11";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -10363,8 +10363,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.10";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.10";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.11";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.11";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -10558,6 +10558,7 @@
      File Associations & Default Handler Management
      ========================================================= */
   let fileAssocItems = [];
+  let fileAssocSelectedKeys = new Set();
   let fileAssocCurrentFilter = "all"; // "all" | "set" | "unset"
 
   async function openFileAssociationModal(isFirstLaunch = false) {
@@ -10566,8 +10567,13 @@
     const titleEl = document.getElementById("modalFileAssocTitle");
     const subEl = document.getElementById("modalFileAssocSub");
     const statusMsg = document.getElementById("fileAssocStatusMsg");
+    const btn = document.getElementById("btnSaveFileAssoc");
     if (!modal || !container) return;
 
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = "💾 儲存並套用設定";
+    }
     if (titleEl) {
       titleEl.textContent = "📂 自訂預設開啟程式（系統檔案關聯）";
     }
@@ -10575,6 +10581,15 @@
       subEl.textContent = "檢視目前各格式預設開啟程式，可隨時候補勾選由本工具預設開啟";
     }
     if (statusMsg) statusMsg.textContent = "";
+
+    // Reset filter to all
+    fileAssocCurrentFilter = "all";
+    document.querySelectorAll(".file-assoc-filter-btn").forEach(b => {
+      const isAll = (b.getAttribute("data-filter") === "all");
+      b.style.background = isAll ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.05)";
+      b.style.borderColor = isAll ? "#3b82f6" : "rgba(255,255,255,0.12)";
+      b.style.color = isAll ? "#93c5fd" : "#94a3b8";
+    });
 
     container.innerHTML = `<div style="text-align:center; padding:30px; color:#94a3b8; font-size:12px;"><span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">⏳</span> 正在查詢系統檔案關聯狀態...</div>`;
     modal.style.display = "flex";
@@ -10587,6 +10602,7 @@
         return;
       }
       fileAssocItems = data.items;
+      fileAssocSelectedKeys = new Set(fileAssocItems.filter(it => it.is_default).map(it => it.key));
       updateFileAssocSummary();
       renderFileAssocList();
     } catch (e) {
@@ -10610,9 +10626,30 @@
     renderFileAssocList();
   }
 
+  function onFileAssocToggle(key, checked) {
+    if (checked) {
+      fileAssocSelectedKeys.add(key);
+    } else {
+      fileAssocSelectedKeys.delete(key);
+    }
+    updateFileAssocSummary();
+    const card = document.getElementById("fileAssocCard_" + key);
+    if (card) {
+      const isHtml = (key === "html");
+      card.style.background = checked ? 'rgba(16,185,129,0.06)' : 'rgba(0,0,0,0.3)';
+      card.style.borderColor = checked ? 'rgba(16,185,129,0.35)' : (isHtml ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)');
+      const badgeSpan = card.querySelector(".assoc-card-badge");
+      if (badgeSpan) {
+        badgeSpan.style.color = checked ? '#34d399' : '#60a5fa';
+        badgeSpan.style.fontWeight = checked ? '700' : 'normal';
+        badgeSpan.textContent = checked ? '套用本工具' : '候補設定';
+      }
+    }
+  }
+
   function updateFileAssocSummary() {
     const total = fileAssocItems.length;
-    const currentCount = fileAssocItems.filter(it => it.is_default).length;
+    const currentCount = fileAssocSelectedKeys.size;
     const otherCount = total - currentCount;
 
     const elTotal = document.getElementById("assocStatTotal");
@@ -10624,7 +10661,7 @@
 
     const badge = document.getElementById("assocOverviewBadge");
     if (badge) {
-      badge.innerHTML = `系統共 <strong>${total}</strong> 項格式：<span style="color:#34d399; font-weight:700;">${currentCount} 項由本工具預設開啟</span>，<span style="color:#94a3b8;">${otherCount} 項保留其他程式開啟</span>。您可以勾選或取消，隨時自訂候補。`;
+      badge.innerHTML = `系統共 <strong>${total}</strong> 項格式：<span style="color:#34d399; font-weight:700;">${currentCount} 項將設為本工具預設開啟</span>，<span style="color:#94a3b8;">${otherCount} 項保留其他程式開啟</span>。可自由勾選候補，點擊下方按鈕套用。`;
     }
   }
 
@@ -10634,9 +10671,9 @@
 
     let itemsToRender = fileAssocItems;
     if (fileAssocCurrentFilter === "set") {
-      itemsToRender = fileAssocItems.filter(it => it.is_default);
+      itemsToRender = fileAssocItems.filter(it => fileAssocSelectedKeys.has(it.key));
     } else if (fileAssocCurrentFilter === "unset") {
-      itemsToRender = fileAssocItems.filter(it => !it.is_default);
+      itemsToRender = fileAssocItems.filter(it => !fileAssocSelectedKeys.has(it.key));
     }
 
     if (itemsToRender.length === 0) {
@@ -10661,13 +10698,13 @@
         <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:8px;">`;
 
       for (const item of list) {
-        const checked = Boolean(item.is_default);
+        const checked = fileAssocSelectedKeys.has(item.key);
         const isCurrentToolbox = item.is_default;
         const isHtml = (item.key === "html");
 
         html += `
-          <label style="display:flex; align-items:flex-start; gap:9px; background:${isCurrentToolbox ? 'rgba(16,185,129,0.06)' : 'rgba(0,0,0,0.3)'}; border:1px solid ${isCurrentToolbox ? 'rgba(16,185,129,0.3)' : (isHtml ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)')}; border-radius:8px; padding:9px 10px; cursor:pointer; user-select:none; transition:all 0.15s ease;">
-            <input type="checkbox" class="file-assoc-chk" data-key="${item.key}" ${checked ? 'checked' : ''} style="margin-top:2px; cursor:pointer; accent-color:#3b82f6;">
+          <label id="fileAssocCard_${escapeHtml(item.key)}" style="display:flex; align-items:flex-start; gap:9px; background:${checked ? 'rgba(16,185,129,0.06)' : 'rgba(0,0,0,0.3)'}; border:1px solid ${checked ? 'rgba(16,185,129,0.35)' : (isHtml ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)')}; border-radius:8px; padding:9px 10px; cursor:pointer; user-select:none; transition:all 0.15s ease;">
+            <input type="checkbox" class="file-assoc-chk" data-key="${escapeHtml(item.key)}" ${checked ? 'checked' : ''} onchange="onFileAssocToggle('${escapeHtml(item.key)}', this.checked)" style="margin-top:2px; cursor:pointer; accent-color:#3b82f6;">
             <div style="flex:1; min-width:0;">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:2px;">
                 <span style="font-size:12px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.name)}</span>
@@ -10680,7 +10717,7 @@
                   ? '<span style="background:rgba(16,185,129,0.18); color:#34d399; padding:2px 6px; border-radius:4px; font-weight:600;">✓ 目前：PowerUp Toolbox</span>'
                   : `<span style="background:rgba(255,255,255,0.06); color:#94a3b8; padding:2px 6px; border-radius:4px;">目前：${escapeHtml(item.current_app || '系統預設')}</span>`
                 }
-                <span style="font-size:9px; color:${isCurrentToolbox ? '#64748b' : '#60a5fa'};">${isCurrentToolbox ? '已設定' : '候補設定'}</span>
+                <span class="assoc-card-badge" style="font-size:9px; color:${checked ? '#34d399' : '#60a5fa'}; font-weight:${checked ? '700' : 'normal'};">${checked ? '套用本工具' : '候補設定'}</span>
               </div>
             </div>
           </label>
@@ -10693,28 +10730,30 @@
   }
 
   function quickSelectAssoc(mode) {
-    const chks = document.querySelectorAll(".file-assoc-chk");
-    chks.forEach(chk => {
-      const key = chk.getAttribute("data-key");
-      const item = fileAssocItems.find(it => it.key === key);
-      if (mode === "all") {
-        chk.checked = true;
-      } else if (mode === "none") {
-        chk.checked = false;
-      } else if (mode === "recommended") {
-        chk.checked = item ? Boolean(item.recommended) : false;
-      }
-    });
+    if (mode === "all") {
+      fileAssocItems.forEach(it => fileAssocSelectedKeys.add(it.key));
+    } else if (mode === "none") {
+      fileAssocSelectedKeys.clear();
+    } else if (mode === "recommended") {
+      fileAssocSelectedKeys.clear();
+      fileAssocItems.forEach(it => {
+        if (it.recommended) fileAssocSelectedKeys.add(it.key);
+      });
+    }
+    updateFileAssocSummary();
+    renderFileAssocList();
   }
 
   async function saveFileAssociations() {
     const btn = document.getElementById("btnSaveFileAssoc");
     const statusMsg = document.getElementById("fileAssocStatusMsg");
-    const chks = document.querySelectorAll(".file-assoc-chk:checked");
-    const selectedKeys = Array.from(chks).map(c => c.getAttribute("data-key"));
+    const selectedKeys = Array.from(fileAssocSelectedKeys);
 
-    if (btn) btn.disabled = true;
-    if (statusMsg) statusMsg.innerHTML = `<span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:4px;">⏳</span> 正在套用檔案關聯設定...`;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner" style="display:inline-block; animation:spin 1s linear infinite; margin-right:4px;">⏳</span> 正在套用...`;
+    }
+    if (statusMsg) statusMsg.innerHTML = `<span style="color:#94a3b8;">正在向系統註冊檔案關聯...</span>`;
 
     try {
       const res = await fetch('/api/file-handlers', {
@@ -10725,7 +10764,6 @@
       const data = await res.json();
       if (!data.ok) {
         if (statusMsg) statusMsg.innerHTML = `<span style="color:#f87171;">❌ 套用失敗：${escapeHtml(data.error || '未知錯誤')}</span>`;
-        if (btn) btn.disabled = false;
         return;
       }
 
@@ -10733,25 +10771,38 @@
       localStorage.setItem("powerup_file_assoc_prompted_done", "1");
       showToast("✅ 預設開啟程式設定已成功套用！");
 
-      // Refresh in-place so user immediately sees which items are now set
-      const resRefresh = await fetch('/api/file-handlers');
-      const dataRefresh = await resRefresh.json();
-      if (dataRefresh.ok && dataRefresh.items) {
-        fileAssocItems = dataRefresh.items;
-        updateFileAssocSummary();
-        renderFileAssocList();
-      }
+      // Refresh in-place so user immediately sees actual updated system state
+      try {
+        const resRefresh = await fetch('/api/file-handlers');
+        const dataRefresh = await resRefresh.json();
+        if (dataRefresh.ok && dataRefresh.items) {
+          fileAssocItems = dataRefresh.items;
+          fileAssocSelectedKeys = new Set(fileAssocItems.filter(it => it.is_default).map(it => it.key));
+          updateFileAssocSummary();
+          renderFileAssocList();
+        }
+      } catch (eRefresh) {}
+
       if (statusMsg) statusMsg.innerHTML = `<span style="color:#34d399; font-weight:700;">✅ 設定已成功套用！</span>`;
-      setTimeout(closeFileAssociationModal, 800);
+      setTimeout(closeFileAssociationModal, 700);
     } catch (e) {
       if (statusMsg) statusMsg.innerHTML = `<span style="color:#f87171;">❌ 套用失敗，請稍後重試</span>`;
-      if (btn) btn.disabled = false;
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = "💾 儲存並套用設定";
+      }
     }
   }
 
   function closeFileAssociationModal() {
     const modal = document.getElementById("fileAssocModal");
     if (modal) modal.style.display = "none";
+    const btn = document.getElementById("btnSaveFileAssoc");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = "💾 儲存並套用設定";
+    }
     try {
       localStorage.setItem("powerup_file_assoc_prompted_done", "1");
     } catch(e){}
@@ -11840,7 +11891,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.10</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.11</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
