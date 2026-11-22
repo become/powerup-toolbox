@@ -2179,7 +2179,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.14 · 點擊手動檢查更新">v2.8.14</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.15 · 點擊手動檢查更新">v2.8.15</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2312,7 +2312,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.14)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.15)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -2333,8 +2333,8 @@
       <button class="btn topbar-sys-btn" onclick="triggerScreenshot('clipboard')" title="貼上剪貼簿圖片 (Cmd+V)">
         <span>📋</span><span class="label-text"> 貼圖</span>
       </button>
-      <button class="btn topbar-sys-btn" onclick="revealInFinder()" title="在 Mac Finder 顯示">
-        <span>🧭</span><span class="label-text"> Finder</span>
+      <button class="btn topbar-sys-btn" id="topbarRevealBtn" onclick="revealInFinder()" title="在 Finder 開啟目前檔案所在目錄 (快捷鍵 ⌥⌘R)">
+        <span id="topbarRevealIcon">🧭</span><span class="label-text" id="topbarRevealLabel"> 所在目錄</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleRightSidebar()" title="切換右側功能面板">
         <span>◧</span><span class="label-text"> 面板</span>
@@ -2377,6 +2377,7 @@
           <button class="btn" id="upDirBtn" style="padding:4px 7px; font-size:11px;" onclick="goUpDir()" title="返回上一層資料夾 (Backspace)">⬆️ 上一層</button>
           <button class="btn" style="padding:4px 7px; font-size:11px; flex:1; justify-content:center;" onclick="pickNativePath('folder')" title="呼叫 Mac Finder 選取要瀏覽的資料夾">📂 選取資料夾…</button>
           <button class="btn" id="recursiveBtn" style="padding:4px 7px; font-size:11px;" onclick="toggleRecursive()" title="同時展開並列出所有子資料夾內的檔案">🌿 含子目錄</button>
+          <button class="btn" id="revealFolderBtn" style="padding:4px 7px; font-size:11px;" onclick="revealInFinder()" title="在 Finder 開啟目前目錄">🧭</button>
           <button class="btn" id="togglePathInputBtn" style="padding:4px 6px; font-size:11px;" onclick="togglePathInputBox()" title="手動輸入或貼上路徑">⌨️</button>
         </div>
 
@@ -2453,6 +2454,7 @@
           <span id="hudBrowseBadge" style="display:none; background:rgba(245,158,11,0.18); color:#fcd34d; border:1px solid rgba(245,158,11,0.4); padding:1px 6px; border-radius:4px; font-size:10.5px; flex-shrink:0;" title="左側正在瀏覽其他資料夾，點擊左側任一檔案即可切換檢視">👀 保持檢視中</span>
           <div id="hudFileActions" style="display:none; align-items:center; gap:3px; margin-left:4px; flex-shrink:0;">
             <button class="icon-btn" onclick="copyActiveFilePath()" title="複製目前檔案完整路徑">📍 路徑</button>
+            <button class="icon-btn" id="hudRevealBtn" onclick="revealActiveFile()" title="在 Finder 開啟目前檔案所在目錄 (快捷鍵 ⌥⌘R)">🧭 <span id="hudRevealBtnText">所在目錄</span></button>
             <button class="icon-btn" onclick="renameActiveFile()" title="重新命名目前檔案">✏️ 改名</button>
             <button class="icon-btn" id="hudSearchBtn" onclick="openInDocSearch()" title="在目前文件內搜尋字串 (快捷鍵 ⌘F / Ctrl+F)">🔎 尋找 <span class="kbd">⌘F</span></button>
             <button class="icon-btn danger" onclick="trashActiveFile()" title="將目前檔案移至 Mac 垃圾桶（快捷鍵 ⌘⌫；直接刪除不詢問：⌘⇧⌫）">🗑️ 刪除</button>
@@ -4365,14 +4367,43 @@
   /* =========================================================
      FILE MANAGEMENT ACTIONS (RENAME, TRASH, REVEAL, COPY PATH)
      ========================================================= */
+  async function revealPathInFileManager(path) {
+    if (!path) {
+      showToast("⚠️ 尚無可開啟的路徑");
+      return;
+    }
+    try {
+      const res = await fetch("/api/reveal-finder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      const data = await res.json();
+      if (data && data.ok) {
+        const mgrName = IS_WIN ? "Windows 檔案總管" : "macOS Finder";
+        showToast(`🧭 已在 ${mgrName} 開啟檔案所在目錄`);
+      } else {
+        showToast("⚠️ " + (data && data.error ? data.error : "無法開啟檔案所在目錄"));
+      }
+    } catch (e) {
+      showToast("⚠️ 無法連線至伺服器開啟目錄");
+    }
+  }
+
+  async function revealActiveFile() {
+    const item = getCurrentActiveItem();
+    const path = item ? item.path : currentDir;
+    if (!path) {
+      showToast("⚠️ 尚無開啟的檔案或目錄");
+      return;
+    }
+    await revealPathInFileManager(path);
+  }
+
   async function revealFileItem(ev, path) {
     if (ev) ev.stopPropagation();
     if (!path) return;
-    await fetch("/api/reveal-finder", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path }),
-    });
+    await revealPathInFileManager(path);
   }
 
   function copyActiveFilePath() {
@@ -9109,13 +9140,7 @@
   }
 
   async function revealInFinder() {
-    const item = getCurrentActiveItem();
-    const path = item ? item.path : currentDir;
-    await fetch("/api/reveal-finder", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path }),
-    });
+    await revealActiveFile();
   }
 
   window.addEventListener("keydown", (e) => {
@@ -9147,6 +9172,13 @@
         openInDocSearch();
         return;
       }
+    }
+
+    // Cmd+Alt+R / Ctrl+Alt+R: Reveal current file in Finder (macOS) / File Explorer (Windows)
+    if ((e.metaKey || e.ctrlKey) && e.altKey && (e.key === "r" || e.key === "R" || e.code === "KeyR")) {
+      e.preventDefault();
+      revealActiveFile();
+      return;
     }
 
     const tag = (e.target && e.target.tagName) || "";
@@ -10139,7 +10171,7 @@
       sysOpen: " 開啟…",
       sysScreenshot: " 截圖",
       sysPaste: " 貼圖",
-      sysFinder: " Finder",
+      sysFinder: " 所在目錄",
       sysPanel: " 面板",
       sysTour: " 引導",
       sysCheckUpdate: " 檢查更新",
@@ -10173,7 +10205,7 @@
       sysOpen: " Open…",
       sysScreenshot: " Snip",
       sysPaste: " Paste",
-      sysFinder: " Finder",
+      sysFinder: " Folder",
       sysPanel: " Panel",
       sysTour: " Guide",
       sysCheckUpdate: " Updates",
@@ -10227,6 +10259,11 @@
     if (lblUpdatePill && (!latestUpdateInfo || !latestUpdateInfo.has_update)) {
       lblUpdatePill.textContent = d.sysCheckUpdate || (lang === "en" ? " Updates" : " 檢查更新");
     }
+
+    const topRevealEl = document.getElementById("topbarRevealLabel");
+    if (topRevealEl) topRevealEl.textContent = d.sysFinder || (lang === "en" ? " Folder" : " 所在目錄");
+    const hudRevealTextEl = document.getElementById("hudRevealBtnText");
+    if (hudRevealTextEl) hudRevealTextEl.textContent = lang === "en" ? "Folder" : "所在目錄";
   }
 
   function toggleAppLanguage() {
@@ -10259,7 +10296,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.14";
+        const curVer = data.current_version || "2.8.15";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -10329,7 +10366,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.14";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.15";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -10393,8 +10430,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.14";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.14";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.15";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.15";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -10844,7 +10881,7 @@
   var IS_WIN = /Windows/i.test(navigator.userAgent);
   function T(str) { return IS_WIN ? winText(str) : str; }   // for fixed UI wording only (never user data)
   function winText(str) {
-    if (!str || !/Mac|macOS|Finder|⌘|⇧|⌫|Cmd|Quick ?Look|垃圾桶|Keynote|Pages|Retina|Vision|OCR 或去背/.test(str)) return str;
+    if (!str || !/Mac|macOS|Finder|⌥|⌘|⇧|⌫|Cmd|Quick ?Look|垃圾桶|Keynote|Pages|Retina|Vision|OCR 或去背/.test(str)) return str;
     return str
       .replace(/（若為掃描檔可點上方按鈕送圖片工坊執行 Vision OCR）/g, "")
       .replace(/，點擊上方「✂️ 在圖片工坊開啟此頁」即可使用 macOS Vision OCR 辨識文字或框選裁切！/g, "，點擊上方「✂️ 在圖片工坊開啟此頁」即可框選裁切。")
@@ -10856,7 +10893,7 @@
       .replace(/直貼 Pages\/Word\/LINE/g, "直貼 Word/LINE")
       .replace(/Retina PNG/g, "高解析 PNG")
       .replace(/⌘⇧⌫/g, "Ctrl+Shift+Del").replace(/⌘⌫/g, "Ctrl+Del")
-      .replace(/⌘/g, "Ctrl+").replace(/⇧/g, "Shift+").replace(/⌫/g, "Del")
+      .replace(/⌥/g, "Alt+").replace(/⌘/g, "Ctrl+").replace(/⇧/g, "Shift+").replace(/⌫/g, "Del")
       .replace(/Cmd\+/g, "Ctrl+").replace(/\bCmd\b/g, "Ctrl")
       .replace(/macOS QuickLook|Quick ?Look/g, "預設程式")
       .replace(/Mac 十字截圖/g, "Windows 截圖工具")
@@ -11921,7 +11958,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.14</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.15</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>

@@ -51,7 +51,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.14"
+APP_VERSION = "2.8.15"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -83,7 +83,10 @@ def reveal_in_file_manager(path):
         else:
             subprocess.Popen([winpath.system_exe("explorer.exe"), "/select," + norm])     # one argv element (list2cmdline quotes it if needed)
     else:
-        _mac_popen(["/usr/bin/open", "-R", "--", os.path.abspath(path)])
+        if os.path.isdir(path):
+            _mac_popen(["/usr/bin/open", "--", os.path.abspath(path)])
+        else:
+            _mac_popen(["/usr/bin/open", "-R", "--", os.path.abspath(path)])
     return True
 
 def windows_move_to_recycle_bin(path):
@@ -4156,12 +4159,22 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             return
 
         if route == "/api/reveal-finder":
-            path = body.get("path", "")
-            if path and os.path.exists(path):
-                reveal_in_file_manager(path)
-                self.send_json({"ok": True})
+            path = body.get("path", "").strip() if isinstance(body.get("path"), str) else ""
+            if not path:
+                self.send_json({"ok": False, "error": "未指定路徑"}, 400)
+                return
+            if not os.path.exists(path):
+                expanded = os.path.expanduser(path)
+                if os.path.exists(expanded):
+                    path = expanded
+                else:
+                    self.send_json({"ok": False, "error": "路徑不存在或已被刪除"}, 404)
+                    return
+            ok = reveal_in_file_manager(path)
+            if ok:
+                self.send_json({"ok": True, "path": path, "target": "explorer" if IS_WINDOWS else "finder"})
             else:
-                self.send_json({"ok": False, "error": "Path not found"}, 404)
+                self.send_json({"ok": False, "error": "無法開啟系統檔案管理員"}, 500)
             return
 
         if route == "/api/pick-path":
