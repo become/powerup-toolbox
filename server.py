@@ -51,7 +51,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.16"
+APP_VERSION = "2.9.0"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -167,6 +167,92 @@ def pick_native_path(mode="folder", default_dir=None, default_name=None):
         if res.returncode == 0 and res.stdout.strip():
             return os.path.abspath(res.stdout.strip())
         return None
+
+def detect_cloud_drives():
+    """Cross-platform auto-detection of local cloud storage directories (Google Drive, iCloud, OneDrive, Dropbox)."""
+    drives = []
+    user_home = os.path.expanduser("~")
+    if not IS_WINDOWS:
+        try:
+            icloud_dir = os.path.expanduser("~/Library/Mobile Documents/com~apple~CloudDocs")
+            if os.path.isdir(icloud_dir):
+                drives.append({
+                    "id": "icloud",
+                    "name": "iCloud 雲端硬碟",
+                    "path": icloud_dir,
+                    "icon": "☁️",
+                    "backup_folder": os.path.join(icloud_dir, "PowerUp_Toolbox_Backup")
+                })
+        except Exception:
+            pass
+        try:
+            cloud_storage = os.path.expanduser("~/Library/CloudStorage")
+            if os.path.isdir(cloud_storage):
+                for entry in sorted(os.listdir(cloud_storage)):
+                    full_entry = os.path.join(cloud_storage, entry)
+                    if os.path.isdir(full_entry):
+                        if "GoogleDrive" in entry:
+                            if " (" in entry and os.path.isdir(os.path.join(cloud_storage, entry.split(" (")[0])):
+                                continue
+                            gdrive_my = os.path.join(full_entry, "我的雲端硬碟")
+                            gpath = gdrive_my if os.path.isdir(gdrive_my) else full_entry
+                            drives.append({
+                                "id": "gdrive",
+                                "name": "Google 雲端硬碟",
+                                "path": gpath,
+                                "icon": "☁️",
+                                "backup_folder": os.path.join(gpath, "PowerUp_Toolbox_Backup")
+                            })
+                        elif "OneDrive" in entry:
+                            drives.append({
+                                "id": "onedrive",
+                                "name": "OneDrive",
+                                "path": full_entry,
+                                "icon": "☁️",
+                                "backup_folder": os.path.join(full_entry, "PowerUp_Toolbox_Backup")
+                            })
+                        elif "Dropbox" in entry:
+                            drives.append({
+                                "id": "dropbox",
+                                "name": "Dropbox",
+                                "path": full_entry,
+                                "icon": "☁️",
+                                "backup_folder": os.path.join(full_entry, "PowerUp_Toolbox_Backup")
+                            })
+        except Exception:
+            pass
+    else:
+        try:
+            onedrive_dir = os.environ.get("OneDrive") or os.path.join(user_home, "OneDrive")
+            if os.path.isdir(onedrive_dir):
+                drives.append({
+                    "id": "onedrive",
+                    "name": "OneDrive",
+                    "path": onedrive_dir,
+                    "icon": "☁️",
+                    "backup_folder": os.path.join(onedrive_dir, "PowerUp_Toolbox_Backup")
+                })
+            gdrive_win = os.path.join(user_home, "Google Drive")
+            if os.path.isdir(gdrive_win):
+                drives.append({
+                    "id": "gdrive",
+                    "name": "Google 雲端硬碟",
+                    "path": gdrive_win,
+                    "icon": "☁️",
+                    "backup_folder": os.path.join(gdrive_win, "PowerUp_Toolbox_Backup")
+                })
+        except Exception:
+            pass
+    return drives
+
+def get_cloud_status():
+    drives = detect_cloud_drives()
+    gp_status = gphotos.get_status() if gphotos else {"connected": False, "demo_mode": False}
+    return {
+        "ok": True,
+        "gphotos": gp_status,
+        "drives": drives
+    }
 
 def compare_versions(v1, v2):
     """Return 1 if v1 > v2, -1 if v1 < v2, 0 if equal."""
@@ -3088,41 +3174,14 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                         bookmarks.append({"name": "💻 專案區", "full_name": "💻 Claude 專案目錄", "path": claude_proj, "icon": "💻"})
                 except Exception:
                     pass
-                # Auto-detect macOS Cloud Storage (Google Drive, iCloud Drive, OneDrive, Dropbox)
-                try:
-                    icloud_dir = os.path.expanduser("~/Library/Mobile Documents/com~apple~CloudDocs")
-                    if os.path.isdir(icloud_dir):
-                        bookmarks.append({"name": "☁️ iCloud 雲端", "full_name": "☁️ iCloud 雲端硬碟 (自動同步)", "path": icloud_dir, "icon": "☁️"})
-                except Exception:
-                    pass
-                try:
-                    cloud_storage = os.path.expanduser("~/Library/CloudStorage")
-                    if os.path.isdir(cloud_storage):
-                        for entry in sorted(os.listdir(cloud_storage)):
-                            full_entry = os.path.join(cloud_storage, entry)
-                            if os.path.isdir(full_entry):
-                                if "GoogleDrive" in entry:
-                                    if " (" in entry and os.path.isdir(os.path.join(cloud_storage, entry.split(" (")[0])):
-                                        continue
-                                    gdrive_my = os.path.join(full_entry, "我的雲端硬碟")
-                                    gpath = gdrive_my if os.path.isdir(gdrive_my) else full_entry
-                                    bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟 (我的雲端硬碟)", "path": gpath, "icon": "☁️"})
-                                elif "OneDrive" in entry:
-                                    bookmarks.append({"name": "☁️ OneDrive", "full_name": "☁️ OneDrive 雲端硬碟", "path": full_entry, "icon": "☁️"})
-                                elif "Dropbox" in entry:
-                                    bookmarks.append({"name": "☁️ Dropbox", "full_name": "☁️ Dropbox 雲端硬碟", "path": full_entry, "icon": "☁️"})
-                except Exception:
-                    pass
-            if IS_WINDOWS:
-                try:
-                    onedrive_dir = os.environ.get("OneDrive") or os.path.join(user_home, "OneDrive")
-                    if os.path.isdir(onedrive_dir):
-                        bookmarks.append({"name": "☁️ OneDrive", "full_name": "☁️ OneDrive 雲端硬碟", "path": onedrive_dir, "icon": "☁️"})
-                    gdrive_win = os.path.join(user_home, "Google Drive")
-                    if os.path.isdir(gdrive_win):
-                        bookmarks.append({"name": "☁️ Google 雲端硬碟", "full_name": "☁️ Google 雲端硬碟", "path": gdrive_win, "icon": "☁️"})
-                except Exception:
-                    pass
+                # Auto-detect Cloud Storage (Google Drive, iCloud Drive, OneDrive, Dropbox)
+                for cd in detect_cloud_drives():
+                    bookmarks.append({
+                        "name": f"☁️ {cd['name']}",
+                        "full_name": f"☁️ {cd['name']} (雲端同步)",
+                        "path": cd["path"],
+                        "icon": cd.get("icon", "☁️")
+                    })
 
             valid = []
             for b in bookmarks:
@@ -3140,6 +3199,10 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
             self.send_json({"ok": True, "bookmarks": valid, "home": safe_or_none("~") or ""})
+            return
+
+        if route == "/api/cloud-status":
+            self.send_json(get_cloud_status())
             return
 
         if route == "/api/recent-files":
@@ -4197,6 +4260,82 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "path": path, "target": "explorer" if IS_WINDOWS else "finder"})
             else:
                 self.send_json({"ok": False, "error": "無法開啟系統檔案管理員"}, 500)
+            return
+
+        if route == "/api/backup-file":
+            src = (body.get("path") or "").strip() if isinstance(body.get("path"), str) else ""
+            target_id = (body.get("target") or "gdrive").strip() if isinstance(body.get("target"), str) else "gdrive"
+            if not src:
+                self.send_json({"ok": False, "error": "未指定欲備份的檔案路徑"}, 400)
+                return
+            src_target = safe_fs_path(src)
+            if not os.path.exists(src_target):
+                self.send_json({"ok": False, "error": "欲備份的檔案不存在"}, 404)
+                return
+
+            drives = detect_cloud_drives()
+            matched_drive = None
+            for d in drives:
+                if d["id"] == target_id or d["name"] == target_id:
+                    matched_drive = d
+                    break
+            if not matched_drive and drives:
+                matched_drive = drives[0]
+
+            if not matched_drive:
+                self.send_json({"ok": False, "error": "尚未偵測到已設定的本機雲端硬碟 (Google Drive, iCloud, OneDrive)"}, 400)
+                return
+
+            dest_folder = matched_drive["backup_folder"]
+            try:
+                os.makedirs(dest_folder, exist_ok=True)
+                base_name = os.path.basename(src_target)
+                dest_file = os.path.join(dest_folder, base_name)
+                if os.path.exists(dest_file):
+                    name_part, ext_part = os.path.splitext(base_name)
+                    ts = time.strftime("%Y%m%d_%H%M%S")
+                    dest_file = os.path.join(dest_folder, f"{name_part}_{ts}{ext_part}")
+
+                if os.path.isdir(src_target):
+                    shutil.copytree(src_target, dest_file)
+                else:
+                    shutil.copy2(src_target, dest_file)
+
+                self.send_json({
+                    "ok": True,
+                    "target_drive": matched_drive["name"],
+                    "target_path": dest_file,
+                    "target_folder": dest_folder,
+                    "filename": os.path.basename(dest_file),
+                    "message": f"成功備份至 {matched_drive['name']}：{os.path.basename(dest_file)}"
+                })
+            except Exception as e:
+                self.send_json({"ok": False, "error": f"備份失敗: {str(e)}"}, 500)
+            return
+
+        if route == "/api/save-file-as":
+            target_path = (body.get("path") or "").strip() if isinstance(body.get("path"), str) else ""
+            content = body.get("content", "")
+            if not target_path:
+                self.send_json({"ok": False, "error": "未指定目標存檔路徑"}, 400)
+                return
+            target = safe_fs_path(target_path)
+            try:
+                parent = os.path.dirname(target)
+                if parent and not os.path.exists(parent):
+                    os.makedirs(parent, exist_ok=True)
+                with open(target, "w", encoding="utf-8") as f:
+                    f.write(content)
+                st = os.stat(target)
+                self.send_json({
+                    "ok": True,
+                    "path": target,
+                    "mtime": int(st.st_mtime),
+                    "mtime_ns": st.st_mtime_ns,
+                    "message": f"另存新檔成功：{os.path.basename(target)}"
+                })
+            except Exception as e:
+                self.send_json({"ok": False, "error": str(e)}, 500)
             return
 
         if route == "/api/pick-path":

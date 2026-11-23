@@ -698,21 +698,24 @@
   }
   .crop-size-badge {
     position: absolute;
-    top: -20px; left: 0;
-    background: rgba(15, 23, 42, 0.88);
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    top: -24px; left: 0;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     color: #93c5fd;
-    font-size: 9.5px;
+    font-size: 10px;
     font-weight: 600;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-family: "SF Mono", monospace;
-    line-height: 1.2;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace;
+    line-height: 1;
+    white-space: nowrap;
     pointer-events: none;
+    z-index: 26;
   }
   .crop-size-badge.badge-inside {
-    top: 4px; left: 4px;
+    top: 6px; left: 6px;
   }
 
   /* Loupe Magnifier */
@@ -2179,7 +2182,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.16 · 點擊手動檢查更新">v2.8.16</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.9.0 · 點擊手動檢查更新">v2.9.0</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2312,7 +2315,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.16)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.9.0)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -2320,6 +2323,9 @@
       </button>
       <button class="btn purple topbar-sys-btn" onclick="openScratchpad()" title="開啟暫存工作台：貼上 JSON/MD/CSV 快速預覽並暫存 (快捷鍵 ⌘N)">
         <span>📝</span><span class="label-text" id="labelScratchpad"> 暫存</span>
+      </button>
+      <button class="btn topbar-sys-btn" id="btnCloudSync" onclick="openCloudSyncModal()" style="border: 1px solid rgba(59,130,246,0.45); background:rgba(30,58,138,0.25); color:#93c5fd;" title="雲端備份與遠端同步中心 (Google Photos, Google Drive, iCloud, OneDrive)">
+        <span>☁️</span><span class="label-text" id="lblCloudSync"> 備份同步</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="openAlbumsView()" id="btnTopGPhotos" title="開啟本機相簿與相片管理工坊" style="border: 1px solid rgba(59,130,246,0.4); background:rgba(37,99,235,0.2); color:#93c5fd;">
         <span>📷</span><span class="label-text"> 本機相簿</span>
@@ -2457,7 +2463,16 @@
             <button class="icon-btn" id="hudRevealBtn" onclick="revealActiveFile()" title="在 Finder 開啟目前檔案所在目錄 (快捷鍵 ⌥⌘R)">🧭 <span id="hudRevealBtnText">所在目錄</span></button>
             <button class="icon-btn" onclick="renameActiveFile()" title="重新命名目前檔案">✏️ 改名</button>
             <button class="icon-btn" id="hudSearchBtn" onclick="openInDocSearch()" title="在目前文件內搜尋字串 (快捷鍵 ⌘F / Ctrl+F)">🔎 尋找 <span class="kbd">⌘F</span></button>
+            <button class="icon-btn" id="hudBackupBtn" onclick="openCloudBackupActiveModal()" title="將目前檔案一鍵備份至雲端硬碟 (Google Drive / iCloud / Google Photos)">☁️ 雲端備份</button>
             <button class="icon-btn danger" onclick="trashActiveFile()" title="將目前檔案移至 Mac 垃圾桶（快捷鍵 ⌘⌫；直接刪除不詢問：⌘⇧⌫）">🗑️ 刪除</button>
+
+            <!-- Quick Save / Live Status Controls for Editable Documents -->
+            <div id="hudDocEditActions" style="display:none; align-items:center; gap:3px; margin-left:4px;">
+              <button class="btn emerald" id="hudQuickSaveBtn" onclick="triggerQuickSave()" style="font-size:11px; padding:2px 8px; font-weight:700;" title="立即儲存檔案變更 (⌘S / Ctrl+S)">💾 儲存</button>
+              <button class="btn" id="hudSaveAsBtn" onclick="triggerSaveAs()" style="font-size:11px; padding:2px 7px;" title="另存新檔為… (⇧⌘S)">💾 另存…</button>
+              <span id="hudSaveStatusBadge" style="display:none; font-size:10.5px; font-weight:600; padding:1px 6px; border-radius:4px;"></span>
+            </div>
+
             <div id="hudScratchActions" style="display:none; align-items:center; gap:3px; margin-left:4px;">
               <button class="btn purple" style="font-size:11px; padding:2px 7px;" onclick="openScratchpadForEdit()" title="重新開啟暫存工作台修改內容">✏️ 修改草稿</button>
               <button class="btn emerald" style="font-size:11px; padding:2px 7px;" onclick="saveScratchToPermanentFile()" title="將此暫存草稿另存為正式檔案 (⌘S)">💾 另存為新檔…</button>
@@ -3244,6 +3259,8 @@
   // JSON View State
   let currentJsonPath = "";
   let currentJsonRaw = "";
+  let originalJsonRaw = "";
+  let isCurrentDocDirty = false;
   let currentJsonData = null;
   let jsonViewMode = "tree"; // "tree" | "table" | "code"
   let selectedJsonPath = "$";
@@ -3500,9 +3517,52 @@
     // } catch (e) {}
   }
 
+  function setDocDirtyState(dirty) {
+    isCurrentDocDirty = !!dirty;
+    const badge = document.getElementById("hudSaveStatusBadge");
+    const saveBtn = document.getElementById("hudQuickSaveBtn");
+    if (!badge) return;
+
+    if (isCurrentDocDirty) {
+      badge.style.display = "inline-flex";
+      badge.style.background = "rgba(245, 158, 11, 0.2)";
+      badge.style.color = "#fcd34d";
+      badge.style.border = "1px solid rgba(245, 158, 11, 0.4)";
+      badge.textContent = "● 未儲存";
+      badge.title = "有尚未儲存的變更，按 ⌘S 儲存";
+      if (saveBtn) {
+        saveBtn.style.boxShadow = "0 0 10px rgba(245, 158, 11, 0.5)";
+      }
+    } else {
+      badge.style.display = "inline-flex";
+      badge.style.background = "rgba(16, 185, 129, 0.15)";
+      badge.style.color = "#34d399";
+      badge.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+      badge.textContent = "✓ 已存檔";
+      badge.title = "檔案已儲存";
+      if (saveBtn) {
+        saveBtn.style.boxShadow = "none";
+      }
+    }
+  }
+
+  function updateHudDocEditActions(fileType) {
+    const editActions = document.getElementById("hudDocEditActions");
+    const backupBtn = document.getElementById("hudBackupBtn");
+    if (backupBtn) backupBtn.style.display = "inline-flex";
+    if (!editActions) return;
+
+    const isEditable = ["markdown", "code", "json", "xml", "csv", "xlsx"].includes(fileType);
+    editActions.style.display = isEditable ? "inline-flex" : "none";
+    if (isEditable) {
+      setDocDirtyState(false);
+    }
+  }
+
   // Morph UI between Image, Markdown, Code, Word, JSON, XML, CSV, Excel, PowerPoint & PDF Modes automatically!
   function adaptUiForFileType(fileType) {
     currentFileType = fileType;
+    updateHudDocEditActions(fileType);
     const isImg = fileType === "image";
     const isMd = fileType === "markdown";
     const isCode = fileType === "code";
@@ -4047,6 +4107,12 @@
 
   async function selectItem(index) {
     if (filteredItems.length === 0) return;
+    if (isCurrentDocDirty) {
+      if (!confirm("目前檔案有未儲存的變更，是否放棄未存檔內容並切換檔案？")) {
+        return;
+      }
+      setDocDirtyState(false);
+    }
     if (index < 0) index = 0;
     if (index >= filteredItems.length) index = filteredItems.length - 1;
     currentIndex = index;
@@ -5024,6 +5090,8 @@
     }
     currentJsonPath = data.path;
     currentJsonRaw = data.content;
+    originalJsonRaw = data.content;
+    setDocDirtyState(false);
     document.getElementById("jsonTextarea").value = currentJsonRaw;
 
     parseAndDisplayJson(currentJsonRaw, data.is_jsonl, data.size, data.lines);
@@ -5040,6 +5108,8 @@
     }
     currentJsonPath = data.path;
     currentJsonRaw = data.content || "";
+    originalJsonRaw = currentJsonRaw;
+    setDocDirtyState(false);
     document.getElementById("jsonTextarea").value = currentJsonRaw;
 
     currentJsonData = data.tree || {};
@@ -5799,6 +5869,7 @@
   function onJsonEditorInput() {
     currentJsonRaw = document.getElementById("jsonTextarea").value;
     updateJsonGutter();
+    setDocDirtyState(currentJsonRaw !== originalJsonRaw);
     if (currentFileType === "json") {
       parseAndDisplayJson(currentJsonRaw);
     }
@@ -6058,6 +6129,9 @@
     });
     const data = await res.json();
     if (data.ok) {
+      originalJsonRaw = document.getElementById("jsonTextarea").value;
+      setDocDirtyState(false);
+      document.getElementById("hudExtraBadge").textContent = "● 已存檔";
       showToast("💾 " + data.message);
       if (currentFileType === "xml") await loadAndRenderXml(currentJsonPath);
     } else {
@@ -6247,6 +6321,7 @@
     currentCsvRows = JSON.parse(JSON.stringify(originalCsvRows));
     currentCsvHeaders = JSON.parse(JSON.stringify(originalCsvHeaders));
     setCsvEditMode(false);
+    setDocDirtyState(false);
     document.getElementById("hudExtraBadge").textContent = "● 已放棄修改";
     showToast("↩️ 已放棄修改，恢復原檔內容");
   }
@@ -6257,6 +6332,7 @@
       currentCsvRows[rowIdx][colIdx] = newText;
       profileCsvColumn(csvActiveCol);
       selectCsvRow(rowIdx);
+      setDocDirtyState(true);
       document.getElementById("hudExtraBadge").textContent = "● 已修改 (未存檔)";
     }
   }
@@ -6407,6 +6483,7 @@
       if (data.ok) {
         originalCsvRows = JSON.parse(JSON.stringify(currentCsvRows));
         originalCsvHeaders = JSON.parse(JSON.stringify(currentCsvHeaders));
+        setDocDirtyState(false);
         document.getElementById("hudExtraBadge").textContent = "● 已存檔";
         showToast("💾 " + data.message);
       } else {
@@ -6428,6 +6505,7 @@
     if (data.ok) {
       originalCsvRows = JSON.parse(JSON.stringify(currentCsvRows));
       originalCsvHeaders = JSON.parse(JSON.stringify(currentCsvHeaders));
+      setDocDirtyState(false);
       document.getElementById("hudExtraBadge").textContent = "● 已存檔";
       showToast("💾 " + data.message);
     } else {
@@ -8333,6 +8411,7 @@
     originalMdRaw = data.content;
     currentMdMtimeNs = data.mtime_ns;
     currentMdDir = data.dir;
+    setDocDirtyState(false);
     setMdEditMode(false);
 
     document.getElementById("hudMeta").textContent =
@@ -8475,6 +8554,7 @@
     if (textarea) textarea.value = originalMdRaw;
     renderMarkdownContent(originalMdRaw);
     setMdEditMode(false);
+    setDocDirtyState(false);
     document.getElementById("hudExtraBadge").textContent = "● 已放棄修改";
     showToast("↩️ 已放棄修改，恢復原檔內容");
   }
@@ -8482,6 +8562,7 @@
   function onMdEditorInput() {
     currentMdRaw = document.getElementById("mdTextarea").value;
     renderMarkdownContent(currentMdRaw);
+    setDocDirtyState(currentMdRaw !== originalMdRaw);
   }
 
   async function saveMarkdownFile() {
@@ -8495,6 +8576,7 @@
     if (data.ok) {
       originalMdRaw = currentMdRaw;
       currentMdMtimeNs = data.mtime_ns;
+      setDocDirtyState(false);
       document.getElementById("hudExtraBadge").textContent = "● 已存檔";
       showToast("💾 " + data.message);
     } else {
@@ -8625,6 +8707,7 @@
     originalCodeRaw = data.content;
     currentCodeMtimeNs = data.mtime_ns;
     currentCodeLang = data.lang || detectCodeLangFromPath(data.path);
+    setDocDirtyState(false);
     setCodeEditMode(false);
 
     const langLabel = CODE_LANG_LABELS[currentCodeLang] || `💻 ${currentCodeLang.toUpperCase()}`;
@@ -8833,6 +8916,7 @@
     const textarea = document.getElementById("codeTextarea");
     if (textarea) textarea.value = originalCodeRaw;
     setCodeEditMode(false);
+    setDocDirtyState(false);
     document.getElementById("hudExtraBadge").textContent = "● 已放棄修改";
     showToast("↩️ 已放棄修改，恢復原檔內容");
   }
@@ -8841,6 +8925,7 @@
     const textarea = document.getElementById("codeTextarea");
     if (!textarea) return;
     currentCodeRaw = textarea.value;
+    setDocDirtyState(currentCodeRaw !== originalCodeRaw);
     document.getElementById("hudExtraBadge").textContent = "● 已修改 (未存檔)";
   }
 
@@ -8871,6 +8956,7 @@
     if (data.ok) {
       originalCodeRaw = currentCodeRaw;
       currentCodeMtimeNs = data.mtime_ns;
+      setDocDirtyState(false);
       document.getElementById("hudExtraBadge").textContent = "● 已存檔";
       showToast("💾 " + data.message);
       renderCodeHighlight();
@@ -9202,16 +9288,12 @@
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        const activeIt = getCurrentActiveItem();
-        const isScratch = activeIt && (Boolean(activeIt.is_scratch) || (activeIt.path && (activeIt.path.includes("/scratch/") || activeIt.path.includes(".cache/scratch"))));
-        if (isScratch) {
-          saveScratchToPermanentFile();
+        if (e.shiftKey) {
+          triggerSaveAs();
         } else {
-          if (currentFileType === "markdown") saveMarkdownFile();
-          else if (currentFileType === "code") saveCodeFile();
-          else if (currentFileType === "json" || currentFileType === "xml") saveJsonFile();
-          else if (currentFileType === "csv" || currentFileType === "xlsx") saveCsvFile();
+          triggerQuickSave();
         }
+        return;
       }
       if (e.key === "Escape") {
         if (e.target.id === "scratchpadTextarea") closeScratchpad();
@@ -9226,15 +9308,15 @@
       return;
     }
 
-    // Cmd+S: Save scratch to permanent file when viewing scratch outside input
+    // Cmd+S / Shift+Cmd+S: Save or Save-As
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
-      const activeIt = getCurrentActiveItem();
-      const isScratch = activeIt && (Boolean(activeIt.is_scratch) || (activeIt.path && (activeIt.path.includes("/scratch/") || activeIt.path.includes(".cache/scratch"))));
-      if (isScratch) {
-        e.preventDefault();
-        saveScratchToPermanentFile();
-        return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        triggerSaveAs();
+      } else {
+        triggerQuickSave();
       }
+      return;
     }
 
     // Cmd+Shift+Backspace: Direct delete to Mac Trash WITHOUT confirmation prompt
@@ -9877,6 +9959,269 @@
   }
 
   /* =========================================================
+     Global Document Save & Save-As Controller (⌘S / ⇧⌘S)
+     ========================================================= */
+  async function triggerQuickSave() {
+    if (currentFileType === "markdown") {
+      await saveMarkdownFile();
+    } else if (currentFileType === "code") {
+      await saveCodeFile();
+    } else if (currentFileType === "json" || currentFileType === "xml") {
+      await saveJsonFile();
+    } else if (currentFileType === "csv" || currentFileType === "xlsx") {
+      await saveCsvFile();
+    } else {
+      const active = getCurrentActiveItem();
+      if (active && active.is_scratch) {
+        await saveScratchToPermanentFile();
+      }
+    }
+  }
+
+  async function triggerSaveAs() {
+    let currentPath = "";
+    let defaultName = "document.txt";
+    let content = "";
+
+    if (currentFileType === "markdown") {
+      currentPath = currentMdPath;
+      defaultName = currentPath ? currentPath.split("/").pop() : "document.md";
+      content = currentMdRaw;
+    } else if (currentFileType === "code") {
+      currentPath = currentCodePath;
+      defaultName = currentPath ? currentPath.split("/").pop() : "code.txt";
+      content = currentCodeRaw;
+    } else if (currentFileType === "json" || currentFileType === "xml") {
+      currentPath = currentJsonPath;
+      defaultName = currentPath ? currentPath.split("/").pop() : (currentFileType === "xml" ? "data.xml" : "data.json");
+      content = document.getElementById("jsonTextarea") ? document.getElementById("jsonTextarea").value : currentJsonRaw;
+    } else if (currentFileType === "csv" || currentFileType === "xlsx") {
+      currentPath = currentCsvPath;
+      defaultName = currentPath ? currentPath.split("/").pop() : "table.csv";
+      content = currentCsvHeaders.join(",") + "\n" + currentCsvRows.map(r => (r || []).join(",")).join("\n");
+    }
+
+    const defaultDir = currentPath ? currentPath.substring(0, currentPath.lastIndexOf("/")) : (currentDir || "~/Desktop");
+    try {
+      const pickRes = await fetch("/api/pick-path", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "save", default_dir: defaultDir, default_name: defaultName })
+      });
+      const pickData = await pickRes.json();
+      if (pickData.ok && pickData.path) {
+        const saveRes = await fetch("/api/save-file-as", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: pickData.path, content: content })
+        });
+        const saveData = await saveRes.json();
+        if (saveData.ok) {
+          showToast(`💾 另存新檔成功：${saveData.path}`);
+          setDocDirtyState(false);
+          await openExternalFile(pickData.path);
+        } else {
+          showToast(`❌ 存檔失敗：${saveData.error || "未知錯誤"}`);
+        }
+      }
+    } catch (e) {
+      showToast(`❌ 另存新檔錯誤：${e.message}`);
+    }
+  }
+
+  /* =========================================================
+     Cloud Backup & Remote Sync Center Controller
+     ========================================================= */
+  async function openCloudSyncModal() {
+    const modal = document.getElementById("cloudSyncModal");
+    if (!modal) return;
+    modal.style.display = "flex";
+
+    const activeItem = getCurrentActiveItem();
+    const activePath = activeItem?.path || currentMdPath || currentCodePath || currentJsonPath || currentCsvPath || "";
+    const activeName = activePath ? activePath.split("/").pop() : "尚未開啟檔案";
+    const fileLabel = document.getElementById("syncCurrentFileLabel");
+    if (fileLabel) fileLabel.textContent = activeName;
+
+    await refreshCloudDrivesStatus();
+  }
+
+  function closeCloudSyncModal() {
+    const modal = document.getElementById("cloudSyncModal");
+    if (modal) modal.style.display = "none";
+  }
+
+  async function refreshCloudDrivesStatus() {
+    const listEl = document.getElementById("cloudDrivesList");
+    const gphotosBadge = document.getElementById("syncGphotosBadge");
+    try {
+      const res = await fetch("/api/cloud-status");
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "無法取得雲端狀態");
+
+      if (gphotosBadge) {
+        if (data.gphotos && data.gphotos.connected) {
+          gphotosBadge.style.background = "rgba(16,185,129,0.2)";
+          gphotosBadge.style.color = "#34d399";
+          gphotosBadge.textContent = "🟢 Google 相簿已連線";
+        } else if (data.gphotos && data.gphotos.demo_mode) {
+          gphotosBadge.style.background = "rgba(168,85,247,0.2)";
+          gphotosBadge.style.color = "#c084fc";
+          gphotosBadge.textContent = "🟣 模擬展示模式";
+        } else {
+          gphotosBadge.style.background = "rgba(100,116,139,0.2)";
+          gphotosBadge.style.color = "#94a3b8";
+          gphotosBadge.textContent = "⚪ 尚未連結帳號";
+        }
+      }
+
+      if (listEl) {
+        if (!data.drives || data.drives.length === 0) {
+          listEl.innerHTML = `
+            <div style="background:rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.15); border-radius:10px; padding:16px; text-align:center; color:#94a3b8; font-size:12px;">
+              未偵測到本機雲端硬碟同步資料夾（Google Drive / iCloud / OneDrive / Dropbox）。<br>
+              <span style="font-size:11px; color:#64748b; margin-top:4px; display:inline-block;">安裝並登入官方 Google 雲端硬碟或 iCloud 後將會自動在此列出。</span>
+            </div>
+          `;
+        } else {
+          listEl.innerHTML = data.drives.map(d => `
+            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 14px;">
+              <div style="min-width:0; flex:1; margin-right:12px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:15px;">${d.icon || '☁️'}</span>
+                  <span style="font-weight:700; color:#fff; font-size:13px;">${escapeHtml(d.name)}</span>
+                  <span style="font-size:10px; padding:1px 6px; border-radius:10px; background:rgba(16,185,129,0.15); color:#34d399; font-weight:600;">已偵測</span>
+                </div>
+                <div style="font-size:11px; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px;" title="${escapeHtml(d.path)}">
+                  路徑: ${escapeHtml(d.path)}
+                </div>
+              </div>
+              <div style="display:flex; gap:6px; flex-shrink:0;">
+                <button class="btn" style="padding:4px 9px; font-size:11px;" onclick="openCloudDriveFolder('${escapeQuotes(d.path)}')" title="在系統檔案管理員中開啟此雲端硬碟">📂 開啟目錄</button>
+                <button class="btn emerald" style="padding:4px 9px; font-size:11px;" onclick="backupFileToSpecificDrive('${escapeQuotes(d.id)}')" title="將目前開啟的檔案備份至此雲端硬碟">🔄 備份至此</button>
+              </div>
+            </div>
+          `).join("");
+        }
+      }
+    } catch (e) {
+      if (listEl) listEl.innerHTML = `<div style="color:#f87171; font-size:12px;">❌ 檢查雲端狀態失敗: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  async function openCloudDriveFolder(path) {
+    if (!path) return;
+    try {
+      const res = await fetch("/api/reveal-finder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: path })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(IS_WIN ? "📂 已在 Windows 檔案總管開啟雲端資料夾" : "📂 已在 Finder 開啟雲端資料夾");
+      } else {
+        showToast("❌ " + (data.error || "無法開啟雲端資料夾"));
+      }
+    } catch (e) {
+      showToast("❌ " + e.message);
+    }
+  }
+
+  async function backupFileToSpecificDrive(driveId) {
+    const activeItem = getCurrentActiveItem();
+    const activePath = activeItem?.path || currentMdPath || currentCodePath || currentJsonPath || currentCsvPath || "";
+    if (!activePath) {
+      return showToast("⚠️ 尚未開啟任何檔案，請先選取欲備份的檔案");
+    }
+
+    const statusEl = document.getElementById("cloudSyncStatusMsg");
+    if (statusEl) {
+      statusEl.style.display = "block";
+      statusEl.style.background = "rgba(59,130,246,0.15)";
+      statusEl.style.color = "#93c5fd";
+      statusEl.innerHTML = "⏳ 正在複製並備份檔案至雲端硬碟...";
+    }
+
+    try {
+      const res = await fetch("/api/backup-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: activePath, target: driveId })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        if (statusEl) {
+          statusEl.style.background = "rgba(16,185,129,0.15)";
+          statusEl.style.color = "#34d399";
+          statusEl.innerHTML = `✅ ${escapeHtml(data.message)}<br><span style="font-size:11px; color:#cbd5e1;">目標: ${escapeHtml(data.target_path)}</span>`;
+        }
+        showToast(`☁️ ${data.message}`);
+      } else {
+        if (statusEl) {
+          statusEl.style.background = "rgba(239,68,68,0.15)";
+          statusEl.style.color = "#f87171";
+          statusEl.innerHTML = `❌ 備份失敗: ${escapeHtml(data.error || "未知錯誤")}`;
+        }
+        showToast(`❌ 備份失敗: ${data.error || "未知錯誤"}`);
+      }
+    } catch (e) {
+      if (statusEl) {
+        statusEl.style.background = "rgba(239,68,68,0.15)";
+        statusEl.style.color = "#f87171";
+        statusEl.innerHTML = `❌ 連線錯誤: ${escapeHtml(e.message)}`;
+      }
+      showToast(`❌ 備份失敗: ${e.message}`);
+    }
+  }
+
+  async function executeQuickBackupCurrentFile() {
+    await backupFileToSpecificDrive("gdrive");
+  }
+
+  async function backupCapturesFolder() {
+    const statusEl = document.getElementById("cloudSyncStatusMsg");
+    if (statusEl) {
+      statusEl.style.display = "block";
+      statusEl.style.background = "rgba(59,130,246,0.15)";
+      statusEl.style.color = "#93c5fd";
+      statusEl.innerHTML = "⏳ 正在備份截圖匣至雲端硬碟...";
+    }
+    try {
+      const res = await fetch("/api/backup-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: "~/Pictures/Toolbox_Captures", target: "gdrive" })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        if (statusEl) {
+          statusEl.style.background = "rgba(16,185,129,0.15)";
+          statusEl.style.color = "#34d399";
+          statusEl.innerHTML = `✅ ${escapeHtml(data.message)}`;
+        }
+        showToast(`📸 ${data.message}`);
+      } else {
+        showToast(`❌ 備份失敗: ${data.error || "未知錯誤"}`);
+      }
+    } catch (e) {
+      showToast(`❌ 備份失敗: ${e.message}`);
+    }
+  }
+
+  function openCloudBackupActiveModal() {
+    openCloudSyncModal();
+  }
+
+  function backupCurrentPhotoToGPhotos() {
+    const activeItem = getCurrentActiveItem();
+    const activePath = activeItem?.path || "";
+    if (!activePath) return showToast("⚠️ 目前尚未選取任何圖片");
+    closeCloudSyncModal();
+    openUploadToGPhotosModal(activePath);
+  }
+
+  /* =========================================================
      In-Document String Search Controller (Cmd+F / Ctrl+F)
      Supports: Excel, CSV, Word, PDF, Markdown, Code, JSON
      ========================================================= */
@@ -10301,7 +10646,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.16";
+        const curVer = data.current_version || "2.9.0";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -10371,7 +10716,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.16";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.9.0";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -10422,10 +10767,12 @@
       const logs = (latestUpdateInfo && latestUpdateInfo.changelog && latestUpdateInfo.changelog.length > 0)
         ? latestUpdateInfo.changelog
         : [
-            "💻 程式碼與文字語言好讀版：支援 Java / Groovy / GSP / HTML / JS / CSS / TXT 語法高亮、符號大綱跳轉與即時編輯",
-            "🍎 官方 Apple Developer ID 簽名與雲端公證",
-            "📷 本機真實相簿工坊與 Google 相簿備份整合",
-            "⚡ 支援一鍵安裝與全新無縫重啟套用機制"
+            "☁️ 雲端備份與遠端同步中心：對接 Google Photos、Google Drive、iCloud、OneDrive，一鍵備份相片與文件",
+            "💾 全格式檔案儲存狀態監控：即時未存檔提示 ●、⌘S 一鍵儲存與另存新檔，保障資料不丟失",
+            "🎨 多角色體驗調校：辦公文書、攝影創作、工程數據、初學入門全方位操作流優化",
+            "🖼️ 裁切畫面與高解析度視窗精準度優化：修復尺寸標籤排版與高縮放比防糊",
+            "📂 開啟檔案所在目錄：跨平台一鍵呼叫 macOS Finder 與 Windows 檔案總管",
+            "🍎 官方 Apple Developer ID 簽名與雲端公證認證"
           ];
       list.innerHTML = logs.map(item => `<li>${escapeHtml(item)}</li>`).join("");
     }
@@ -10435,8 +10782,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.16";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.16";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.9.0";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.9.0";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -10477,10 +10824,12 @@
       const logs = (latestUpdateInfo && latestUpdateInfo.changelog && latestUpdateInfo.changelog.length > 0)
         ? latestUpdateInfo.changelog
         : [
-            "💻 程式碼與文字語言好讀版：支援 Java / Groovy / GSP / HTML / JS / CSS / TXT 語法高亮、符號大綱跳轉與即時編輯",
-            "🍎 官方 Apple Developer ID 簽名與雲端公證",
-            "📷 本機真實相簿工坊與 Google 相簿備份整合",
-            "⚡ 支援一鍵安裝與全新無縫重啟套用機制"
+            "☁️ 雲端備份與遠端同步中心：對接 Google Photos、Google Drive、iCloud、OneDrive，一鍵備份相片與文件",
+            "💾 全格式檔案儲存狀態監控：即時未存檔提示 ●、⌘S 一鍵儲存與另存新檔，保障資料不丟失",
+            "🎨 多角色體驗調校：辦公文書、攝影創作、工程數據、初學入門全方位操作流優化",
+            "🖼️ 裁切畫面與高解析度視窗精準度優化：修復尺寸標籤排版與高縮放比防糊",
+            "📂 開啟檔案所在目錄：跨平台一鍵呼叫 macOS Finder 與 Windows 檔案總管",
+            "🍎 官方 Apple Developer ID 簽名與雲端公證認證"
           ];
       list.innerHTML = logs.map(item => `<li>${escapeHtml(item)}</li>`).join("");
     }
@@ -11979,7 +12328,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.16</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.9.0</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
@@ -12054,6 +12403,84 @@
           <button class="btn" onclick="closeFileAssociationModal()" style="padding:7px 14px; font-size:12px;">關閉</button>
           <button class="btn btn-primary" id="btnSaveFileAssoc" onclick="saveFileAssociations()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #2563eb, #1d4ed8); border:none; color:#fff; font-weight:700; cursor:pointer;">💾 儲存並套用設定</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cloud Backup & Sync Hub Modal (v2.9.0) -->
+  <div id="cloudSyncModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.82); backdrop-filter:blur(10px); z-index:100000; align-items:center; justify-content:center;">
+    <div class="modal-card" style="background:#0b0f19; border:1px solid rgba(59,130,246,0.45); border-radius:18px; width:640px; max-width:95vw; max-height:90vh; display:flex; flex-direction:column; padding:24px; box-shadow:0 25px 60px rgba(0,0,0,0.92), 0 0 35px rgba(59,130,246,0.2);">
+      <!-- Header -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:9px;">
+          <span style="font-size:22px;">☁️</span>
+          <div>
+            <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;">雲端備份與遠端同步中心</h3>
+            <div style="font-size:11.5px; color:#94a3b8;">本機端原生對接 Google Drive、iCloud、OneDrive 與 Google Photos，安全無外洩</div>
+          </div>
+        </div>
+        <button onclick="closeCloudSyncModal()" style="background:transparent; border:none; color:#64748b; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Scrollable Body -->
+      <div style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:16px; padding-right:4px;">
+        <!-- Card 1: Google Photos Integration -->
+        <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:18px;">📷</span>
+              <span style="font-size:14px; font-weight:700; color:#fff;">Google 雲端相簿 (Google Photos)</span>
+            </div>
+            <span id="syncGphotosBadge" style="font-size:11px; padding:2px 8px; border-radius:12px; background:rgba(100,116,139,0.2); color:#94a3b8; font-weight:600;">檢查中...</span>
+          </div>
+          <div style="font-size:12px; color:#cbd5e1; line-height:1.5; margin-bottom:12px;">
+            支援將本機照片、修圖後作品與裁切成品一鍵上傳備份至 Google 相簿，或直接在 Toolbox 內極速瀏覽雲端圖庫。
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn purple" style="font-size:12px;" onclick="backupCurrentPhotoToGPhotos()">⬆️ 備份目前檔案至 Google 相簿</button>
+            <button class="btn" style="font-size:12px;" onclick="closeCloudSyncModal(); openGPhotosView();">📷 瀏覽雲端相簿</button>
+            <button class="btn" style="font-size:12px;" onclick="openGPhotosSettingsModal()">⚙️ 雲端相簿授權設定</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Detected Cloud Sync Drives -->
+        <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:18px;">📁</span>
+              <span style="font-size:14px; font-weight:700; color:#fff;">本機雲端硬碟同步 (Google Drive / iCloud / OneDrive)</span>
+            </div>
+            <span style="font-size:11px; color:#60a5fa; cursor:pointer;" onclick="refreshCloudDrivesStatus()">🔄 重新整理</span>
+          </div>
+          <div style="font-size:12px; color:#cbd5e1; line-height:1.5; margin-bottom:10px;">
+            自動偵測電腦上的雲端同步資料夾。點擊一鍵備份即可將目前檔案安全複製進雲端同步區（自動儲存於 <code>PowerUp_Toolbox_Backup</code> 資料夾）：
+          </div>
+          <div id="cloudDrivesList" style="display:flex; flex-direction:column; gap:8px;">
+            <div style="color:var(--muted); font-size:12px; text-align:center; padding:12px;">正在偵測本機雲端同步硬碟...</div>
+          </div>
+        </div>
+
+        <!-- Card 3: One-Click Quick Backup of Active File / Folder -->
+        <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="font-size:18px;">⚡</span>
+            <span style="font-size:14px; font-weight:700; color:#fff;">快速備份目前開啟檔案</span>
+          </div>
+          <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">
+            目前檔案：<span id="syncCurrentFileLabel" style="color:#fff; font-family:'SF Mono',Menlo,monospace; font-weight:600;">尚未開啟檔案</span>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button class="btn emerald" id="btnQuickBackupCurrent" style="font-size:12px;" onclick="executeQuickBackupCurrentFile()">🔄 一鍵備份目前檔案至雲端硬碟</button>
+            <button class="btn" style="font-size:12px;" onclick="backupCapturesFolder()">📸 備份整個截圖匣 (Captures) 至雲端</button>
+          </div>
+          <div id="cloudSyncStatusMsg" style="display:none; margin-top:10px; font-size:12px; padding:8px 12px; border-radius:8px;"></div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; border-top:1px solid rgba(255,255,255,0.08); padding-top:12px;">
+        <span style="font-size:11.5px; color:#64748b;">🛡️ 100% 本機執行，備份至您自有的個人雲端硬碟</span>
+        <button class="btn primary" onclick="closeCloudSyncModal()">完成</button>
       </div>
     </div>
   </div>
