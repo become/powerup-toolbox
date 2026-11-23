@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="2.8.15"
+VERSION="2.8.16"
 APP_NAME="MacToolbox.app"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
 
 # Keep Info.plist versions synchronized
 plutil -replace CFBundleShortVersionString -string "${VERSION}" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
-plutil -replace CFBundleVersion -string "2815" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
+plutil -replace CFBundleVersion -string "2816" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 
 echo "🧪 [0/5] 語法檢查 (index.html 前端程式＋Python)..."
 # One SyntaxError in index.html's inline script disables the whole front end (v2.8.7 could not open files).
@@ -91,9 +91,15 @@ if [ -x "$LSREGISTER" ] && [ -d "$APP_PATH" ]; then
     "$LSREGISTER" -f "$APP_PATH" || true
 fi
 
+# Proactively restore system default web browser (Safari / Chrome) if ever touched by older versions
+if [ -x "$APP_PATH/Contents/Resources/set_default_handlers" ]; then
+    "$APP_PATH/Contents/Resources/set_default_handlers" --restore-browser 2>/dev/null || true
+fi
+
 CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || echo become)"
 if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
     chown -R "$CONSOLE_USER":staff "$APP_PATH" 2>/dev/null || true
+    su -l "$CONSOLE_USER" -c "'$APP_PATH/Contents/Resources/set_default_handlers' --restore-browser 2>/dev/null || true"
     su -l "$CONSOLE_USER" -c 'python3 -c "
 import plistlib, os, subprocess
 p = os.path.expanduser(\"~/Library/Preferences/com.apple.dock.plist\")

@@ -51,7 +51,7 @@ if IS_WIN_FROZEN:
     import win_support
 IS_APP_BUNDLE = (not IS_WINDOWS) and (".app/Contents/Resources" in TOOLBOX_DIR or not os.access(TOOLBOX_DIR, os.W_OK))
 
-APP_VERSION = "2.8.15"
+APP_VERSION = "2.8.16"
 DEFAULT_GITHUB_REPO = os.environ.get("POWERUP_GITHUB_REPO", "become/powerup-toolbox")
 DEFAULT_GITHUB_BRANCH = os.environ.get("POWERUP_GITHUB_BRANCH", "main")
 
@@ -2992,6 +2992,17 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": str(e)})
             return
 
+        if route == "/api/restore-browser":
+            if sys.platform != "darwin" or not os.path.isfile(DEFAULT_HANDLERS_BIN):
+                self.send_json({"ok": True, "message": "非 macOS 系統無須重設"})
+                return
+            try:
+                out = subprocess.check_output([DEFAULT_HANDLERS_BIN, "--restore-browser"], timeout=10)
+                self.send_json(json.loads(out.decode("utf-8")))
+            except Exception as e:
+                self.send_json({"ok": False, "error": str(e)}, 500)
+            return
+
         if route == "/api/gphotos/status":
             self.send_json(gphotos.get_status() if gphotos else {"ok": False, "error": "Google Photos 模組未載入"})
             return
@@ -4002,6 +4013,17 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": str(e)})
             return
 
+        if route == "/api/restore-browser":
+            if sys.platform != "darwin" or not os.path.isfile(DEFAULT_HANDLERS_BIN):
+                self.send_json({"ok": True, "message": "非 macOS 系統無須重設"})
+                return
+            try:
+                out = subprocess.check_output([DEFAULT_HANDLERS_BIN, "--restore-browser"], timeout=10)
+                self.send_json(json.loads(out.decode("utf-8")))
+            except Exception as e:
+                self.send_json({"ok": False, "error": str(e)}, 500)
+            return
+
         if route == "/api/pdf-interact":
             # the page reports that the user clicked inside the built-in PDF viewer (window blur with the PDF frame active):
             # the shell uses it to tell a PDF link click from a script-driven navigation (see windows/launcher.py)
@@ -4810,6 +4832,13 @@ def main():
         LAST_OPEN_REQUEST["path"] = abs_p
         LAST_OPEN_REQUEST["type"] = detect_file_type(abs_p)
         LAST_OPEN_REQUEST["timestamp"] = time.time()
+
+    # Proactively ensure MacToolbox never interferes with the system default web browser
+    if sys.platform == "darwin" and os.path.isfile(DEFAULT_HANDLERS_BIN):
+        try:
+            subprocess.Popen([DEFAULT_HANDLERS_BIN, "--restore-browser"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
 
     server = ReusableThreadingHTTPServer(("127.0.0.1", port), ToolboxHandler)
     print(f"MacToolbox Server running on http://127.0.0.1:{port}", flush=True)

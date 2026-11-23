@@ -1,7 +1,7 @@
 {
-  "version": "2.8.15",
+  "version": "2.8.16",
   "name": "PowerUp Toolbox",
-  "release_date": "2026-11-22",
+  "release_date": "2026-11-23",
   "min_macos": "12.0",
   "latest_dmg": "MacToolbox-latest.dmg",
   "latest_pkg": "MacToolbox-latest.pkg",
@@ -11,7 +11,7 @@
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
-    "version": "2.8.15",
+    "version": "2.8.16",
     "min_macos": "12.0",
     "latest_dmg": "MacToolbox-latest.dmg",
     "latest_pkg": "MacToolbox-latest.pkg",
@@ -26,11 +26,11 @@
     "size": 40917919
   },
   "changelog": [
+    "🌐 預設瀏覽器防干擾與自動修復：徹底自系統登記中剔除 HTML 網頁關聯，確保絕不影響 macOS 預設瀏覽器與 LINE / 即時通訊內的網址開啟；啟動時與安裝時自動將網址與網頁協議還原給 Chrome / Safari，並於設定視窗提供一鍵還原按鈕",
     "📂 開啟檔案所在目錄：支援 macOS Finder 與 Windows 檔案總管一鍵開啟檔案所在資料夾並精準標記（中央上方檢視區 HUD「🧭 所在目錄」、頂部系統列與側欄皆可呼叫，支援快捷鍵 ⌥⌘R / Ctrl+Alt+R）",
     "✨ 圖片工具面板精簡優化：移除需本機 Python/PyTorch 權重檔的實驗性 AI 功能與 Codex CLI，保留 100% 穩定且開箱即用的 macOS 原生 Apple Vision 工具（一鍵去背、OCR 繁中/英文辨識、人臉偵測、無損縮放與裁切比對）",
     "🖼️ 圖片檢視防模糊保護：適應視窗模式維持最高 100% 原始解析度不強制拉大，裁切工具列全面適應高解析度畫面不遮擋",
     "🔎 文件內關鍵字即時搜尋：全面支援 Excel、CSV、Word、PDF、Markdown 與程式碼按 ⌘F / Ctrl+F 即時搜尋字串，高亮標註、跳轉符合項目與即時結果計數",
-    "📊 零相依 Office 檔案極速解析：內建純 Python 標準庫解析引擎，無須安裝 openpyxl 或 python-docx 即可在任何乾淨系統完美開啟 .xlsx / .docx / .pptx 試算表與文件",
     "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證認證"
   ]
 }

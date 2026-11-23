@@ -2179,7 +2179,7 @@
       <div class="brand">
         <img src="/assets/apple-touch-icon.png" style="width:20px; height:20px; border-radius:5px; vertical-align:middle; margin-right:3px; object-fit:cover;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" alt="PowerUp Toolbox" />
         <span>PowerUp Toolbox</span>
-        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.15 · 點擊手動檢查更新">v2.8.15</span>
+        <span class="app-version-badge" id="appVersionBadge" onclick="checkAppUpdates(false)" title="目前版本 v2.8.16 · 點擊手動檢查更新">v2.8.16</span>
         <span id="currentModePill" class="mode-pill image">🖼️ 圖片模式</span>
       </div>
     </div>
@@ -2312,7 +2312,7 @@
       <button class="btn topbar-sys-btn" id="btnFileAssociations" onclick="openFileAssociationModal(false)" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="自訂預設開啟程式（隨時設定哪些副檔名由本工具開啟）">
         <span style="font-size:12px;">📂</span><span class="label-text" id="lblFileAssoc"> 預設開啟</span>
       </button>
-      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.15)">
+      <button class="btn topbar-sys-btn" id="btnAppUpdatePill" onclick="handleUpdatePillClick()" style="align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s ease;" title="手動檢查版本更新 (目前版本 v2.8.16)">
         <span id="icoUpdateStatus">⚡</span><span class="label-text" id="lblUpdatePill"> 檢查更新</span>
       </button>
       <button class="btn topbar-sys-btn" onclick="toggleAppLanguage()" id="appLangBtn" title="切換語言 / Switch Language (繁中 ⇋ English)" style="border: 1px solid rgba(255,255,255,0.18);">
@@ -3462,6 +3462,11 @@
     await loadBookmarks();
     await loadRecentFiles();
     await checkPendingOpen();
+
+    // Proactively heal default browser if any older version touched public.html/browser associations
+    if (!IS_WIN) {
+      fetch('/api/restore-browser').catch(() => {});
+    }
 
     if (!currentDir) {
       await loadDirectory(initialPath, initialPath || null, true);
@@ -10296,7 +10301,7 @@
       const data = await res.json();
       if (data && data.ok) {
         latestUpdateInfo = data;
-        const curVer = data.current_version || "2.8.15";
+        const curVer = data.current_version || "2.8.16";
         const badge = document.getElementById("appVersionBadge");
         if (badge) {
           badge.textContent = "v" + curVer;
@@ -10366,7 +10371,7 @@
   function showUpdateModal(forceLatest = false) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.15";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.16";
     const hasUpd = (latestUpdateInfo && latestUpdateInfo.has_update) && !forceLatest;
     const latestVer = (latestUpdateInfo && latestUpdateInfo.latest_version) || curVer;
 
@@ -10430,8 +10435,8 @@
   function showRestartModal(installedVer) {
     const modal = document.getElementById("updateModal");
     if (!modal) return;
-    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.15";
-    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.15";
+    const curVer = (latestUpdateInfo && latestUpdateInfo.current_version) || "2.8.16";
+    const newVer = installedVer || (latestUpdateInfo && latestUpdateInfo.installed_version) || "2.8.16";
 
     const titleEl = document.getElementById("modalUpdateTitle");
     const badgeEl = document.getElementById("modalUpdateVersionBadge");
@@ -10702,9 +10707,8 @@
     updateFileAssocSummary();
     const card = document.getElementById("fileAssocCard_" + key);
     if (card) {
-      const isHtml = (key === "html");
       card.style.background = checked ? 'rgba(16,185,129,0.06)' : 'rgba(0,0,0,0.3)';
-      card.style.borderColor = checked ? 'rgba(16,185,129,0.35)' : (isHtml ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)');
+      card.style.borderColor = checked ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)';
       const badgeSpan = card.querySelector(".assoc-card-badge");
       if (badgeSpan) {
         badgeSpan.style.color = checked ? '#34d399' : '#60a5fa';
@@ -10767,16 +10771,14 @@
       for (const item of list) {
         const checked = fileAssocSelectedKeys.has(item.key);
         const isCurrentToolbox = item.is_default;
-        const isHtml = (item.key === "html");
 
         html += `
-          <label id="fileAssocCard_${escapeHtml(item.key)}" style="display:flex; align-items:flex-start; gap:9px; background:${checked ? 'rgba(16,185,129,0.06)' : 'rgba(0,0,0,0.3)'}; border:1px solid ${checked ? 'rgba(16,185,129,0.35)' : (isHtml ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)')}; border-radius:8px; padding:9px 10px; cursor:pointer; user-select:none; transition:all 0.15s ease;">
+          <label id="fileAssocCard_${escapeHtml(item.key)}" style="display:flex; align-items:flex-start; gap:9px; background:${checked ? 'rgba(16,185,129,0.06)' : 'rgba(0,0,0,0.3)'}; border:1px solid ${checked ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}; border-radius:8px; padding:9px 10px; cursor:pointer; user-select:none; transition:all 0.15s ease;">
             <input type="checkbox" class="file-assoc-chk" data-key="${escapeHtml(item.key)}" ${checked ? 'checked' : ''} onchange="onFileAssocToggle('${escapeHtml(item.key)}', this.checked)" style="margin-top:2px; cursor:pointer; accent-color:#3b82f6;">
             <div style="flex:1; min-width:0;">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:2px;">
                 <span style="font-size:12px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(item.name)}</span>
                 ${item.recommended ? '<span style="background:rgba(59,130,246,0.25); color:#93c5fd; font-size:9px; padding:1px 5px; border-radius:4px; font-weight:700;">推薦</span>' : ''}
-                ${isHtml ? '<span style="background:rgba(245,158,11,0.2); color:#fcd34d; font-size:9px; padding:1px 5px; border-radius:4px;">保留瀏覽器</span>' : ''}
               </div>
               <div style="font-size:11px; color:#94a3b8; font-family:'SF Mono',Menlo,monospace; margin-bottom:4px;">${escapeHtml(item.exts.join(" "))}</div>
               <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; font-size:10px;">
@@ -10873,6 +10875,25 @@
     try {
       localStorage.setItem("powerup_file_assoc_prompted_done", "1");
     } catch(e){}
+  }
+
+  async function restoreSystemDefaultBrowser() {
+    const statusMsg = document.getElementById("fileAssocStatusMsg");
+    if (statusMsg) statusMsg.innerHTML = `<span style="color:#93c5fd;">⏳ 正在重設預設瀏覽器...</span>`;
+    showToast("⏳ 正在重設系統預設網頁瀏覽器...");
+    try {
+      const res = await fetch('/api/restore-browser', { method: 'POST' });
+      const data = await res.json();
+      if (data && data.ok) {
+        showToast("🌐 " + (data.message || "已成功恢復系統預設網頁瀏覽器！"), 5000);
+        if (statusMsg) statusMsg.innerHTML = `<span style="color:#34d399; font-weight:700;">✅ 已重設為 ${escapeHtml(data.browser_name || '系統瀏覽器')}</span>`;
+      } else {
+        showToast("⚠️ " + (data && data.error ? data.error : "重設失敗，請於系統設定中選取預設瀏覽器"), 5000);
+        if (statusMsg) statusMsg.innerHTML = `<span style="color:#f87171;">❌ 重設失敗</span>`;
+      }
+    } catch (e) {
+      showToast("⚠️ 無法連線至服務重設瀏覽器");
+    }
   }
 
   /* =========================================================
@@ -11958,7 +11979,7 @@
           <img src="/assets/apple-touch-icon.png" style="width:36px; height:36px; border-radius:8px;" onerror="this.onerror=null; this.src='/assets/app_icon.png';" />
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:#fff;" id="modalUpdateTitle">🎉 發現 PowerUp Toolbox 新版本！</h3>
-            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.15</span>
+            <span style="font-size:12px; color:#94a3b8;" id="modalUpdateVersionBadge">目前版本: v2.8.16</span>
           </div>
         </div>
         <button onclick="closeUpdateModal()" style="background:transparent; border:none; color:#64748b; font-size:20px; cursor:pointer; line-height:1;">✕</button>
@@ -12025,7 +12046,10 @@
 
       <!-- Modal Footer -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08);">
-        <span id="fileAssocStatusMsg" style="font-size:12px; color:#94a3b8;"></span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn" onclick="restoreSystemDefaultBrowser()" style="padding:6px 11px; font-size:11.5px; border-color:rgba(59,130,246,0.35); color:#93c5fd;" title="強制將 macOS 預設網頁瀏覽器與網址連結恢復為系統原裝 Chrome 或 Safari">🌐 恢復預設瀏覽器</button>
+          <span id="fileAssocStatusMsg" style="font-size:12px; color:#94a3b8;"></span>
+        </div>
         <div style="display:flex; gap:10px;">
           <button class="btn" onclick="closeFileAssociationModal()" style="padding:7px 14px; font-size:12px;">關閉</button>
           <button class="btn btn-primary" id="btnSaveFileAssoc" onclick="saveFileAssociations()" style="padding:7px 18px; font-size:12px; background:linear-gradient(135deg, #2563eb, #1d4ed8); border:none; color:#fff; font-weight:700; cursor:pointer;">💾 儲存並套用設定</button>
