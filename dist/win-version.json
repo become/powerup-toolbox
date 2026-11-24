@@ -1,14 +1,15 @@
 {
-    "version":  "2.8.10",
-    "name":  "PowerUp Toolbox for Windows",
-    "release_date":  "2026-11-20",
-    "asset":  "PowerUpToolbox-portable.zip",
-    "sha256":  "745ea0248afb52b1d01dcae250b7e74ac31473660cc013ac6fc4c29562357091",
-    "size":  40917919,
-    "changelog":  [
-                      "文件內關鍵字即時搜尋：全面支援 Excel、CSV、Word、PDF、Markdown 按 Ctrl+F 即時搜尋字串、高亮標註、跳轉符合項目與計數",
-                      "零相依 Office 檔案極速解析：內建純 Python 標準庫解析引擎，無須額外套件即可完美開啟 .xlsx / .docx / .pptx",
-                      "修正前端重複宣告變數問題，確保啟動與開啟檔案順暢無阻",
-                      "支援文件與程式碼視圖雙指/滾輪縮放"
-                  ]
+  "version": "2.9.0",
+  "name": "PowerUp Toolbox for Windows",
+  "release_date": "2026-11-24",
+  "asset": "PowerUpToolbox-portable.zip",
+  "sha256": "c7d716275e7146cdd6a938e5c1b3962763487fd129d85dbb422f7ec0d176c1bb",
+  "size": 40927058,
+  "changelog": [
+    "☁️ 雲端備份與遠端同步中心：對接 Google Photos、Google Drive、OneDrive，一鍵備份相片與文件，即時偵測本機雲端硬碟同步目錄",
+    "💾 全格式檔案儲存狀態即時監控：未存檔即時警示 ●、快捷鍵 Ctrl+S 一鍵存檔、另存新檔 (Save As) 與防未存檔關閉防護",
+    "🎨 多角色體驗檢視調校：針對一般辦公文書、攝影創作、工程數據分析與初學者全面調校 UI 排版與互動體驗",
+    "🖼️ 裁切畫面與高解析度視窗精準度優化：修復裁切尺寸標籤排版折行問題，維持原寸清晰度防模糊",
+    "📂 開啟檔案所在目錄：Windows 檔案總管一鍵呼叫並精準定位標記檔案 (Ctrl+Alt+R)"
+  ]
 }

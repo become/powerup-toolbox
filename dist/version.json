@@ -7,7 +7,7 @@
   "latest_pkg": "MacToolbox-latest.pkg",
   "dmg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.dmg",
   "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg",
-  "windows_version": "2.8.10",
+  "windows_version": "2.9.0",
   "windows_zip": "PowerUpToolbox-portable.zip",
   "windows_zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
   "macos": {
@@ -19,11 +19,11 @@
     "pkg_url": "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
   },
   "windows": {
-    "version": "2.8.10",
+    "version": "2.9.0",
     "latest_zip": "PowerUpToolbox-portable.zip",
     "zip_url": "https://powerup.dancingarden.com/downloads/toolbox/PowerUpToolbox-portable.zip",
-    "sha256": "745ea0248afb52b1d01dcae250b7e74ac31473660cc013ac6fc4c29562357091",
-    "size": 40917919
+    "sha256": "c7d716275e7146cdd6a938e5c1b3962763487fd129d85dbb422f7ec0d176c1bb",
+    "size": 40927058
   },
   "changelog": [
     "☁️ 雲端備份與遠端同步中心：對接 Google Photos、Google Drive、iCloud、OneDrive，一鍵備份相片與文件，即時偵測本機雲端硬碟同步目錄",
