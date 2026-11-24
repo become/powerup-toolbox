@@ -413,38 +413,88 @@
   .crumb-seg.current { color: #93c5fd; font-weight: 700; background: rgba(59,130,246,0.14); }
   .crumb-sep { color: #475569; font-size: 10px; user-select: none; }
 
-  /* Type Filter Pills & Sort Controls */
+  /* Type Filter Pills (全部 vs 對應格式 單選控制) */
   .type-pills {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 3px;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
     margin-bottom: 6px;
+    position: relative;
   }
   .type-pill {
     background: var(--bg-0);
     border: 1px solid var(--border);
     color: var(--muted);
-    border-radius: 6px;
-    padding: 4px 2px;
-    font-size: 10.5px;
+    border-radius: 7px;
+    padding: 5px 8px;
+    font-size: 11.5px;
     font-weight: 600;
     cursor: pointer;
-    display: flex;
-    flex-direction: column;
+    display: inline-flex;
     align-items: center;
-    gap: 1px;
-    transition: all 0.12s;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    user-select: none;
+    line-height: 1.2;
   }
-  .type-pill:hover { background: var(--bg-2); color: var(--text); }
+  .type-pill:hover { background: var(--bg-2); color: var(--text); border-color: #3b4252; }
   .type-pill.active {
     background: rgba(59, 130, 246, 0.22);
-    border-color: var(--accent);
-    color: #fff;
+    border-color: rgba(59, 130, 246, 0.65);
+    color: #93c5fd;
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
   }
   .type-pill .cnt {
-    font-size: 9.5px;
-    font-family: "SF Mono", monospace;
-    opacity: 0.75;
+    font-size: 10px;
+    font-family: "SF Mono", Menlo, monospace;
+    opacity: 0.85;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .type-pill.active .cnt {
+    background: rgba(59, 130, 246, 0.25);
+    color: #fff;
+  }
+
+  .format-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 120;
+    min-width: 155px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+    padding: 4px;
+  }
+  .format-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 9px;
+    font-size: 11.5px;
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .format-menu-item:hover {
+    background: var(--bg-2);
+  }
+  .format-menu-item.active {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+    font-weight: 700;
+  }
+  .format-menu-item .cnt {
+    color: var(--muted);
+    font-size: 10px;
+    font-family: "SF Mono", Menlo, monospace;
   }
 
   .sort-bar {
@@ -2405,34 +2455,21 @@
         </div>
 
         <div class="type-pills">
-          <button class="type-pill active" id="typeAllBtn" onclick="setTypeFilter('all')">
+          <button class="type-pill active" id="typeAllBtn" onclick="setTypeFilter('all')" style="flex:1;" title="顯示此目錄所有檔案">
             <span>全部</span>
             <span class="cnt" id="cntAll">0</span>
           </button>
-          <button class="type-pill" id="typeImgBtn" onclick="setTypeFilter('image')">
-            <span>🖼️ 圖</span>
-            <span class="cnt" id="cntImg">0</span>
+          <button class="type-pill" id="typeFormatBtn" onclick="toggleActiveFormatFilter()" style="flex:1.2; overflow:hidden; text-overflow:ellipsis;" title="僅篩選對應檔案格式">
+            <span id="activeFormatIcon">📝</span>
+            <span id="activeFormatLabel">MD</span>
+            <span class="cnt" id="cntFormat">0</span>
           </button>
-          <button class="type-pill" id="typeMdBtn" onclick="setTypeFilter('markdown')">
-            <span>📝 MD</span>
-            <span class="cnt" id="cntMd">0</span>
-          </button>
-          <button class="type-pill" id="typeCodeBtn" onclick="setTypeFilter('code')" title="篩選程式碼與文字檔 (Java / Groovy / GSP / HTML / JS / CSS / TXT...)">
-            <span>💻 程式碼</span>
-            <span class="cnt" id="cntCode">0</span>
-          </button>
-          <button class="type-pill" id="typeJsonBtn" onclick="setTypeFilter('json')" title="篩選 JSON / XML / PLIST 結構檔">
-            <span>🧩 JSON/XML</span>
-            <span class="cnt" id="cntJson">0</span>
-          </button>
-          <button class="type-pill" id="typeCsvBtn" onclick="setTypeFilter('csv')">
-            <span>📊 CSV</span>
-            <span class="cnt" id="cntCsv">0</span>
-          </button>
-          <button class="type-pill" id="typeOfficeBtn" onclick="setTypeFilter('office')" title="篩選 Word / PowerPoint / Excel / PDF 檔案">
-            <span>📎 文書/PDF</span>
-            <span class="cnt" id="cntOffice">0</span>
-          </button>
+          <div style="position:relative; flex-shrink:0;">
+            <button class="type-pill" id="typeMoreFormatsBtn" onclick="toggleFormatMenu(event)" style="padding:5px 7px; height:100%; min-width:24px;" title="選擇其他檔案格式篩選">
+              <span style="font-size:9.5px; color:var(--muted);">▾</span>
+            </button>
+            <div id="formatDropdownMenu" class="format-dropdown"></div>
+          </div>
         </div>
 
         <div class="sort-bar">
@@ -3505,6 +3542,17 @@
       if (tourActive) positionTourElements();
     });
 
+    // Dismiss format dropdown menu when clicking outside
+    document.addEventListener("click", (e) => {
+      const menu = document.getElementById("formatDropdownMenu");
+      const btn = document.getElementById("typeMoreFormatsBtn");
+      if (menu && menu.style.display === "block") {
+        if (!menu.contains(e.target) && !btn.contains(e.target)) {
+          menu.style.display = "none";
+        }
+      }
+    });
+
     setInterval(checkPendingOpen, 1200);
     setInterval(pollMarkdownLiveReload, 2000);
     setupDragAndDrop();
@@ -3931,16 +3979,120 @@
     return t === "json" || t === "xml";
   }
 
+  const FORMAT_CONFIG = {
+    image:    { label: "圖片",     icon: "🖼️", short: "圖" },
+    markdown: { label: "Markdown", icon: "📝", short: "MD" },
+    code:     { label: "程式碼",   icon: "💻", short: "程式碼" },
+    json:     { label: "JSON/XML", icon: "🧩", short: "JSON/XML" },
+    csv:      { label: "CSV",      icon: "📊", short: "CSV" },
+    office:   { label: "文書/PDF", icon: "📎", short: "文書/PDF" }
+  };
+
+  let currentFocusCategory = "markdown";
+  let categoryCounts = { all: 0, image: 0, markdown: 0, code: 0, json: 0, csv: 0, office: 0 };
+
+  function getCategoryForType(t) {
+    if (!t) return "markdown";
+    if (isOfficeType(t)) return "office";
+    if (isStructuredType(t)) return "json";
+    if (t === "csv") return "csv";
+    if (t === "code") return "code";
+    if (t === "markdown") return "markdown";
+    if (t === "image") return "image";
+    return "image";
+  }
+
+  function detectClientFileType(ext) {
+    if (!ext) return null;
+    ext = ext.toLowerCase();
+    if (["md", "markdown", "mdown"].includes(ext)) return "markdown";
+    if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "heic", "svg", "tiff"].includes(ext)) return "image";
+    if (["csv", "tsv"].includes(ext)) return "csv";
+    if (["json", "xml", "plist"].includes(ext)) return "json";
+    if (["pptx", "docx", "xlsx", "pdf"].includes(ext)) return "office";
+    return "code";
+  }
+
+  function updateTypePills() {
+    const isAll = (typeFilter === "all");
+    const allBtn = document.getElementById("typeAllBtn");
+    const fmtBtn = document.getElementById("typeFormatBtn");
+
+    if (allBtn) allBtn.classList.toggle("active", isAll);
+    if (fmtBtn) fmtBtn.classList.toggle("active", !isAll && typeFilter === currentFocusCategory);
+
+    const cfg = FORMAT_CONFIG[currentFocusCategory] || FORMAT_CONFIG.markdown;
+    const iconEl = document.getElementById("activeFormatIcon");
+    const labelEl = document.getElementById("activeFormatLabel");
+    const cntFmtEl = document.getElementById("cntFormat");
+
+    if (iconEl) iconEl.textContent = cfg.icon;
+    if (labelEl) labelEl.textContent = cfg.short;
+    if (cntFmtEl) cntFmtEl.textContent = categoryCounts[currentFocusCategory] || 0;
+  }
+
   function setTypeFilter(t) {
     typeFilter = t;
-    document.getElementById("typeAllBtn").classList.toggle("active", t === "all");
-    document.getElementById("typeImgBtn").classList.toggle("active", t === "image");
-    document.getElementById("typeMdBtn").classList.toggle("active", t === "markdown");
-    document.getElementById("typeCodeBtn").classList.toggle("active", t === "code");
-    document.getElementById("typeJsonBtn").classList.toggle("active", t === "json");
-    document.getElementById("typeCsvBtn").classList.toggle("active", t === "csv");
-    document.getElementById("typeOfficeBtn").classList.toggle("active", t === "office");
+    if (t !== "all") {
+      currentFocusCategory = t;
+    }
+    updateTypePills();
     applyFilter();
+  }
+
+  function toggleActiveFormatFilter() {
+    if (typeFilter === currentFocusCategory) {
+      // 保持單選選取
+      return;
+    }
+    setTypeFilter(currentFocusCategory);
+  }
+
+  function toggleFormatMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById("formatDropdownMenu");
+    if (!menu) return;
+    if (menu.style.display === "block") {
+      menu.style.display = "none";
+      return;
+    }
+    renderFormatMenu();
+    menu.style.display = "block";
+  }
+
+  function renderFormatMenu() {
+    const menu = document.getElementById("formatDropdownMenu");
+    if (!menu) return;
+    const cats = [
+      { key: "image",    icon: "🖼️", label: "圖 (圖片)" },
+      { key: "markdown", icon: "📝", label: "MD (Markdown)" },
+      { key: "code",     icon: "💻", label: "程式碼" },
+      { key: "json",     icon: "🧩", label: "JSON/XML" },
+      { key: "csv",      icon: "📊", label: "CSV" },
+      { key: "office",   icon: "📎", label: "文書/PDF" }
+    ];
+    let html = `<div style="font-size:10px; color:var(--muted); padding:3px 8px; font-weight:700; border-bottom:1px solid var(--border); margin-bottom:3px;">選擇篩選格式</div>`;
+    html += cats.map(c => {
+      const cnt = categoryCounts[c.key] || 0;
+      const isCur = currentFocusCategory === c.key && typeFilter === c.key;
+      return `
+        <div class="format-menu-item ${isCur ? 'active' : ''}" onclick="selectDropdownFormat('${c.key}')">
+          <span style="display:flex; align-items:center; gap:6px;">
+            <span>${c.icon}</span>
+            <span>${c.label}</span>
+          </span>
+          <span class="cnt">${cnt}</span>
+        </div>
+      `;
+    }).join("");
+    menu.innerHTML = html;
+  }
+
+  function selectDropdownFormat(catKey) {
+    const menu = document.getElementById("formatDropdownMenu");
+    if (menu) menu.style.display = "none";
+    currentFocusCategory = catKey;
+    setTypeFilter(catKey);
   }
 
   async function loadDirectory(path = "", focusFile = null, forceOpen = false) {
@@ -3982,16 +4134,20 @@
 
     // A folder path passed as "focus" (e.g. launched with a folder) is not a file target.
     const target = data.focus_file || ((focusFile && focusFile !== path) ? focusFile : null);
-    const focusMatchesFilter = (typeFilter === "all") ||
-      (typeFilter === "office" && isOfficeType(data.focus_type)) ||
-      (typeFilter === "json" && isStructuredType(data.focus_type)) ||
-      (typeFilter === data.focus_type);
-    if (target && data.focus_type && !focusMatchesFilter) {
-      typeFilter = "all";
-      ["typeAllBtn", "typeImgBtn", "typeMdBtn", "typeCodeBtn", "typeJsonBtn", "typeCsvBtn", "typeOfficeBtn"].forEach(id => {
-        document.getElementById(id).classList.toggle("active", id === "typeAllBtn");
-      });
+
+    // 檔案直接打開時，預設是指針對單一檔案格式就好
+    if (target && data.focus_type) {
+      currentFocusCategory = getCategoryForType(data.focus_type);
+      typeFilter = currentFocusCategory;
+    } else if (target) {
+      const ext = (target.split('.').pop() || '').toLowerCase();
+      const inferred = detectClientFileType(ext);
+      if (inferred) {
+        currentFocusCategory = getCategoryForType(inferred);
+        typeFilter = currentFocusCategory;
+      }
     }
+    updateTypePills();
 
     // Entering a folder (no specific file requested). With the opt-in auto thumbnail wall, switch to the wall
     // and do NOT auto-open the first file (avoids an async load racing the view switch).
@@ -4032,13 +4188,21 @@
     const csvCount = kwMatched.filter(x => x.type === "csv").length;
     const officeCount = kwMatched.filter(x => isOfficeType(x.type)).length;
 
-    document.getElementById("cntAll").textContent = kwMatched.length;
-    document.getElementById("cntImg").textContent = imgCount;
-    document.getElementById("cntMd").textContent = mdCount;
-    document.getElementById("cntCode").textContent = codeCount;
-    document.getElementById("cntJson").textContent = jsonCount;
-    document.getElementById("cntCsv").textContent = csvCount;
-    document.getElementById("cntOffice").textContent = officeCount;
+    categoryCounts = {
+      all: kwMatched.length,
+      image: imgCount,
+      markdown: mdCount,
+      code: codeCount,
+      json: jsonCount,
+      csv: csvCount,
+      office: officeCount
+    };
+
+    const cntAllEl = document.getElementById("cntAll");
+    if (cntAllEl) cntAllEl.textContent = kwMatched.length;
+    const cntFmtEl = document.getElementById("cntFormat");
+    if (cntFmtEl) cntFmtEl.textContent = categoryCounts[currentFocusCategory] || 0;
+    updateTypePills();
 
     const typeMatched = kwMatched.filter(item => {
       if (typeFilter === "all") return true;
@@ -4123,6 +4287,14 @@
 
     const item = filteredItems[currentIndex];
     activeFileObj = { ...item };
+
+    if (item && item.type) {
+      const cat = getCategoryForType(item.type);
+      if (cat !== currentFocusCategory) {
+        currentFocusCategory = cat;
+        updateTypePills();
+      }
+    }
 
     const displayName = item.name.split("/").pop();
     document.getElementById("hudFilename").textContent = displayName;
