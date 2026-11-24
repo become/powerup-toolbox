@@ -316,11 +316,17 @@ def check_github_update(repo=None, branch=None):
 
     # Priority 1: Official Website Update Endpoint (Works even when GitHub repo is Private!)
     try:
+        ts = int(time.time() * 1000)
+        cache_busted_url = f"{OFFICIAL_UPDATE_URL}?_t={ts}"
         req_official = urllib.request.Request(
-            OFFICIAL_UPDATE_URL,
-            headers={"User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)"}
+            cache_busted_url,
+            headers={
+                "User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache"
+            }
         )
-        with urllib.request.urlopen(req_official, timeout=3.5) as resp:
+        with urllib.request.urlopen(req_official, timeout=4.0) as resp:
             if resp.status == 200:
                 remote_data = json.loads(resp.read().decode("utf-8"))
                 update_source = "official_website"
@@ -329,13 +335,18 @@ def check_github_update(repo=None, branch=None):
 
     # Priority 2: GitHub Contents API (Instant 0-delay real-time commit data)
     if not remote_data:
-        api_url = f"https://api.github.com/repos/{repo}/contents/dist/version.json?ref={branch}"
+        ts = int(time.time() * 1000)
+        api_url = f"https://api.github.com/repos/{repo}/contents/dist/version.json?ref={branch}&_t={ts}"
         req_api = urllib.request.Request(
             api_url,
-            headers={"User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)"}
+            headers={
+                "User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache"
+            }
         )
         try:
-            with urllib.request.urlopen(req_api, timeout=3.5) as resp:
+            with urllib.request.urlopen(req_api, timeout=4.0) as resp:
                 if resp.status == 200:
                     raw_api = json.loads(resp.read().decode("utf-8"))
                     content_b64 = raw_api.get("content", "")
@@ -347,13 +358,18 @@ def check_github_update(repo=None, branch=None):
 
     # Priority 3: Raw GitHub URL fallback
     if not remote_data:
-        raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/dist/version.json"
+        ts = int(time.time() * 1000)
+        raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/dist/version.json?_t={ts}"
         req_raw = urllib.request.Request(
             raw_url,
-            headers={"User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)"}
+            headers={
+                "User-Agent": f"MacToolbox/{APP_VERSION} (AutoUpdater)",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache"
+            }
         )
         try:
-            with urllib.request.urlopen(req_raw, timeout=3.5) as resp:
+            with urllib.request.urlopen(req_raw, timeout=4.0) as resp:
                 if resp.status == 200:
                     remote_data = json.loads(resp.read().decode("utf-8"))
                     update_source = "github_raw"
@@ -2920,7 +2936,9 @@ class ToolboxHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
@@ -3983,6 +4001,9 @@ class ToolboxHandler(BaseHTTPRequestHandler):
             if not pkg_url:
                 pkg_url = "https://powerup.dancingarden.com/downloads/toolbox/MacToolbox-latest.pkg"
 
+            ts = int(time.time() * 1000)
+            pkg_url_busted = f"{pkg_url}?_t={ts}" if "?" not in pkg_url else f"{pkg_url}&_t={ts}"
+
             MAC_UPDATE_STATE["state"] = "downloading"
             MAC_UPDATE_STATE["target_version"] = target_version
             MAC_UPDATE_STATE["message"] = "正在下載最新安裝包..."
@@ -3991,30 +4012,70 @@ class ToolboxHandler(BaseHTTPRequestHandler):
                 import urllib.request
                 dest = "/tmp/MacToolbox-Update.pkg"
                 try:
-                    req = urllib.request.Request(pkg_url, headers={"User-Agent": f"MacToolbox/{APP_VERSION}"})
-                    with urllib.request.urlopen(req, timeout=45.0) as resp, open(dest, "wb") as out:
+                    req = urllib.request.Request(
+                        pkg_url_busted,
+                        headers={
+                            "User-Agent": f"MacToolbox/{APP_VERSION}",
+                            "Cache-Control": "no-cache, no-store, must-revalidate",
+                            "Pragma": "no-cache"
+                        }
+                    )
+                    with urllib.request.urlopen(req, timeout=60.0) as resp, open(dest, "wb") as out:
                         shutil.copyfileobj(resp, out)
                     _mac_popen(["/usr/bin/xattr", "-cr", dest])
 
                     MAC_UPDATE_STATE["state"] = "installing"
                     MAC_UPDATE_STATE["message"] = "已啟動 macOS 安裝引導，請在系統視窗完成安裝..."
-                    _mac_popen(["/usr/bin/open", dest])
+                    _mac_popen(["/usr/bin/open", "-a", "Installer", dest])
+                    _mac_popen(["/usr/bin/osascript", "-e", 'tell application "Installer" to activate'])
 
                     # Monitor /Applications/MacToolbox.app/Contents/Info.plist for completion
-                    for _ in range(300):
+                    for i in range(300):
                         time.sleep(1.0)
                         cur_installed = get_installed_macos_version()
-                        if cur_installed and compare_versions(cur_installed, APP_VERSION) > 0:
-                            MAC_UPDATE_STATE["state"] = "ready_to_restart"
-                            MAC_UPDATE_STATE["installed_version"] = cur_installed
-                            MAC_UPDATE_STATE["message"] = f"新版本 v{cur_installed} 已安裝完成！是否要立即重新啟動應用程式？"
-                            return
+                        if cur_installed:
+                            is_target = bool(target_version and compare_versions(cur_installed, target_version) >= 0)
+                            is_newer = bool(compare_versions(cur_installed, APP_VERSION) > 0)
+                            if is_target or is_newer:
+                                MAC_UPDATE_STATE["state"] = "ready_to_restart"
+                                MAC_UPDATE_STATE["installed_version"] = cur_installed
+                                MAC_UPDATE_STATE["message"] = f"新版本 v{cur_installed} 已安裝完成！是否要立即重新啟動應用程式？"
+                                return
+
+                        # If user closed Installer window after 15 seconds, exit cleanly
+                        if i >= 15:
+                            chk = subprocess.run(["/usr/bin/pgrep", "-x", "Installer"], stdout=subprocess.DEVNULL)
+                            if chk.returncode != 0:
+                                cur_installed = get_installed_macos_version()
+                                if cur_installed and (compare_versions(cur_installed, target_version or "999") >= 0 or compare_versions(cur_installed, APP_VERSION) > 0):
+                                    MAC_UPDATE_STATE["state"] = "ready_to_restart"
+                                    MAC_UPDATE_STATE["installed_version"] = cur_installed
+                                    return
+                                else:
+                                    MAC_UPDATE_STATE["state"] = "idle"
+                                    MAC_UPDATE_STATE["message"] = "安裝視窗已關閉。若尚未安裝完成，請重新點擊升級或在 Finder 開啟安裝包。"
+                                    return
                 except Exception as err:
                     MAC_UPDATE_STATE["state"] = "failed"
                     MAC_UPDATE_STATE["message"] = f"更新失敗: {err}"
 
             threading.Thread(target=do_download_and_install, daemon=True).start()
             self.send_json({"ok": True, "message": "已開始背景下載最新安裝包，完成後將自動啟動 macOS 安裝引導。"})
+            return
+
+        if route == "/api/reveal-update-pkg":
+            dest = "/tmp/MacToolbox-Update.pkg"
+            if os.path.exists(dest):
+                reveal_in_file_manager(dest)
+                self.send_json({"ok": True, "path": dest})
+            else:
+                self.send_json({"ok": False, "error": "尚未下載安裝包"}, 404)
+            return
+
+        if route == "/api/reset-update-state":
+            MAC_UPDATE_STATE["state"] = "idle"
+            MAC_UPDATE_STATE["message"] = ""
+            self.send_json({"ok": True})
             return
 
         if route == "/api/restart":
