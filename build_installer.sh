@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="2.9.0"
+VERSION="2.9.1"
 APP_NAME="MacToolbox.app"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_TMP="$ROOT_DIR/.cache/pkg_build"
 
 # Keep Info.plist versions synchronized
 plutil -replace CFBundleShortVersionString -string "${VERSION}" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
-plutil -replace CFBundleVersion -string "2900" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
+plutil -replace CFBundleVersion -string "2910" "$ROOT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || true
 
 echo "🧪 [0/5] 語法檢查 (index.html 前端程式＋Python)..."
 # One SyntaxError in index.html's inline script disables the whole front end (v2.8.7 could not open files).
@@ -218,12 +218,12 @@ cat << EOF > "$DIST_DIR/version.json"
     "size": ${WIN_SIZE}
   },
   "changelog": [
-    "☁️ 雲端備份與遠端同步中心：對接 Google Photos、Google Drive、iCloud、OneDrive，一鍵備份相片與文件，即時偵測本機雲端硬碟同步目錄",
-    "💾 全格式檔案儲存狀態即時監控：未存檔即時警示 ●、快捷鍵 ⌘S 一鍵存檔、另存新檔 (Save As) 與防未存檔關閉防護",
-    "🎨 多角色體驗檢視調校：針對一般辦公文書、攝影創作、工程數據分析與初學者全面調校 UI 排版與互動體驗",
-    "🖼️ 裁切畫面與高解析度視窗精準度優化：修復裁切尺寸標籤排版折行問題，維持原寸清晰度防模糊",
+    "📁 智慧單選檔案篩選列：精簡為「全部」與「對應檔案格式」單選切換，附帶下拉選單可選其他格式",
+    "🎯 檔案直開自動聚焦單一格式：開啟特定檔案時預設僅篩選同類型格式，免除雜檔干擾",
+    "⚡ 一鍵升級零快取與即時回調防凍結：全面保證第一時間抓取最新發布，安裝視窗中斷自動恢復",
+    "☁️ 雲端備份與遠端同步中心：對接 Google Photos、Google Drive、iCloud、OneDrive，一鍵備份相片與文件",
+    "💾 全格式檔案儲存狀態即時監控：未存檔即時警示 ●、快捷鍵 ⌘S 一鍵存檔、另存新檔 (Save As)",
     "📂 開啟檔案所在目錄：跨平台一鍵呼叫 macOS Finder 與 Windows 檔案總管並精準定位標記檔案 (⌥⌘R)",
-    "🌐 預設瀏覽器防干擾保證：完全自系統中排除 HTML 網頁關聯，確保絕不影響 Chrome/Safari 與 LINE 連結開啟",
     "🍎 macOS 官方 Apple Developer ID 簽名與雲端公證認證"
   ]
 }
